@@ -155,7 +155,7 @@ play(const Options &given, const std::string &name, const GameList &games, Setti
 
 	const bool network = network_on(settings);
 	std::unique_ptr<OutputsNetwork> outputs =
-		network ? OutputsNetwork::open(game->name, game->outputs) : nullptr;
+		network ? OutputsNetwork::open(game->name, game->outputs, game->drive_first_output) : nullptr;
 
 	const std::unique_ptr<AudioOut> audio = open_sound(options, *game, settings);
 	/* The pads shake unless [players.<game>] says off */

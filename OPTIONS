@@ -210,7 +210,9 @@ apart by commas (see INPUTS below).
                                this computer (Hook Of The Reaper,
                                QMamehook, OutputHooker, the Sinden
                                software drive the light guns from it).
-                               Default off.
+                               NASCAR's drive board too, as m3ffb
+                               (BackForceFeeder drives a real one or a
+                               wheel from it). Default off.
 
 [network]
 

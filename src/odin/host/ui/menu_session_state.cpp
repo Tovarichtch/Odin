@@ -597,7 +597,7 @@ MenuSession::apply_link(const MenuState &was)
 	 * that runs */
 	if (now.network != was.network) {
 		if (now.network && m_game)
-			m_outputs = OutputsNetwork::open(m_game->name, m_game->outputs);
+			m_outputs = OutputsNetwork::open(m_game->name, m_game->outputs, m_game->drive_first_output);
 		else
 			m_outputs.reset();
 		m_menu_state.network_failed = now.network && m_game && !m_outputs;
