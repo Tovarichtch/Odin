@@ -451,8 +451,9 @@ Inputs and outputs
   and smoothing are guessed; a pad is not a shaker (audio_out.hpp).
 - The shaking of a light gun goes to an XGunner only; other guns
   (RetroShooter 3...) are not done yet (gun_serial.cpp).
-- The drive board of NASCAR is not sent on the network outputs yet
-  (outputs_network.cpp).
+- The command of the drive board of NASCAR goes out on the network
+  outputs (m3ffb), but the reply of a real board is not read back
+  (m3ffb_rx, as Supermodel and Flycast take it; outputs_network.cpp).
 
 Gaelco boards
 
