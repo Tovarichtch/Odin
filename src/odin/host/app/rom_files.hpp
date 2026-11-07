@@ -98,6 +98,10 @@ public:
 	 * whose CRC is not the one told is said on stderr, and taken, as MAME
 	 * does */
 	std::optional<std::vector<uint8_t>> read(const std::string &game, const File &file, std::string &where);
+	/* Whether the set MAME keeps that file of the game in is there, as a
+	 * folder or an archive (false: the set is missing whole, not a file
+	 * of it) */
+	bool set_there(const std::string &game, const File &file) const;
 
 private:
 	/* A file found: in a folder, or an entry of an archive */

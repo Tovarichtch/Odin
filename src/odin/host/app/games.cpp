@@ -275,8 +275,9 @@ player_of(const json_t *player)
 /* A control: {"name": ..., "id": ..., then "switch", "analog" with "low",
  * or "positions"; "role", and "player" when it is 2; a switch may have
  * "keys", a list of key names, "pad", a list of inputs of the gamepad,
- * and "wheel", a part of a known wheel; on a Gaelco board, "port" for a switch, "span" or "ball" for an
- * analog control}. */
+ * and "wheel", a part of a known wheel; an analog control that is no
+ * pedal "invertible"; on a Gaelco board, "port" for a switch, "span" or
+ * "ball" for an analog control}. */
 std::optional<GameControl>
 parse_control(const json_t *control)
 {
@@ -295,13 +296,15 @@ parse_control(const json_t *control)
 	const json_t *const pin = json_object_get(control, "port");
 	const json_t *const span = json_object_get(control, "span");
 	const json_t *const ball = json_object_get(control, "ball");
+	const json_t *const invertible = json_object_get(control, "invertible");
 	const auto parsed_role = role ? parse_role(role) : std::nullopt;
 
 	if (!name || !name[0] || !is_id(id) || (button != nullptr) + (analog != nullptr) + (positions != nullptr) != 1 ||
 	    !parsed_role || !player_right(player) ||
 	    (keys && (!button || !json_array_size(keys))) || (pad && (!button || !json_array_size(pad))) ||
 	    (wheel && (!button || !json_is_string(wheel))) ||
-	    (pin && !button) || ((span || ball) && !analog) || (span && ball))
+	    (pin && !button) || ((span || ball) && !analog) || (span && ball) ||
+	    (invertible && (!analog || !json_is_boolean(invertible))))
 		return std::nullopt;
 	if (pin) {
 		out.port = parse_pin(pin);
@@ -351,9 +354,10 @@ parse_control(const json_t *control)
 
 		if (!json_is_integer(analog) || json_integer_value(analog) < 0 || json_integer_value(analog) > 7 || !low)
 			return std::nullopt;
-		if (!role_is_analog(out.role))
+		if (!role_is_analog(out.role) || (json_is_true(invertible) && !GameControl::half(*low, false)))
 			return std::nullopt;
 		out.type = GameControl::Type::ANALOG;
+		out.invertible = json_is_true(invertible);
 		out.analog = static_cast<uint8_t>(json_integer_value(analog));
 		out.low = *low;
 		return out;

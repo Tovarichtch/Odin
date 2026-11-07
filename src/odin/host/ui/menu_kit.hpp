@@ -334,6 +334,9 @@ public:
 	/* A button of a gamepad drawn as a pill; its size first */
 	ImVec2 pill_size(const char *name) const;
 	void pill(ImDrawList *list, ImVec2 at, const char *name) const;
+	/* What the page is doing, the size of a button, filled with the
+	 * accent colour (Test mode) */
+	void badge(ImDrawList *list, ImVec2 at, const char *label) const;
 	/* A row of an action of Odin: its name, its keys (each the caps of a
 	 * combination), its gamepad buttons as pills (none: a dash); those
 	 * caught now (0 and 1 the keys, 2 the buttons, -1 none) say

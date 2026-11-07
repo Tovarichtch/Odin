@@ -24,24 +24,27 @@
 
 #include "odin/host/app/hotkeys.hpp"
 
+#include <algorithm>
 #include <bit>
 #include <cstdio>
 
 #include "odin/host/app/settings.hpp"
+#include "odin/host/input/keyboard.hpp"
 
 namespace odin {
 
 namespace {
 
 constexpr const char *IDS[Hotkeys::ACTIONS] = { "menu", "pause", "save_state", "load_state", "reset", "fullscreen",
-                                                "card", "light_gun", "close_game", "quit" };
+                                                "card", "light_gun", "test", "service", "close_game", "quit" };
 
 /* Escape or F10 the menu, Guide tapped alone; P pauses (as in MAME); F2
  * saves the state and F4 loads it (as in RetroArch); Ctrl+R switches the
  * cabinet off and on; F11 or Alt+Enter the whole display; F6 the card in
- * or out; F7 the light gun mode; Ctrl+C closes the game (back to the
- * library); Ctrl+Q quits. On a gamepad Guide held with Back, RB, LB, Y, B
- * or Start, as Batocera, which has no button to reset. */
+ * or out; F7 hides the cursor or shows it; 0 TEST and 9 SERVICE, or Guide
+ * with R3 and L3; Ctrl+C closes the game (back to the library); Ctrl+Q
+ * quits. On a gamepad Guide held with Back, RB, LB, Y, B or Start; no
+ * button resets. */
 const Hotkeys::Binding STANDARD[Hotkeys::ACTIONS] = {
 	{ { { { SDLK_ESCAPE, SDL_KMOD_NONE }, { SDLK_F10, SDL_KMOD_NONE } } }, Hotkeys::GUIDE_ALONE },
 	{ { { { SDLK_P, SDL_KMOD_NONE }, {} } }, SDL_GAMEPAD_BUTTON_BACK },
@@ -51,8 +54,18 @@ const Hotkeys::Binding STANDARD[Hotkeys::ACTIONS] = {
 	{ { { { SDLK_F11, SDL_KMOD_NONE }, { SDLK_RETURN, SDL_KMOD_ALT } } }, Hotkeys::NO_PAD },
 	{ { { { SDLK_F6, SDL_KMOD_NONE }, {} } }, SDL_GAMEPAD_BUTTON_NORTH },
 	{ { { { SDLK_F7, SDL_KMOD_NONE }, {} } }, Hotkeys::NO_PAD },
+	{ { { { SDLK_0, SDL_KMOD_NONE }, {} } }, SDL_GAMEPAD_BUTTON_RIGHT_STICK },
+	{ { { { SDLK_9, SDL_KMOD_NONE }, {} } }, SDL_GAMEPAD_BUTTON_LEFT_STICK },
 	{ { { { SDLK_C, SDL_KMOD_CTRL }, {} } }, SDL_GAMEPAD_BUTTON_EAST },
 	{ { { { SDLK_Q, SDL_KMOD_CTRL }, {} } }, SDL_GAMEPAD_BUTTON_START },
+};
+
+/* The buttons that may be the hotkey button, Guide first: not the D-pad
+ * nor the four of the face (A presses in the menu) */
+constexpr int HOTKEY_BUTTONS[] = {
+	SDL_GAMEPAD_BUTTON_GUIDE, SDL_GAMEPAD_BUTTON_BACK, SDL_GAMEPAD_BUTTON_START, SDL_GAMEPAD_BUTTON_LEFT_STICK,
+	SDL_GAMEPAD_BUTTON_RIGHT_STICK, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER,
+	SDL_GAMEPAD_BUTTON_MISC1, SDL_GAMEPAD_BUTTON_TOUCHPAD,
 };
 
 /* The modifiers as odin.ini names them */
@@ -67,18 +80,30 @@ Hotkeys::Hotkeys()
 	reset();
 }
 
-Hotkeys::Hotkeys(const Settings &settings) : Hotkeys()
+Hotkeys::Hotkeys(const Settings &settings, bool tell) : Hotkeys()
 {
+	for (const auto &[key, value] : settings.section("hotkeys")) {
+		if (key != "button")
+			continue;
+		if (const std::optional<int> button = button_of(value))
+			m_button = *button;
+		else if (tell)
+			refuse_setting("hotkeys", key, value);
+	}
+	reset();
 	for (const auto &[key, value] : settings.section("hotkeys")) {
 		size_t action = 0;
 
+		if (key == "button")
+			continue;
 		while (action < ACTIONS && key != IDS[action])
 			action++;
 
 		const std::optional<Binding> binding = action < ACTIONS ? parse(value) : std::nullopt;
 
 		if (!binding) {
-			refuse_setting("hotkeys", key, value);
+			if (tell)
+				refuse_setting("hotkeys", key, value);
 			continue;
 		}
 		m_bindings[action] = {};
@@ -95,28 +120,87 @@ Hotkeys::id(Action action)
 	return IDS[static_cast<size_t>(action)];
 }
 
-const Hotkeys::Binding &
-Hotkeys::standard(Action action)
+Hotkeys::Binding
+Hotkeys::standard(Action action, int button)
 {
-	return STANDARD[static_cast<size_t>(action)];
+	Binding binding = STANDARD[static_cast<size_t>(action)];
+
+	if (button != SDL_GAMEPAD_BUTTON_GUIDE && action == Action::MENU)
+		binding.pad = SDL_GAMEPAD_BUTTON_SOUTH;
+	else if (button != SDL_GAMEPAD_BUTTON_GUIDE && binding.pad == button)
+		binding.pad = NO_PAD;
+	return binding;
+}
+
+std::span<const int>
+Hotkeys::buttons()
+{
+	return HOTKEY_BUTTONS;
+}
+
+std::string
+Hotkeys::button_text(int button)
+{
+	const char *const text = SDL_GetGamepadStringForButton(static_cast<SDL_GamepadButton>(button));
+
+	return text ? text : "";
+}
+
+std::optional<int>
+Hotkeys::button_of(std::string_view text)
+{
+	const int button = SDL_GetGamepadButtonFromString(std::string(trimmed(text)).c_str());
+
+	if (std::find(std::begin(HOTKEY_BUTTONS), std::end(HOTKEY_BUTTONS), button) == std::end(HOTKEY_BUTTONS))
+		return std::nullopt;
+	return button;
+}
+
+void
+Hotkeys::set_button(int button)
+{
+	std::array<bool, ACTIONS> standard_was{};
+
+	for (size_t a = 0; a < ACTIONS; a++)
+		standard_was[a] = m_bindings[a].pad == standard(static_cast<Action>(a), m_button).pad;
+	m_button = button;
+	for (Binding &binding : m_bindings)
+		if (button != SDL_GAMEPAD_BUTTON_GUIDE && (binding.pad == button || binding.pad == GUIDE_ALONE))
+			binding.pad = NO_PAD;
+	for (size_t a = 0; a < ACTIONS; a++)
+		if (standard_was[a])
+			set_pad(static_cast<Action>(a), standard(static_cast<Action>(a), button).pad);
+}
+
+std::array<bool, SDL_GAMEPAD_BUTTON_COUNT>
+Hotkeys::combos() const
+{
+	std::array<bool, SDL_GAMEPAD_BUTTON_COUNT> out{};
+
+	for (const Binding &binding : m_bindings)
+		if (binding.pad != NO_PAD && binding.pad != GUIDE_ALONE && binding.pad < SDL_GAMEPAD_BUTTON_COUNT)
+			out[static_cast<size_t>(binding.pad)] = true;
+	return out;
 }
 
 std::optional<Hotkeys::Action>
 Hotkeys::key_action(SDL_Keycode key, SDL_Keymod mods) const
 {
-	const SDL_Keymod held = modifiers(mods);
+	const SDL_Keymod down_mods = modifiers(mods);
 	std::optional<Action> found;
 	int most = -1;
 
 	/* Alt+F4 closes the window (Windows): not the state F4 loads */
-	if (key == SDLK_F4 && (held & SDL_KMOD_ALT))
+	if (key == SDLK_F4 && (down_mods & SDL_KMOD_ALT))
 		return std::nullopt;
 
 	for (size_t action = 0; action < ACTIONS; action++) {
+		if (held(static_cast<Action>(action)))
+			continue;
 		for (const HotKey &k : m_bindings[action].keys) {
 			const int own = std::popcount(static_cast<unsigned>(k.mods));
 
-			if (k.key == SDLK_UNKNOWN || k.key != key || (k.mods & ~held) || own <= most)
+			if (k.key == SDLK_UNKNOWN || k.key != key || (k.mods & ~down_mods) || own <= most)
 				continue;
 			found = static_cast<Action>(action);
 			most = own;
@@ -129,7 +213,7 @@ std::optional<Hotkeys::Action>
 Hotkeys::pad_action(int pad) const
 {
 	for (size_t action = 0; action < ACTIONS; action++)
-		if (pad != NO_PAD && m_bindings[action].pad == pad)
+		if (pad != NO_PAD && m_bindings[action].pad == pad && !held(static_cast<Action>(action)))
 			return static_cast<Action>(action);
 	return std::nullopt;
 }
@@ -137,9 +221,9 @@ Hotkeys::pad_action(int pad) const
 bool
 Hotkeys::takes(SDL_Keycode key) const
 {
-	for (const Binding &binding : m_bindings)
-		for (const HotKey &k : binding.keys)
-			if (k.key == key && k.mods == SDL_KMOD_NONE)
+	for (size_t action = 0; action < ACTIONS; action++)
+		for (const HotKey &k : m_bindings[action].keys)
+			if (k.key == key && k.mods == SDL_KMOD_NONE && !held(static_cast<Action>(action)))
 				return true;
 	return false;
 }
@@ -151,7 +235,7 @@ Hotkeys::set_key(Action action, size_t slot, HotKey key)
 
 	if (slot >= KEYS)
 		return from;
-	key.mods = modifiers(key.mods);
+	key.mods = held(action) ? SDL_KMOD_NONE : modifiers(key.mods);
 	for (size_t a = 0; a < ACTIONS; a++)
 		for (HotKey &k : m_bindings[a].keys)
 			if (key.key != SDLK_UNKNOWN && k == key) {
@@ -168,6 +252,10 @@ Hotkeys::set_pad(Action action, int pad)
 {
 	std::optional<Action> from;
 
+	/* The hotkey button pressed with itself is no shortcut, and another
+	 * one than Guide is the game's when tapped alone */
+	if (m_button != SDL_GAMEPAD_BUTTON_GUIDE && (pad == m_button || pad == GUIDE_ALONE))
+		pad = NO_PAD;
 	for (size_t a = 0; a < ACTIONS; a++)
 		if (pad != NO_PAD && m_bindings[a].pad == pad) {
 			m_bindings[a].pad = NO_PAD;
@@ -182,7 +270,7 @@ void
 Hotkeys::reset()
 {
 	for (size_t action = 0; action < ACTIONS; action++)
-		m_bindings[action] = STANDARD[action];
+		m_bindings[action] = standard(static_cast<Action>(action), m_button);
 }
 
 SDL_Keymod
@@ -255,7 +343,7 @@ Hotkeys::key_of(std::string_view text)
 			return std::nullopt;
 		text.remove_prefix(plus + 1);
 	}
-	key.key = SDL_GetKeyFromName(std::string(text).c_str());
+	key.key = key_named(std::string(text).c_str());
 	if (key.key == SDLK_UNKNOWN || is_modifier(key.key))
 		return std::nullopt;
 	return key;

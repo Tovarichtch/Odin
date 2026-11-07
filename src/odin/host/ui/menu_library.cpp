@@ -458,44 +458,66 @@ Menu::build_library(LibraryState &state, BarState &bar_state)
 		list->AddLine({ x, y }, { x + width, y }, palette.line, kit.stroke());
 		y += kit.px(10.0f);
 
-		list->PushClipRect({ x, y }, { x + width, foot - kit.px(6.0f) }, true);
+		/* Under a game that lacks files, the folders to choose, one
+		 * above the other, unless the command line gives them */
+		const char games[] = "Games folder...";
+		const char bios[] = "BIOS folder...";
+		const bool lacks = !game.missing.empty();
+		const bool choose_games = lacks && !state.roms_given && !state.choosing;
+		const bool choose_bios =
+			lacks && !game.gaelco && !state.bios_given && !state.choosing && !state.roms.empty();
+		const float apart = kit.px(6.0f);
+		const float buttons = (choose_games ? kit.button_size(games).y : 0.0f) +
+		                      (choose_bios ? kit.button_size(bios).y : 0.0f) +
+		                      (choose_games && choose_bios ? apart : 0.0f);
+		const float end = lacks ? sb.y - inside - buttons : foot;
+
+		/* What it lacks scrolls when taller than the sheet, its bar
+		 * in the room at its right; each game its own scroll */
+		ImGui::SetCursorScreenPos({ x, y });
+		ImGui::PushID(game.name.c_str());
+		ImGui::BeginChild("sheet", { sb.x - kit.px(3.0f) - x, std::max(1.0f, end - apart - y) }, ImGuiChildFlags_None,
+		                  ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoNav);
+
+		ImDrawList *const text = ImGui::GetWindowDrawList();
+		const float start = ImGui::GetCursorScreenPos().y;
+		float at = start;
+
 		if (state.failed == game.name)
-			y += wrapped(list, { x, y }, width, size, palette.danger,
-			             "It failed to start: see odin.log for why.") + line;
+			at += wrapped(text, { x, at }, width, size, palette.danger,
+			              "It failed to start: see odin.log for why.") + line;
 		const std::string &roms = state.roms;
 
 		if (roms.empty()) {
-			y += wrapped(list, { x, y }, width, size, palette.ink,
-			             "Choose your games folder: one folder, zip or 7z per game, named as in MAME.") + line;
-		} else if (!game.missing.empty()) {
-			y += wrapped(list, { x, y }, width, size, palette.ink, "Missing files:") + kit.px(4.0f);
+			at += wrapped(text, { x, at }, width, size, palette.ink,
+			              "Choose your games folder: one folder, zip or 7z per game, named as in MAME.") + line;
+		} else if (lacks) {
+			at += wrapped(text, { x, at }, width, size, palette.ink, "Missing files:") + kit.px(4.0f);
 			for (const std::string &file : game.missing)
-				y += wrapped(list, { x, y }, width, size, palette.dim, file);
-			y += line;
-			y += wrapped(list, { x, y }, width, size, palette.faint,
-			             "Searched in " + shown_path(roms, "") +
-			             (game.gaelco || state.bios.empty() ? std::string() : " and " + shown_path(state.bios, ""))) +
-			     line;
+				at += wrapped(text, { x, at }, width, size, palette.dim, file);
+			at += line;
+			at += wrapped(text, { x, at }, width, size, palette.faint,
+			              "Searched in " + shown_path(roms, "") +
+			              (game.gaelco || state.bios.empty() ? std::string() : " and " + shown_path(state.bios, "")));
 		}
-		if (!game.missing.empty()) {
-			/* The folders to choose, unless the command line gives them */
-			const char games[] = "Games folder...";
-			const char bios[] = "BIOS folder...";
+		ImGui::SetCursorScreenPos({ x, start });
+		ImGui::Dummy({ width, at - start });
+		ImGui::EndChild();
+		ImGui::PopID();
 
-			if (!state.roms_given && !state.choosing) {
-				if (kit.button(games, { x, y }, false))
-					state.choose = LibraryState::Folder::ROMS;
-				y += kit.button_size(games).y + kit.px(6.0f);
-			}
-			if (!game.gaelco && !state.bios_given && !state.choosing && !state.roms.empty() &&
-			    kit.button(bios, { x, y }, false))
-				state.choose = LibraryState::Folder::BIOS;
+		float button_y = end;
+
+		if (choose_games) {
+			if (kit.button(games, { x, button_y }, false))
+				state.choose = LibraryState::Folder::ROMS;
+			button_y += kit.button_size(games).y + apart;
 		}
-		list->PopClipRect();
+		if (choose_bios && kit.button(bios, { x, button_y }, false))
+			state.choose = LibraryState::Folder::BIOS;
 
 		/* How to play it, on as many lines as it takes: Enter in the
 		 * action colour */
-		if (game.missing.empty()) {
+		if (!lacks) {
 			wrapped(list, { x, foot }, width, size, palette.faint, play);
 			list->AddText({ x, foot }, palette.action, enter);
 		}

@@ -84,8 +84,8 @@ find_hole(const SDL_Surface &rgba)
 		 static_cast<double>(bottom - top + 1) / h, static_cast<double>(w), static_cast<double>(h) };
 }
 
-/* The hole as Batocera writes it beside its bezels (<bezel>.info): the
- * size the bezel is drawn for, and what is around the hole on each side,
+/* The hole as the file <bezel>.info beside a bezel gives it: the size the
+ * bezel is drawn for, and what is around the hole on each side,
  * in its pixels; none without such a file */
 PictureHole
 read_hole(const std::string &info, int bezel_w, int bezel_h)

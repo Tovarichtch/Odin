@@ -57,6 +57,23 @@ private:
 	std::vector<SDL_Keycode> m_swallowed;	/* down when swallowed, until released */
 };
 
+/* The key a name gives (odin.ini, the list of games) as the key events
+ * give it: on a French keyboard, "5" is the key 5, not '(' */
+inline SDL_Keycode
+key_named(const char *name)
+{
+	const SDL_Keycode key = SDL_GetKeyFromName(name);
+	/* A keyboard without latin letters (Russian, Greek...): the names and
+	 * the events both read those of a QWERTY, the name as it is */
+	const bool own_letters = SDL_GetKeyFromScancode(SDL_SCANCODE_A, SDL_KMOD_NONE, true) ==
+	                         SDL_GetKeyFromScancode(SDL_SCANCODE_A, SDL_KMOD_NONE, false);
+	/* The keymaps of Windows and macOS hold keys without a keycode */
+	const SDL_Scancode scancode =
+		key == SDLK_UNKNOWN || !own_letters ? SDL_SCANCODE_UNKNOWN : SDL_GetScancodeFromKey(key, nullptr);
+
+	return scancode == SDL_SCANCODE_UNKNOWN ? key : SDL_GetKeyFromScancode(scancode, SDL_KMOD_NONE, true);
+}
+
 } /* namespace odin */
 
 #endif /* ODIN_KEYBOARD_HPP */

@@ -35,7 +35,7 @@
 #include <span>
 #include <vector>
 
-#include <unistd.h>
+#include <getopt.h>
 
 #include "odin/common/env.hpp"
 #include "odin/host/app/hotkeys.hpp"
@@ -87,7 +87,15 @@ const char HELP[] = "Usage: %s [options]\n"
 "			at the level of the list or of odin.ini), quad (four) or off; by\n"
 "			default those the cabinet has: main, or mix\n"
 "	-v		Set verbosity (affects debug messages)\n"
-"	-h              Show this help\n";
+"	-V, --version	Show the version and exit\n"
+"	-h, --help	Show this help\n";
+
+/* The long names of -V and -h */
+const option LONG_OPTIONS[] = {
+	{ "version", no_argument, nullptr, 'V' },
+	{ "help", no_argument, nullptr, 'h' },
+	{ nullptr, 0, nullptr, 0 },
+};
 
 /* A size of the window in points as odin.ini writes it, <w>x<h>: from
  * 320 by 240 to 16384 by 16384 */
@@ -258,7 +266,8 @@ parse_options(int argc, char **argv, Options &options)
 	int opt = 0;
 	bool wrong = false;
 
-	while (opt != 'h' && (opt = getopt(argc, argv, "R:B:c:r:n:l:s:ux:a:w:fo:vh?")) != -1) {
+	while (opt != 'h' && opt != 'V' &&
+	       (opt = getopt_long(argc, argv, "R:B:c:r:n:l:s:ux:a:w:fo:vVh?", LONG_OPTIONS, nullptr)) != -1) {
 		switch (opt) {
 		case 'c':
 			options.config = optarg;
@@ -325,12 +334,16 @@ parse_options(int argc, char **argv, Options &options)
 		case 'v':
 			options.verbose = options.given.verbose = true;
 			break;
+		case 'V':
+			break;
 		default:
 			wrong = opt != 'h';
 			opt = 'h';
 			break;
 		}
 	}
+	if (opt == 'V')
+		return Parsed::VERSION_ASKED;
 	if (opt != 'h')
 		return Parsed::RUN;
 	return wrong ? Parsed::WRONG : Parsed::HELP_ASKED;
@@ -505,9 +518,9 @@ output_route_of(const Settings &settings, const std::string &game, const std::st
 }
 
 bool
-light_gun_mode_on(const Settings &settings, const std::string &game)
+hide_cursor_on(const Settings &settings, const std::string &game, bool standard)
 {
-	return player_on(settings, game, "light_gun_mode", true);
+	return player_on(settings, game, "hide_cursor", player_on(settings, game, "light_gun_mode", standard));
 }
 
 std::optional<int>
@@ -662,7 +675,7 @@ load_game_list(GameList &games)
 }
 
 std::vector<Settings::Known>
-known_settings(const GameList &games)
+known_settings(const GameList &games, int button)
 {
 	std::vector<Settings::Known> out = {
 		{ "display", "scale", "1" }, { "display", "upscale_mode", UPSCALE_MODES[0] }, { "display", "anisotropy", "1" },
@@ -674,10 +687,11 @@ known_settings(const GameList &games)
 		{ "sound", "device", "" }, { "sound", "volume", "100" }, { "sound", "background", "on" },
 	};
 
+	out.push_back({ "hotkeys", "button", Hotkeys::button_text(SDL_GAMEPAD_BUTTON_GUIDE) });
 	for (size_t a = 0; a < Hotkeys::ACTIONS; a++) {
 		const auto action = static_cast<Hotkeys::Action>(a);
 
-		out.push_back({ "hotkeys", Hotkeys::id(action), Hotkeys::line(Hotkeys::standard(action)) });
+		out.push_back({ "hotkeys", Hotkeys::id(action), Hotkeys::line(Hotkeys::standard(action, button)) });
 	}
 	out.insert(out.end(), { { "outputs", "network", "off" }, { "network", "board", "none" },
 	                        { "network", "port", std::to_string(NetCable::PORT) }, { "network", "next", "" },
@@ -722,7 +736,7 @@ known_settings(const GameList &games)
 			if (control.role == Role::GUN_X) {
 				out.push_back({ "players." + name, control.player ? "gun2" : "gun1", "" });
 				if (!control.player)
-					out.insert(out.end(), { { "players." + name, "light_gun_mode", "on" },
+					out.insert(out.end(), { { "players." + name, "hide_cursor", "on" },
 					                        { "players." + name, "sinden_border", "off" },
 					                        { "players." + name, "sinden_border_style", SINDEN_BORDER_STYLES[0] },
 					                        { "players." + name, "sinden_border_size",
@@ -736,6 +750,9 @@ known_settings(const GameList &games)
 			out.push_back({ "players." + name, "wheel_force", std::to_string(WHEEL_FORCE) });
 		if (steers_of(game->controls))
 			out.push_back({ "players." + name, "wheel_rotation", std::to_string(WHEEL_ROTATION) });
+		if (std::any_of(game->controls.begin(), game->controls.end(),
+		                [](const GameControl &control) { return control.invertible; }))
+			out.push_back({ "players." + name, "invert", "" });
 		if (!game->cabinets.empty())
 			out.push_back({ "players." + name, "cabinet", "standard" });
 		if (!game->card_reader.empty())

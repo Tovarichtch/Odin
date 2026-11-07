@@ -107,8 +107,8 @@ struct Options {
 };
 
 /* RUN: go on; HELP_ASKED or WRONG: the help is to be shown (exit 0 or 1),
- * print_help */
-enum class Parsed { RUN, HELP_ASKED, WRONG };
+ * print_help; VERSION_ASKED: the version alone (exit 0) */
+enum class Parsed { RUN, HELP_ASKED, VERSION_ASKED, WRONG };
 void print_help(const char *program);
 
 /* The help is shown for -h and for an option that is not right. Without
@@ -190,10 +190,11 @@ std::optional<OutputRoute> output_route_named(const std::string &value);
 std::string output_route_name(const OutputRoute &route);
 std::optional<OutputRoute> output_route_of(const Settings &settings, const std::string &game, const std::string &id,
                                            bool tell = true);
-/* [players.<game>] light_gun_mode: in a game where player 1 has a sight,
- * the mouse aims and shoots there, no pointer, no bar (on, when it does
- * not say), or is a pointer again (off); the last line says */
-bool light_gun_mode_on(const Settings &settings, const std::string &game);
+/* [players.<game>] hide_cursor (light_gun_mode before 0.1.1): no cursor,
+ * no bar, the mouse controls the game (on), or a normal pointer (off); its
+ * last line says, else the last of light_gun_mode, else `standard`
+ * (ControlPanel::takes_mouse) */
+bool hide_cursor_on(const Settings &settings, const std::string &game, bool standard);
 /* [players.<game>] sinden_border: a white border for a light gun that
  * finds the screen by it, in a game with one, as xemu's Chihiro draws it:
  * off when it does not say, or on; sinden_border_style: inside the edges of
@@ -253,8 +254,9 @@ bool load_game_list(GameList &games);
 
 /* Every key of odin.ini, at its value by default, in the order the file
  * shows them: what holds for every game (OPTIONS), then the sound, the
- * controls and the gamepads of each game of the list */
-std::vector<Settings::Known> known_settings(const GameList &games);
+ * controls and the gamepads of each game of the list; the hotkeys as by
+ * default with that hotkey button */
+std::vector<Settings::Known> known_settings(const GameList &games, int button = SDL_GAMEPAD_BUTTON_GUIDE);
 
 } /* namespace odin */
 

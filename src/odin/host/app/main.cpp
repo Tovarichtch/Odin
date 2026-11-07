@@ -34,6 +34,7 @@
 
 #include "odin/host/video/display.hpp"
 #include "odin/host/app/games.hpp"
+#include "odin/host/app/hotkeys.hpp"
 #include "odin/host/app/atvtrack_play.hpp"
 #include "odin/machine/boards/hikaru/hikaru.hpp"
 #include "odin/host/input/keyboard.hpp"
@@ -46,6 +47,7 @@
 #include "odin/host/app/session.hpp"
 #include "odin/host/app/settings.hpp"
 #include "odin/host/app/user_files.hpp"
+#include "odin/host/app/version.hpp"
 
 namespace odin {
 namespace {
@@ -227,7 +229,7 @@ print_banner()
 		    "██║   ██║██║  ██║██║██║╚██╗██║\n"
 		    "╚██████╔╝██████╔╝██║██║ ╚████║\n"
 		    " ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝\n\n");
-	std::printf("Odin (ᚨ), Copyright (C) 2026 Réda Chérif-Touil\n");
+	std::printf("Odin (ᚨ)%s%s, Copyright (C) 2026 Réda Chérif-Touil\n", *odin_version() ? " " : "", odin_version());
 	std::printf("A hard fork of Valkyrie, Copyright (C) 2011-2013 Stefano Teso\n");
 	std::printf("Released under the GNU GPL, version 3 or later.\n");
 }
@@ -246,7 +248,7 @@ load_settings(Settings &settings, const GameList &games, const std::string &chos
 
 	if (!settings_file.empty() && settings.load(settings_file)) {
 		std::printf("settings: '%s'\n", settings_file.c_str());
-		settings.know(known_settings(games));
+		settings.know(known_settings(games, Hotkeys(settings, false).button()));
 		settings.complete(settings_file);
 	}
 	return settings_file;
@@ -281,6 +283,12 @@ main(int argc, char **argv)
 	/* The options first: -c names the settings, where the log is */
 	const odin::Parsed parsed = odin::parse_options(argc, argv, options);
 
+	/* -V: the version alone, before the log: odin.log stays as it is, and
+	 * on Windows the console still takes the line (the log lets it go) */
+	if (parsed == odin::Parsed::VERSION_ASKED) {
+		std::printf("Odin %s\n", *odin::odin_version() ? odin::odin_version() : "unknown");
+		return 0;
+	}
 	odin::start_log(options);
 	odin::print_banner();
 	if (parsed != odin::Parsed::RUN) {

@@ -1126,10 +1126,10 @@ gun_drawing(GunKind kind)
  * buttons into its own (package/batocera/controllers/guns: aimtrak-add,
  * guncon-add, guncon3-add, virtual-aelightgun-add, xgunner-lightguns-add)
  * and from the settings the Sinden's own software comes with
- * (LightgunMono.exe.config). Batocera's own devices, and any other gun,
- * as Batocera numbers them: the trigger left, action right, start middle;
- * its other buttons are buttons 1 to 8 of a mouse, which Odin does not
- * read. */
+ * (LightgunMono.exe.config). Batocera's own devices, and any other gun, by
+ * the numbers those scripts give: the trigger left, action right, start
+ * middle; its other buttons are buttons 1 to 8 of a mouse, which Odin
+ * does not read. */
 std::array<std::optional<HostInput>, GUN_BUTTONS>
 gun_inputs(GunKind kind, std::string_view name, std::string_view identity)
 {

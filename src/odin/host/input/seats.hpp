@@ -28,8 +28,10 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include <SDL3/SDL.h>
@@ -53,11 +55,35 @@ identity_text(std::string text)
 	return text;
 }
 
-/* A gamepad open: its id, and the GUID of its make and model */
+/* A gamepad open: its id, the GUID of its make and model, and its path as
+ * SDL tells it (empty: none), which tells two of a make apart */
 struct OpenPad {
 	SDL_JoystickID id;
 	std::string guid;
+	std::string path = {};
 };
+
+/* A path of [players.<game>] (p1_path...) as SDL tells that of a device: a
+ * link (Linux: /dev/input/by-path/..., by-id/...) the node it points to */
+inline std::string
+device_path(const std::string &path)
+{
+	std::error_code error;
+
+	if (path.empty() || path.front() != '/')
+		return path;
+
+	const std::filesystem::path node = std::filesystem::canonical(path, error);
+
+	return error ? path : node.string();
+}
+
+/* Whether a path asked is that of a device, in any case (Windows) */
+inline bool
+same_path(const std::string &asked, const std::string &path)
+{
+	return !asked.empty() && SDL_strcasecmp(asked.c_str(), path.c_str()) == 0;
+}
 
 /* The player a device open is seated for, 0 or 1; -1 for none */
 inline int
@@ -74,15 +100,32 @@ joystick_fits(int kind, bool steers)
 	return steers || kind != SDL_JOYSTICK_TYPE_WHEEL;
 }
 
+/* In a game steered by a wheel, the wheels first (kinds: SDL_JoystickType
+ * of each): a shifter or pedals of their own plugged in before it take no
+ * player's place from it */
+inline void
+wheels_first(std::vector<OpenPad> &joys, const std::vector<int> &kinds)
+{
+	std::vector<OpenPad> wheels, others;
+
+	for (size_t i = 0; i < joys.size() && i < kinds.size(); i++)
+		(kinds[i] == SDL_JOYSTICK_TYPE_WHEEL ? wheels : others).push_back(joys[i]);
+	wheels.insert(wheels.end(), others.begin(), others.end());
+	joys = std::move(wheels);
+}
+
 /* The gamepad of each player (0: none), from those open in the order they
  * were plugged in, the GUID each player wants (empty: any), the very pad
- * each one picked (0: none; two of a make share their GUID) and the ones
- * they had: the one picked if it is open, else the one they want if they
- * have it, else the first free one of that kind, else the one they had (a
- * player keeps their pad when another goes), else the first free one. */
+ * each one picked (0: none; two of a make share their GUID), the ones they
+ * had and the path each one names (empty: none): the one picked if it is
+ * open, else the one of that path of the kind they want, else the one they
+ * want if they have it, else the first free one of that kind, else the one
+ * they had (a player keeps their pad when another goes), else the first
+ * free one. */
 inline std::array<SDL_JoystickID, 2>
 seat_pads(const std::vector<OpenPad> &pads, const std::array<std::string, 2> &wanted,
-          const std::array<SDL_JoystickID, 2> &picked, const std::array<SDL_JoystickID, 2> &had)
+          const std::array<SDL_JoystickID, 2> &picked, const std::array<SDL_JoystickID, 2> &had,
+          const std::array<std::string, 2> &paths = {})
 {
 	std::array<SDL_JoystickID, 2> out{};
 	std::vector<bool> taken(pads.size());
@@ -98,6 +141,10 @@ seat_pads(const std::vector<OpenPad> &pads, const std::array<std::string, 2> &wa
 	for (unsigned player = 0; player < 2; player++)
 		if (picked[player])
 			take(player, [&](const OpenPad &pad) { return pad.id == picked[player]; });
+	for (unsigned player = 0; player < 2; player++)
+		take(player, [&](const OpenPad &pad) {
+			return same_path(paths[player], pad.path) && (wanted[player].empty() || pad.guid == wanted[player]);
+		});
 	for (unsigned player = 0; player < 2; player++)
 		if (!wanted[player].empty())
 			take(player, [&](const OpenPad &pad) { return pad.id == had[player] && pad.guid == wanted[player]; });

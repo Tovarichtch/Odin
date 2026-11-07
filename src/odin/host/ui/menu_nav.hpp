@@ -64,15 +64,24 @@ public:
 
 	/* The actions an event starts: an input of theirs pressed from let go
 	 * (a key held down again: the frame moves on); none from a gamepad
-	 * while its Guide is held, which makes a shortcut */
+	 * while its Guide is held, which makes a shortcut. Another hotkey
+	 * button ([hotkeys] button) works the menu as any, and holds back
+	 * only the buttons that are a shortcut with it (`with`). */
 	std::vector<Action> event(const SDL_Event &event);
+	void hotkey(int button, const std::array<bool, SDL_GAMEPAD_BUTTON_COUNT> &with)
+	{
+		m_hotkey = button;
+		m_with = with;
+	}
 	/* Everything let go (the menu closes) */
 	void reset();
 
 private:
 	std::array<std::vector<HostInput>, ACTIONS> m_inputs;
 	std::array<std::vector<bool>, ACTIONS> m_held;
-	std::set<SDL_JoystickID> m_guide;
+	std::set<SDL_JoystickID> m_guide;	/* those whose hotkey button is held */
+	int m_hotkey = SDL_GAMEPAD_BUTTON_GUIDE;
+	std::array<bool, SDL_GAMEPAD_BUTTON_COUNT> m_with{};
 };
 
 } /* namespace odin */

@@ -378,6 +378,24 @@ RomFiles::locate(const std::string &game, const File &file)
 	return std::nullopt;
 }
 
+bool
+RomFiles::set_there(const std::string &game, const File &file) const
+{
+	std::error_code error;
+	const std::string &set = file.set_of(game);
+	const auto there = [&error, &set](const std::string &dir) {
+		if (dir.empty())
+			return false;
+		for (const char *const kind : ARCHIVES)
+			if (std::filesystem::exists(dir + "/" + set + kind, error))
+				return true;
+		return std::filesystem::is_directory(dir + "/" + set, error);
+	};
+
+	/* The game's own set is looked for in the folder of the ROMs only */
+	return there(m_roms) || (set != game && there(m_bios));
+}
+
 std::string
 RomFiles::find(const std::string &game, const File &file)
 {

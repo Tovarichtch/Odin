@@ -550,12 +550,13 @@ bool Sh4::translate_float(Inline form, const Sh4Op &op, uint32_t i, std::vector<
 }
 
 /* FIPR and FTRV where the host has vectors, LDS and STS of FPUL: the long
- * way, a call of the instruction, when SR.FD has the FPU disabled. False
- * for FIPR and FTRV on another host. */
+ * way, a call of the instruction, when SR.FD has the FPU disabled (or
+ * FPSCR.PR is set: FIPR and FTRV do nothing then). False for FIPR and FTRV on
+ * another host. */
 bool Sh4::translate_vector(Inline form, const Sh4Op &op, uint32_t i, std::vector<LongWay> &ways)
 {
 	constexpr uint32_t FR = offsetof(Regs, fr) / 4, XF = offsetof(Regs, xf) / 4, SR = offsetof(Regs, sr) / 4;
-	constexpr uint32_t FPUL = offsetof(Regs, fpul) / 4;
+	constexpr uint32_t FPUL = offsetof(Regs, fpul) / 4, FPSCR = offsetof(Regs, fpscr) / 4;
 	Sh4Host &host = *m_host;
 	Sh4Host::Slow slow{};
 	const bool fpul = form == Inline::LdsFpul || form == Inline::StsFpul;
@@ -564,6 +565,9 @@ bool Sh4::translate_vector(Inline form, const Sh4Op &op, uint32_t i, std::vector
 		return false;
 	}
 	slow.jumps[slow.count++] = host.jump_if_bits(SR, SR_FD, true);
+	if (!fpul) {
+		slow.jumps[slow.count++] = host.jump_if_bits(FPSCR, FPSCR_PR, true);
+	}
 	if (form == Inline::LdsFpul) {
 		host.load(op.n);
 		host.store(FPUL);

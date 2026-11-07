@@ -61,7 +61,8 @@ COMMAND LINE
                   digits) in the current folder after these frames.
  -n <n>           Stop after frame n.
  -v               Detailed log of the board (slow).
- -h               Show the help.
+ -V, --version    Show the version (e.g. Odin v0.1.1) and exit.
+ -h, --help       Show the help.
 
 The command line comes before odin.ini.
 
@@ -144,8 +145,19 @@ apart by commas (see INPUTS below).
 [hotkeys]
 
  Up to two keys each (Ctrl+Q written like that) and one gamepad input:
- pad:guide alone, or pad:guide+<button>. none: nothing.
+ pad:guide alone, or pad:guide+<button>. none: nothing. test and service
+ take keys without Ctrl, Alt or Shift.
 
+ button        guide, back, start,     The hotkey button: "guide" in the
+               leftstick, rightstick,  lines below. Another one than Guide
+               leftshoulder,           goes to the game at each press, in
+               rightshoulder, misc1,   a shortcut too (back: a coin), so
+               touchpad                the menu is then pad:guide+a, and an
+                                       action that takes that button by
+                                       default has none (pause, with back);
+                                       while it is held, only the buttons
+                                       of its shortcuts leave the game.
+                                       Default guide.
  menu          Escape, F10, pad:guide
  pause         P, pad:guide+back
  save_state    F2, pad:guide+rightshoulder
@@ -153,7 +165,9 @@ apart by commas (see INPUTS below).
  reset         Ctrl+R
  fullscreen    F11, Alt+Return
  card          F6, pad:guide+y          (Virtual-On card in or out)
- light_gun     F7                       (light gun mode on or off)
+ light_gun     F7                       (hide the cursor or show it)
+ test          0, pad:guide+rightstick  (TEST of the cabinet, held)
+ service       9, pad:guide+leftstick   (SERVICE of player 1, held)
  close_game    Ctrl+C, pad:guide+b      (back to the library)
  quit          Ctrl+Q, pad:guide+start
 
@@ -239,13 +253,30 @@ count, after its parent's.
  joy1, joy2       <GUID> <name>   Wheel or other joystick of player 1, 2
                                   (a wheel: NASCAR, ATV Track, Smashing
                                   Drive, one player).
+ p1_path,         <path>          The very gamepad of player 1, 2 when two
+ p2_path,                         alike share a GUID: its path, as the log
+ joy1_path,                       names it ("pad: ... plugged, <GUID> at
+ joy2_path                        <path>"); on Linux, for a path
+                                  /dev/input/event..., a link to it of
+                                  /dev/input/by-path or by-id too. The
+                                  page Input and the bar write it when two
+                                  alike are plugged in. Gone or changed: any
+                                  of the GUID asked. On Windows an Xbox pad is
+                                  XInput#0 to #3; the SDL 2 of a frontend
+                                  (before 2.33) names it by its raw input
+                                  path, as Odin does when started with
+                                  SDL_JOYSTICK_RAWINPUT=1.
  device1,         keyboard, pad,  What the player plays with (it alone
  device2          joystick        shakes or turns). Default: Odin picks.
  gun1, gun2       <identity>      Light gun of player 1, 2, as the log
                   <name>          names it ("pointer: ..."), e.g.
                                   "vidpid:1209:0001 GUN4IR".
- light_gun_mode   on, off         The mouse aims in the game (games with a
-                                  sight: braveff). Default on.
+ hide_cursor      on, off         No cursor, no bar: the mouse controls
+                                  the game (off: a normal pointer).
+                                  Default on when a control of player 1
+                                  or of the cabinet (coin, test...) uses
+                                  the mouse (the sight of braveff), else
+                                  off. light_gun_mode before 0.1.1.
  sinden_border    on, off         White border for a Sinden gun.
                                   Default off.
  sinden_border_   game, window    Border around the game (4:3) or the
@@ -259,6 +290,10 @@ count, after its parent's.
                                   ATV Track, Smashing Drive). Default 100.
  wheel_rotation   0, 270, 360,    How far the wheel turns from one end to
                   540, 900, 1080  the other (0: all the way). Default 0.
+ invert           <id>, ...       Controls turned the other way, on every
+                                  device: pharrier stick_v (push up to
+                                  climb; the cabinet's stick climbs pulled
+                                  back). Default none.
  cabinet          standard,       The cabinet model: deluxe (NASCAR),
                   deluxe,         minideluxe (Star Wars Racer), vibrator
                   minideluxe,     (ATV Track: Odin sets its MOTION SYSTEM
@@ -312,7 +347,9 @@ count, after its parent's.
  for keys and buttons. Every start also takes joy:start, the Start of a
  known wheel (see joy:gas below).
 
- Every game:
+ Every game ([hotkeys] test and service give 1p_service, 2p_service and
+ test to every game, the gamepad of player 2 for its SERVICE; a line here
+ wins for that game):
   1p_service    key:9, pad:guide+leftstick
   2p_service    pad:guide+leftstick
   coin1         key:5, pad:back, joy:select
@@ -351,6 +388,8 @@ count, after its parent's.
   start         key:1, pad:start
   stick_h       pad:leftx            (_left key:Left, _right key:Right)
   stick_v       pad:lefty            (_up key:Up, _down key:Down)
+ The stick can follow the mouse (or a trackball): stick_h = pad:leftx,
+ mouse:x and stick_v = pad:lefty, mouse:y in [controls.pharrier].
 
  swracer:
   boost         key:C, pad:a
@@ -445,19 +484,25 @@ INPUTS
  pad:+<axis>         pad:+leftx the left stick right.
  pad:<axis>:invert   A whole stick axis turned over (not a trigger).
  pad:<a>+<b>         Button b while a is held: pad:guide+x, pad:back+start
-                     (Guide and what it holds are not seen by the game).
+                     (what the hotkey button holds for a shortcut is not
+                     seen by the game; Guide, all it holds).
  joy:axis<n>         An axis of a wheel or joystick; joy:-axis<n> and
                      joy:+axis<n> its halves; joy:axis<n>:invert turned
                      over (a pedal).
  joy:button<n>       A button of a wheel or joystick.
  joy:hat<n>_up       A hat direction (_up, _down, _left, _right).
  joy:gas             The gas pedal of a known wheel, whatever its numbers
-                     (Batocera's list: Logitech G25 to G923, PRO, Driving
-                     Force, MOMO; Thrustmaster FFB Wheel, T150, T300,
-                     Advance Racer; MOZA R12); nothing on another joystick. joy:brake,
+                     (Logitech G25 to G923, PRO, Driving Force, MOMO;
+                     Thrustmaster FFB Wheel, T150, T300, Advance Racer;
+                     MOZA R12); nothing on another joystick. joy:brake,
                      joy:paddle_left, joy:paddle_right, joy:start and
                      joy:select the same. On a button, a pedal presses it
                      from half its way.
+ joy@<GUID>:<input>  The same on another joystick than the player's (a
+                     shifter or pedals of their own), by its GUID as the
+                     log names it, e.g.
+                     joy@030000006d0400001ac2000000000000:button1. The
+                     page Input writes it when it catches such a joystick.
  mouse:left          Mouse or light gun buttons: left, middle, right, side,
                      extra.
  mouse:x, mouse:y    Where the mouse or the light gun aims.

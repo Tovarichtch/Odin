@@ -91,6 +91,7 @@ private:
 	 * bottom-left corner a while (Menu::note) */
 	bool bar_event(const SDL_Event &event);
 	void follow_bar();
+	void leave_bar();
 	void fill_bar();
 	void do_bar();
 	void say(const std::string &note);

@@ -27,8 +27,9 @@
 
 namespace odin {
 
-/* The commit of git Odin is built from, as CMakeLists.txt gives it (the page
- * About of the menu says it); empty for a build from elsewhere */
+/* The version Odin is built as, as CMakeLists.txt gives it: the tag of a
+ * release (v0.1.0), else the commit of git (the page About, -V and the
+ * banner say it); empty for a build from elsewhere */
 const char *odin_version();
 
 } /* namespace odin */

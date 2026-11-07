@@ -243,7 +243,7 @@ struct BarState : BarSettings {
 	std::vector<LightGun> guns;
 	std::array<std::string, 2> gun;
 	std::array<bool, 2> sights{};
-	bool can_shake = false, shake = true, undo = false, light_gun = true;
+	bool can_shake = false, shake = true, undo = false, hide_cursor = false;
 	/* The next cabinet of the link (typed in Settings); the link set by
 	 * ODIN_NETBD; the game that runs is on a Gaelco board and does not link
 	 * cabinets (Gaelco Football) */
@@ -310,9 +310,13 @@ struct MenuState : BarSettings {
 	std::array<Hotkeys::Binding, Hotkeys::ACTIONS> hotkeys{};
 	std::optional<std::pair<size_t, size_t>> hotkey_catching;
 	bool hotkeys_default = false;
+	/* The hotkey button ([hotkeys] button), and another one chosen */
+	int hotkey_button = SDL_GAMEPAD_BUTTON_GUIDE;
+	std::optional<int> hotkey_button_asked;
 	/* What the last key or buttons caught took from another action: from
-	 * it to the one changed, the key, else the button held with Guide (or
-	 * GUIDE_ALONE); said at the bottom of the page until the next change */
+	 * it to the one changed, the key, else the button held with the
+	 * hotkey button (or GUIDE_ALONE); said at the bottom of the page
+	 * until the next change */
 	struct HotkeyMoved {
 		size_t from = 0, to = 0;
 		std::optional<HotKey> key;
@@ -417,6 +421,9 @@ struct MenuState : BarSettings {
 	/* The joysticks that are no gamepads (a wheel), the same (kind: their
 	 * SDL_JoystickType), and the one asked for the player shown */
 	std::vector<Plugged> joysticks;
+	/* The control of the page Input under the mouse in its list this
+	 * frame (-1: none): the foot says all its inputs */
+	int hovered_control = -1;
 	std::optional<Plugged> want_joystick;
 	/* The light guns and mice seen; that of each player in the game shown
 	 * (its identity; empty: none) and whether the player has a sight there;
@@ -448,9 +455,16 @@ struct MenuState : BarSettings {
 	 * vibration_force) */
 	bool can_shake = false, shake = true;
 	int vibration_force = 100;
-	/* Player 1 has a sight (sights): the mouse aims there, or is a pointer
-	 * ([players.<game>] light_gun_mode) */
-	bool light_gun = true;
+	/* The cursor hidden, the mouse controlling the game, or a normal
+	 * pointer ([players.<game>] hide_cursor) */
+	bool hide_cursor = false;
+	/* The controls of the player shown that the player may turn over
+	 * (GameControl::invertible): "Invert" and their names, their ids, and
+	 * whether each is turned over ([players.<game>] invert; bytes:
+	 * MinGW's GCC reads a word at nullptr to compare two empty
+	 * vector<bool>) */
+	std::vector<std::string> invert_names, invert_ids;
+	std::vector<uint8_t> inverted;
 	/* Its white border for a light gun that finds the screen by it
 	 * ([players.<game>] sinden_border, sinden_border_style,
 	 * sinden_border_size) */
@@ -479,6 +493,9 @@ struct MenuState : BarSettings {
 	 * make and model's); its options open over the drawing */
 	PadTuning tuning;
 	bool advanced = false;
+	/* The page Input tests the controls: the gamepads and the keys light
+	 * them up and work no part of the menu (the mouse does) */
+	bool testing = false;
 	/* The animations of the menu ([menu] animations): the row of the
 	 * games moves from the game shown before, since then (seconds of the
 	 * menu), the one shown at the last picture; while something moves the
@@ -740,6 +757,9 @@ private:
 	 * The height it takes, drawn when `draw`. */
 	static std::string help(int page, const MenuState &state);
 	static float input_foot(const MenuKit &kit, MenuState &state, ImVec2 at, float width, float height, bool draw);
+	/* Whether Input says a control there now (framed, under the mouse or
+	 * worked): the keys beside it give it their room */
+	static bool input_tells(const MenuState &state);
 	static std::string hotkeys_help(const MenuState &state);
 	/* A button of a gamepad of that kind (pad_drawing.hpp), as its maker
 	 * prints it */

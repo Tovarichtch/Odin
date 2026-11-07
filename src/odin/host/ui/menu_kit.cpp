@@ -135,6 +135,8 @@ constexpr Sign SIGNS[] = {
 	{ 0x2190, 0.9f }, { 0x2192, 0.9f }, { 0x2191, 0.6f }, { 0x2193, 0.6f }, { 0x2194, 1.1f }, { 0x2195, 0.6f },
 	{ 0x23CE, 0.9f }, { 0x2715, 0.85f }, { 0x25CB, 0.85f }, { 0x25A1, 0.85f }, { 0x25B3, 0.85f },
 	{ 0x2039, 0.5f }, { 0x203A, 0.5f }, { 0x2212, 0.6f }, { 0x232B, 1.0f },
+	{ 0x2460, 1.0f }, { 0x2461, 1.0f }, { 0x2462, 1.0f }, { 0x2463, 1.0f }, { 0x2464, 1.0f },
+	{ 0x2465, 1.0f }, { 0x2466, 1.0f }, { 0x2467, 1.0f }, { 0x2468, 1.0f },
 };
 
 const Sign *
@@ -159,6 +161,16 @@ draw_sign(ImDrawList *list, const Sign &sign, float x, float y, float size, ImU3
 		line(t, { t.x - dx * head - dy * head, t.y - dy * head + dx * head });
 	};
 
+	/* ① to ⑨: its number in a circle */
+	if (sign.code >= 0x2460 && sign.code <= 0x2468) {
+		const char digit[2] = { static_cast<char>('1' + (sign.code - 0x2460)), 0 };
+		const float small = e * 0.7f;
+		const ImVec2 wide = ImGui::GetFont()->CalcTextSizeA(small, FLT_MAX, 0.0f, digit);
+
+		list->AddCircle({ cx, cy }, e * 0.42f, colour, 0, w);
+		list->AddText(ImGui::GetFont(), small, { cx - wide.x / 2.0f, cy - wide.y / 2.0f }, colour, digit);
+		return;
+	}
 	switch (sign.code) {
 	case 0x25B2:
 		list->AddTriangleFilled({ cx, cy - h }, { cx + h * 1.15f, cy + h * 0.85f }, { cx - h * 1.15f, cy + h * 0.85f },
@@ -1457,6 +1469,15 @@ MenuKit::pill(ImDrawList *list, ImVec2 at, const char *name) const
 
 	list->AddRect(at, { at.x + size.x, at.y + size.y }, m_palette.outline, size.y / 2.0f, ImDrawFlags_None, stroke());
 	write(list, { at.x + (size.x - w) / 2.0f, at.y + (size.y - small) / 2.0f }, m_palette.ink, name, small);
+}
+
+void
+MenuKit::badge(ImDrawList *list, ImVec2 at, const char *label) const
+{
+	const ImVec2 box = button_size(label);
+
+	frame(list, at, { at.x + box.x, at.y + box.y }, px(CONTROL_CUT), m_palette.accent, 0);
+	write(list, { at.x + px(BUTTON_WIDE), at.y + px(BUTTON_HIGH) }, m_palette.on_accent, label, font(SMALL));
 }
 
 int

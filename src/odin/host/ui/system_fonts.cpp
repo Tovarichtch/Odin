@@ -67,8 +67,8 @@ const std::vector<std::vector<const char *>> WANTED = {
 #else
 /* Anywhere in the folders of fonts of Linux, the first of each line found:
  * Latin, Greek, Cyrillic, Arabic, Hebrew (DejaVu Sans, on nearly all);
- * Chinese, Japanese and Korean (Noto Sans CJK, else Droid Sans Fallback
- * as Batocera has, else WenQuanYi); Thai; Hindi */
+ * Chinese, Japanese and Korean (Noto Sans CJK, else Droid Sans Fallback,
+ * else WenQuanYi); Thai; Hindi */
 const std::vector<std::vector<const char *>> WANTED = {
 	{ "DejaVuSans.ttf", "NotoSans-Regular.ttf" },
 	{ "NotoSansCJK-Regular.ttc", "DroidSansFallbackFull.ttf", "DroidSansFallback.ttf", "wqy-microhei.ttc",

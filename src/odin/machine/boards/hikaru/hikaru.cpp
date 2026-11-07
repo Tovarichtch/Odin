@@ -777,8 +777,6 @@ Hikaru::update_irqs()
  *  - the system library of the game (0xDF, then 0xFF): the sound boards;
  *  - VON4, when two lists in a row did not end (@0C711C30): 0xEF, 0xFD,
  *    then 0xFF, for the graphics chips, see HikaruGpu::set_reset_lines.
- *    Here it does each time its SYSTEM MENU is left with EXIT, see the
- *    TODO.
  *
  * The slave is held while its line is low and starts again from its reset
  * vector when it goes high. The BOOTROM uses that to know the slave ready:

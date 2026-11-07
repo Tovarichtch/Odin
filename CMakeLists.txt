@@ -444,10 +444,24 @@ endif()
 if(WIN32)
 	target_link_libraries(odin PRIVATE ws2_32 hid setupapi)
 	target_link_options(odin PRIVATE -static)
-	# The manifest (UTF-8) and the icon of odin.exe, found beside odin.rc
+	# The manifest (UTF-8) and icon of odin.exe, found beside odin.rc, and
+	# its version: the numbers of a tag v<a>.<b>.<c>, 0.0.0.0 for a commit
+	set(numbers 0 0 0)
+	if(version MATCHES "^v?([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+		set(numbers ${CMAKE_MATCH_1} ${CMAKE_MATCH_2} ${CMAKE_MATCH_3})
+	endif()
+	list(JOIN numbers "," version_commas)
+	list(JOIN numbers "." version_dots)
+	file(CONFIGURE OUTPUT ${CMAKE_BINARY_DIR}/odin_version.h CONTENT [[
+#define ODIN_VERSION_NUMBERS @version_commas@,0
+#define ODIN_VERSION_DOTS "@version_dots@.0"
+#define ODIN_VERSION_TEXT "@version@"
+]] @ONLY)
 	target_sources(odin PRIVATE src/odin/host/app/odin.rc)
 	set_property(SOURCE src/odin/host/app/odin.rc APPEND PROPERTY INCLUDE_DIRECTORIES
-		${CMAKE_SOURCE_DIR}/src/odin/host/app)
+		${CMAKE_SOURCE_DIR}/src/odin/host/app ${CMAKE_BINARY_DIR})
+	set_property(SOURCE src/odin/host/app/odin.rc APPEND PROPERTY OBJECT_DEPENDS
+		${CMAKE_BINARY_DIR}/odin_version.h)
 endif()
 target_link_libraries(odin PRIVATE odin_deps odin_sdl)
 

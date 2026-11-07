@@ -154,16 +154,21 @@ MenuNav::event(const SDL_Event &event)
 	std::vector<Action> out;
 	const bool button = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP;
 
-	if (button && event.gbutton.button == SDL_GAMEPAD_BUTTON_GUIDE) {
+	const bool guide = m_hotkey == SDL_GAMEPAD_BUTTON_GUIDE;
+
+	if (button && event.gbutton.button == m_hotkey) {
 		if (event.gbutton.down)
 			m_guide.insert(event.gbutton.which);
 		else
 			m_guide.erase(event.gbutton.which);
+		if (guide)
+			return out;
+	} else if (button && m_guide.contains(event.gbutton.which) &&
+	           (guide || (event.gbutton.button < SDL_GAMEPAD_BUTTON_COUNT && m_with[event.gbutton.button]))) {
+		return out;
+	} else if (guide && event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION && m_guide.contains(event.gaxis.which)) {
 		return out;
 	}
-	if ((button && m_guide.contains(event.gbutton.which)) ||
-	    (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION && m_guide.contains(event.gaxis.which)))
-		return out;
 
 	const bool repeat = event.type == SDL_EVENT_KEY_DOWN && event.key.repeat;
 

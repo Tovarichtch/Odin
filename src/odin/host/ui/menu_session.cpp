@@ -129,6 +129,8 @@ MenuSession::MenuSession(const Options &options, Display &display, Keyboard &key
 {
 	MenuState &state = m_menu_state;
 
+	m_nav.hotkey(m_hotkeys.button(), m_hotkeys.combos());
+
 	state.scale = options.display.scale;
 	state.anisotropy = options.display.anisotropy;
 	state.upscale_mode = static_cast<unsigned>(options.display.upscale_mode);
@@ -347,16 +349,16 @@ MenuSession::card_file(const std::string &name) const
 }
 
 std::string
-MenuSession::light_gun_in_out()
+MenuSession::cursor_in_out()
 {
-	if (!m_game || !m_controls.has_sight())
+	if (!m_game || !m_controls.on())
 		return {};
 
-	const bool on = !light_gun_mode_on(m_settings, m_game->name);
+	const bool on = !m_controls.hides_cursor();
 
-	keep_light_gun(m_game->name, on, true);
+	keep_hide_cursor(m_game->name, on, true, m_controls.panel().takes_mouse());
 	m_controls.follow_cursor();
-	return on ? "Light gun mode: the mouse aims" : "Light gun mode off: the mouse is a pointer";
+	return on ? "Cursor hidden: the mouse controls the game" : "Cursor shown: normal pointer";
 }
 
 /* In hand, the card goes into the slot; at the slot, it comes back to the
@@ -514,6 +516,8 @@ MenuSession::event(const SDL_Event &event)
 {
 	using Action = Hotkeys::Action;
 
+	if (!m_menu_state.catching && !m_menu_state.mapping)
+		m_catch_from.reset();
 	if (m_menu_state.catching && catch_input(event)) {
 		m_menu_pictures = MENU_PICTURES;
 		return Asked::NONE;
@@ -536,10 +540,10 @@ MenuSession::event(const SDL_Event &event)
 		if (event.key.down && !event.key.repeat && !m_display.menu_typing())
 			action = m_hotkeys.key_action(event.key.key, event.key.mod);
 		/* Escape closes a list dropped open first, then the advanced
-		 * options */
-		if (action == Action::MENU && event.key.key == SDLK_ESCAPE && m_display.menu_popup_open()) {
+		 * options, whatever action it has */
+		if (event.key.down && event.key.key == SDLK_ESCAPE && m_display.menu_popup_open()) {
 			action.reset();
-		} else if (action == Action::MENU && event.key.key == SDLK_ESCAPE && m_menu_state.advanced) {
+		} else if (event.key.down && !event.key.repeat && event.key.key == SDLK_ESCAPE && m_menu_state.advanced) {
 			action.reset();
 			m_menu_state.advanced = false;
 		}
@@ -578,6 +582,15 @@ MenuSession::event(const SDL_Event &event)
 	default:
 		break;
 	}
+	/* The test of the page Input stops first, as a list dropped open, on
+	 * the menu's key or any shortcut of a gamepad; while it runs, the
+	 * gamepads and the keys work no part of the menu */
+	const bool testing = m_menu_state.testing;
+
+	if (testing && (action == Action::MENU || (pad && action))) {
+		m_menu_state.testing = false;
+		action.reset();
+	}
 	if (action == Action::QUIT)
 		return Asked::QUIT;
 	if (action == Action::CLOSE_GAME && m_game)
@@ -588,13 +601,15 @@ MenuSession::event(const SDL_Event &event)
 		m_display.toggle_fullscreen();
 	/* The menu's own buttons; the keys of a list dropped open are the list's */
 	for (const MenuNav::Action nav : m_nav.event(event)) {
-		if (action || (!pad && m_display.menu_popup_open()) || !navigate(nav))
+		if (action || testing || (!pad && m_display.menu_popup_open()) || !navigate(nav))
 			continue;
 		m_menu_pictures = MENU_PICTURES;
 		return Asked::CLOSE;
 	}
-	/* The gamepads are Odin's, not Dear ImGui's */
-	if (!pad)
+
+	/* The gamepads are Odin's, not Dear ImGui's; a key let go still
+	 * reaches it, pressed before the test */
+	if (!pad && !(event.type == SDL_EVENT_KEY_DOWN && testing && !m_display.menu_popup_open()))
 		m_display.menu_event(event);
 	m_menu_pictures = MENU_PICTURES;
 	return Asked::NONE;
@@ -672,6 +687,7 @@ MenuSession::close()
 	m_nav.reset();
 	m_held.reset();
 	m_menu_state.advanced = false;
+	m_menu_state.testing = false;
 	m_menu_state.nav = {};
 	m_keys.swallow();
 	if (m_audio)
@@ -870,7 +886,7 @@ MenuSession::fill_bar_inputs(BarState &bar) const
 		}
 	light_guns(m_game->name, controls, bar.guns, bar.gun, bar.sights);
 	bar.shake = vibration_on(m_settings, m_game->name);
-	bar.light_gun = light_gun_mode_on(m_settings, m_game->name);
+	bar.hide_cursor = m_controls.hides_cursor();
 }
 
 /* As the menu does them: kept in odin.ini the same way */
@@ -914,8 +930,8 @@ MenuSession::do_bar(BarState &bar)
 	if (m_game) {
 		if (bar.can_shake && bar.shake != vibration_on(m_settings, m_game->name))
 			keep_vibration(m_game->name, bar.shake, true);
-		if (bar.sights[0] && bar.light_gun != light_gun_mode_on(m_settings, m_game->name)) {
-			keep_light_gun(m_game->name, bar.light_gun, true);
+		if (bar.hide_cursor != m_controls.hides_cursor()) {
+			keep_hide_cursor(m_game->name, bar.hide_cursor, true, m_controls.panel().takes_mouse());
 			m_controls.follow_cursor();
 		}
 		for (const Controls::Plugged &pad : m_controls.plugged())
@@ -980,6 +996,7 @@ MenuSession::do_bar(BarState &bar)
 			undo();
 		return Ask::NONE;
 	case Ask::HOTKEYS_DEFAULTS:
+		m_hotkeys.set_button(SDL_GAMEPAD_BUTTON_GUIDE);
 		m_hotkeys.reset();
 		keep_hotkeys();
 		return Ask::NONE;

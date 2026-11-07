@@ -29,6 +29,7 @@
 #include "odin/host/ui/menu.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <numbers>
@@ -81,23 +82,24 @@ is_switch(int kind)
 }
 
 /* The names a maker prints on the buttons that differ: Back, Start, the
- * sticks pressed, Guide, the shoulders and the triggers; the D-pad and the
+ * sticks pressed, Guide, the shoulders, the triggers and misc1 (Share of an
+ * Xbox Series, the mic of a PS5, Capture of a Switch); the D-pad and the
  * right stick (the pads of the Steam Controller) */
 struct Family {
-	const char *back, *start, *left_stick, *right_stick, *guide, *lb, *rb, *lt, *rt, *dpad, *right_axes;
+	const char *back, *start, *left_stick, *right_stick, *guide, *lb, *rb, *lt, *rt, *dpad, *right_axes, *misc;
 };
 
 const Family &
 family(int kind)
 {
-	static constexpr Family ODIN = { "Select", "Start", "L3", "R3", "Guide", "LB", "RB", "LT", "RT", "D-pad", "R stick" };
-	static constexpr Family XBOX_360 = { "Back", "Start", "LS", "RS", "Guide", "LB", "RB", "LT", "RT", "D-pad", "R stick" };
-	static constexpr Family XBOX_ONE = { "View", "Menu", "LS", "RS", "Guide", "LB", "RB", "LT", "RT", "D-pad", "R stick" };
-	static constexpr Family PS3 = { "Select", "Start", "L3", "R3", "PS", "L1", "R1", "L2", "R2", "D-pad", "R stick" };
-	static constexpr Family PS4 = { "Share", "Options", "L3", "R3", "PS", "L1", "R1", "L2", "R2", "D-pad", "R stick" };
-	static constexpr Family PS5 = { "Create", "Options", "L3", "R3", "PS", "L1", "R1", "L2", "R2", "D-pad", "R stick" };
-	static constexpr Family SWITCH = { "−", "+", "LS", "RS", "Home", "L", "R", "ZL", "ZR", "D-pad", "R stick" };
-	static constexpr Family STEAM = { "◀", "▶", "LS", "R pad", "Steam", "LB", "RB", "LT", "RT", "L pad", "R pad" };
+	static constexpr Family ODIN = { "Select", "Start", "L3", "R3", "Guide", "LB", "RB", "LT", "RT", "D-pad", "R stick", "Misc" };
+	static constexpr Family XBOX_360 = { "Back", "Start", "LS", "RS", "Guide", "LB", "RB", "LT", "RT", "D-pad", "R stick", "Misc" };
+	static constexpr Family XBOX_ONE = { "View", "Menu", "LS", "RS", "Guide", "LB", "RB", "LT", "RT", "D-pad", "R stick", "Share" };
+	static constexpr Family PS3 = { "Select", "Start", "L3", "R3", "PS", "L1", "R1", "L2", "R2", "D-pad", "R stick", "Misc" };
+	static constexpr Family PS4 = { "Share", "Options", "L3", "R3", "PS", "L1", "R1", "L2", "R2", "D-pad", "R stick", "Misc" };
+	static constexpr Family PS5 = { "Create", "Options", "L3", "R3", "PS", "L1", "R1", "L2", "R2", "D-pad", "R stick", "Mic" };
+	static constexpr Family SWITCH = { "−", "+", "LS", "RS", "Home", "L", "R", "ZL", "ZR", "D-pad", "R stick", "Capture" };
+	static constexpr Family STEAM = { "◀", "▶", "LS", "R pad", "Steam", "LB", "RB", "LT", "RT", "L pad", "R pad", "Misc" };
 
 	if (kind == PAD_STEAM_CONTROLLER)
 		return STEAM;
@@ -145,6 +147,7 @@ pad_label(const PadInput &pad, int kind)
 		case SDL_GAMEPAD_BUTTON_DPAD_LEFT: return dpad + "←";
 		case SDL_GAMEPAD_BUTTON_DPAD_RIGHT: return dpad + "→";
 		case SDL_GAMEPAD_BUTTON_TOUCHPAD: return "Touchpad";
+		case SDL_GAMEPAD_BUTTON_MISC1: return names.misc;
 		default: {
 			/* The grips of the Steam Controller, under it */
 			if (kind == PAD_STEAM_CONTROLLER && button == SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1)
@@ -180,12 +183,12 @@ pad_label(const PadInput &pad, int kind)
 	return pad.inverted ? out + " (inverted)" : out;
 }
 
-/* "Axis 2 (inverted)", "Axis 1 −", "Button 4", "Hat 0 ↑", "Gas pedal" */
+/* "Axis 2 (inverted)", "Axis 1 −", "Button 4", "Hat 0 ↑", "Gas" (a part
+ * of a known wheel: it is the wheel's) */
 std::string
 joy_label(const JoyInput &joy)
 {
-	static const char *const PARTS[WHEEL_PARTS] = { "Gas pedal", "Brake pedal", "Left paddle", "Right paddle",
-	                                                "Wheel's Start", "Wheel's Select" };
+	static const char *const PARTS[WHEEL_PARTS] = { "Gas", "Brake", "Left paddle", "Right paddle", "Start", "Select" };
 	const std::string index = std::to_string(joy.index);
 
 	switch (joy.type) {
@@ -201,8 +204,36 @@ joy_label(const JoyInput &joy)
 	return "Axis " + index + (joy.inverted ? " (inverted)" : "");
 }
 
+/* ① to ⑨ (drawn by menu_kit.cpp), then (10)... */
 std::string
-label(const HostInput &input, int kind)
+joystick_number(size_t n)
+{
+	if (n >= 9)
+		return "(" + std::to_string(n + 1) + ")";
+	return { static_cast<char>(0xE2), static_cast<char>(0x91), static_cast<char>(0xA0 + n) };
+}
+
+/* The name of a joystick by its GUID, "unplugged" when it is not there */
+std::string
+joystick_name(const std::string &guid, std::span<const MenuState::Plugged> joysticks)
+{
+	const auto one = std::find_if(joysticks.begin(), joysticks.end(),
+	                              [&guid](const MenuState::Plugged &joy) { return joy.guid == guid; });
+
+	return one == joysticks.end() ? std::string("unplugged") : one->name;
+}
+
+/* How the inputs of another joystick than the player's are said: by their
+ * number on the page ("① Button 1"), else by the joystick's name ("Button
+ * 1 · TH8A") */
+struct Others {
+	std::span<const std::string> numbered;
+	std::span<const MenuState::Plugged> joysticks;
+};
+
+/* An input as the page says it */
+std::string
+label(const HostInput &input, int kind, const Others &others = {})
 {
 	static const char *const MOUSE[] = { "Mouse left", "Mouse middle", "Mouse right", "Mouse side", "Mouse extra" };
 
@@ -223,8 +254,16 @@ label(const HostInput &input, int kind)
 			return pad_label(with, kind) + " + " + pad_label(input.pad, kind);
 		}
 		return pad_label(input.pad, kind);
-	case HostInput::Kind::JOY:
-		return joy_label(input.joy);
+	case HostInput::Kind::JOY: {
+		if (input.joy.device.empty())
+			return joy_label(input.joy);
+
+		const auto n = std::find(others.numbered.begin(), others.numbered.end(), input.joy.device);
+
+		if (n != others.numbered.end())
+			return joystick_number(static_cast<size_t>(n - others.numbered.begin())) + " " + joy_label(input.joy);
+		return joy_label(input.joy) + " · " + joystick_name(input.joy.device, others.joysticks);
+	}
 	case HostInput::Kind::MOUSE:
 		break;
 	}
@@ -238,12 +277,12 @@ label(const HostInput &input, int kind)
 }
 
 std::string
-labels(const std::vector<HostInput> &inputs, int kind)
+labels(const std::vector<HostInput> &inputs, int kind, const Others &others)
 {
 	std::string out;
 
 	for (const HostInput &input : inputs)
-		out += (out.empty() ? "" : ", ") + label(input, kind);
+		out += (out.empty() ? "" : ", ") + label(input, kind, others);
 	return out;
 }
 
@@ -262,6 +301,21 @@ struct InputRow {
 	std::vector<HostInput> inputs;
 	bool lit, catchable, half = false;
 };
+
+/* The joysticks other than the player's that the inputs of these rows
+ * name, in the order they first come: ① the first, ② the next... */
+std::vector<std::string>
+other_joysticks(std::span<const InputRow> rows)
+{
+	std::vector<std::string> out;
+
+	for (const InputRow &row : rows)
+		for (const HostInput &input : row.inputs)
+			if (input.kind == HostInput::Kind::JOY && !input.joy.device.empty() &&
+			    std::find(out.begin(), out.end(), input.joy.device) == out.end())
+				out.push_back(input.joy.device);
+	return out;
+}
 
 /* The controls of the player in the order of the game, then the coin, the
  * SERVICE of the player and TEST (player 1): an axis on a gamepad or a
@@ -311,8 +365,9 @@ input_rows(const MenuState &state)
 			add(control.name, { i, 0, control.role }, bindings.part(c, 0), lit, true);
 			break;
 		case GameControl::Type::POSITIONS:
-			add(control.name + " ▲", { i, 2, control.role }, bindings.part(c, 2), lit, true);
-			add(control.name + " ▼", { i, 1, control.role }, bindings.part(c, 1), lit, true);
+			/* Its two ways, as in odin.ini (gear_up: GEAR UP) */
+			add(MenuKit::capitals(control.id) + " UP", { i, 2, control.role }, bindings.part(c, 2), lit, true);
+			add(MenuKit::capitals(control.id) + " DOWN", { i, 1, control.role }, bindings.part(c, 1), lit, true);
 			break;
 		case GameControl::Type::ANALOG: {
 			const char *const left = GameControl::half(control.low, false);
@@ -381,9 +436,8 @@ is_chosen(const MenuState &state, const MenuSlot &slot)
 }
 
 /* A control of the player as Classic and the line at the bottom show it:
- * its name, its parts (rows of input_rows) each after its sign (▲ and ▼
- * of a lever, · before a half on a gamepad), how far it is worked now (0
- * to 1) */
+ * its name, its parts (rows of input_rows) each after its sign (· before
+ * a half on a gamepad), how far it is worked now (0 to 1) */
 struct Group {
 	struct Part {
 		size_t row;
@@ -422,10 +476,13 @@ groups(const MenuState &state, std::span<const InputRow> rows)
 		/* A half on a gamepad, empty, says nothing */
 		if (row.half && row.inputs.empty() && !picked)
 			continue;
-		if (out.empty() || c < 0 || rows[out.back().parts.front().row].slot.control != c) {
+		/* A lever's two ways are two controls: GEAR UP, GEAR DOWN */
+		const bool lever = c >= 0 && controls[static_cast<size_t>(c)].type == GameControl::Type::POSITIONS;
+
+		if (out.empty() || c < 0 || lever || rows[out.back().parts.front().row].slot.control != c) {
 			Group group;
 
-			group.name = c >= 0 && controls[static_cast<size_t>(c)].type != GameControl::Type::BUTTON ?
+			group.name = c >= 0 && controls[static_cast<size_t>(c)].type == GameControl::Type::ANALOG ?
 			             controls[static_cast<size_t>(c)].name : row.name;
 			if (c >= 0 && static_cast<size_t>(c) < state.now.size()) {
 				const ControlNow &now = state.now[static_cast<size_t>(c)];
@@ -439,18 +496,12 @@ groups(const MenuState &state, std::span<const InputRow> rows)
 		Group &group = out.back();
 		const char *sign = "";
 
-		if (c >= 0) {
-			const GameControl &control = controls[static_cast<size_t>(c)];
-
-			if (control.type == GameControl::Type::POSITIONS)
-				sign = row.slot.part == 2 ? "▲" : "▼";
-			else if (row.half)
-				sign = "·";
-		}
+		if (c >= 0 && row.half)
+			sign = "·";
 		group.parts.push_back({ r, sign });
 		group.lit = group.lit || row.lit;
 		group.chosen = group.chosen || picked;
-		if (c < 0)
+		if (c < 0 || lever)
 			group.amount = row.lit ? 1.0f : 0.0f;
 	}
 	return out;
@@ -459,11 +510,12 @@ groups(const MenuState &state, std::span<const InputRow> rows)
 /* A part as a chip says it: its sign, then its inputs, "press..." while
  * caught, "-" for none */
 std::string
-part_text(const MenuState &state, std::span<const InputRow> rows, const Group::Part &part, int kind)
+part_text(const MenuState &state, std::span<const InputRow> rows, const Group::Part &part, int kind,
+          const Others &others)
 {
 	const InputRow &row = rows[part.row];
 	const std::string inputs = same(state.catching, row.slot) ? "press..." :
-	                           row.inputs.empty() ? "-" : labels(row.inputs, kind);
+	                           row.inputs.empty() ? "-" : labels(row.inputs, kind, others);
 
 	return *part.sign ? std::string(part.sign) + " " + inputs : inputs;
 }
@@ -517,8 +569,8 @@ touched(int key, const PadState &now)
 }
 
 /* Whether the game takes that input of a label now, as ControlPanel reads
- * it: a button pressed with Guide held is a shortcut of Odin, unless the
- * input is that pair */
+ * it: a button of a shortcut, pressed with the hotkey button held, is
+ * Odin's (PadState::shortcut), unless the input is that pair */
 bool
 taken(const PadInput &input, int key, const PadState &now)
 {
@@ -546,8 +598,8 @@ struct Label {
 /* The text of a label: its names, the words they begin with said once
  * ("1P START · WATER", "1P X AXIS · Y AXIS"); names that differ only by
  * their last word are one control, its directions say nothing more, when
- * there are three of them or more ("LEFT-LEVER") or when that word is an
- * axis or an arrow ("GEAR", for ▲ and ▼) */
+ * there are three of them or more ("LEFT-LEVER") or when that word is a
+ * letter or a sign ("VR", for VR L and VR R) */
 std::string
 label_text(std::span<const std::string> names)
 {
@@ -1233,7 +1285,9 @@ sort_gun_rows(const MenuState &state, std::span<const InputRow> rows, const PadD
 				const bool standing = input.kind == HostInput::Kind::KEY || input.kind == HostInput::Kind::PAD;
 
 				if (!standing || std::find(standard.begin(), standard.end(), input) == standard.end()) {
-					out.elsewhere.push_back({ r, row.name + " · " + label(input, state.pad_types[state.player & 1]) });
+					out.elsewhere.push_back({ r, row.name + " · " +
+					                                 label(input, state.pad_types[state.player & 1],
+					                                       Others{ {}, state.joysticks }) });
 					shown = true;
 				}
 				continue;
@@ -1266,7 +1320,8 @@ sort_gun_rows(const MenuState &state, std::span<const InputRow> rows, const PadD
 
 /* Each column from the top down, each label at the height of its part or
  * under the one above, then from the bottom up; the right one starts under
- * the corner of the box, the left one too in a game of two (1P and 2P) */
+ * the corner of the box, the left one too in a game of two (1P and 2P) or
+ * while the controls are tried (Test mode) */
 void
 place_labels(const MenuKit &kit, std::span<Label> labels, float top, float corner, float left_corner, float bottom)
 {
@@ -1383,8 +1438,8 @@ drawn_box(const MenuKit &kit, MenuState &state, std::span<const InputRow> rows, 
 			chosen |= 1u << l.part;
 	}
 	view.draw(ImGui::GetWindowDrawList(), kit.palette(), now, chosen, kit.px(1.0f));
-	place_labels(kit, sorted.labels, a.y + kit.px(LABEL_EDGE), corner, state.panel->two_players() ? corner : 0.0f,
-	             bottom);
+	place_labels(kit, sorted.labels, a.y + kit.px(LABEL_EDGE), corner,
+	             state.panel->two_players() || state.testing ? corner : 0.0f, bottom);
 	for (Label &l : sorted.labels)
 		draw_label(kit, state, rows, l, l.left ? a.x + column : b.x - column, column - kit.px(10.0f));
 	draw_elsewhere(kit, state, rows, sorted, a, b, bottom);
@@ -1600,6 +1655,8 @@ list_box(const MenuKit &kit, MenuState &state, std::span<const InputRow> rows, I
 	const MenuPalette &palette = kit.palette();
 	const int kind = state.pad_types[state.player & 1];
 	const std::vector<Group> all = groups(state, rows);
+	const std::vector<std::string> numbered = other_joysticks(rows);
+	const Others others{ numbered, state.joysticks };
 	const float line = ImGui::GetTextLineHeight(), gap = kit.px(28.0f), wide = kit.px(8.0f), high = kit.px(2.0f);
 	const float apart = kit.px(8.0f);
 	ImVec2 lo = { a.x + kit.px(14.0f), a.y + kit.px(MenuKit::BOX_INSIDE) + corner };
@@ -1625,16 +1682,18 @@ list_box(const MenuKit &kit, MenuState &state, std::span<const InputRow> rows, I
 		const Group &group = all[g];
 		const bool second = g >= half;
 		const ImVec2 at = { lo.x + (second ? column + gap : 0.0f), top + static_cast<float>(second ? g - half : g) * h };
-		/* The pill: its parts, the longest cut first where they are too
-		 * long together */
+		/* The pill: its parts, the longest cut first where they are
+		 * too long together for the room the name leaves (60 % of the
+		 * line at least) */
 		const size_t n = group.parts.size();
-		const float room = column * 0.6f - 2.0f * wide;
+		const float room =
+			std::max(column * 0.6f, column - MenuKit::measure(group.name.c_str()) - kit.px(18.0f)) - 2.0f * wide;
 		std::vector<std::string> texts;
 		std::vector<float> widths;
 		bool empty = true;
 
 		for (const Group::Part &part : group.parts) {
-			texts.push_back(part_text(state, rows, part, kind));
+			texts.push_back(part_text(state, rows, part, kind, others));
 			widths.push_back(MenuKit::measure(texts.back().c_str()));
 			empty = empty && rows[part.row].inputs.empty() && !same(state.catching, rows[part.row].slot);
 		}
@@ -1683,8 +1742,10 @@ list_box(const MenuKit &kit, MenuState &state, std::span<const InputRow> rows, I
 		}
 		ImGui::PopID();
 
-		if (hovered)
+		if (hovered) {
 			list->AddRectFilled(at, { at.x + column, at.y + h }, palette.hover);
+			state.hovered_control = static_cast<int>(g);
+		}
 		list->AddLine({ at.x, at.y + h }, { at.x + column, at.y + h }, palette.line, kit.stroke());
 		MenuKit::write(list, { at.x + kit.px(4.0f), at.y + (h - line) / 2.0f },
 		               group.lit || group.chosen ? palette.accent : palette.ink,
@@ -1713,9 +1774,9 @@ list_box(const MenuKit &kit, MenuState &state, std::span<const InputRow> rows, I
 	}
 }
 
-/* The buttons under the drawing, as many on a line as fit: Advanced
- * options on a gamepad or a joystick, Defaults, Clear mapping (Undo for a
- * while after), Start mapping. Their height, with the room around them;
+/* The buttons under the drawing, as many on a line as fit: Test, the
+ * options of the device shown, Defaults, Clear all (Undo for a while
+ * after), Map all. Their height, with the room around them;
  * drawn and clicked when `draw`. */
 float
 buttons_bar(const MenuKit &kit, MenuState &state, std::span<const InputRow> rows, ImVec2 at, float width, bool draw)
@@ -1724,12 +1785,8 @@ buttons_bar(const MenuKit &kit, MenuState &state, std::span<const InputRow> rows
 	using Tone = MenuKit::Tone;
 	const float across = kit.px(12.0f), down = kit.px(5.0f), h = kit.button_size("Defaults", Icon::DEFAULTS).y;
 	const char *const clear = state.undo ? "Undo" : "Clear all";
-	/* The keyboard and the mouse have options in a game the mouse aims in */
-	const bool advanced = state.on_pad() || state.on_joystick() || state.sights[0];
-	std::vector<float> widths;
+	std::vector<float> widths = { kit.button_size("Test", Icon::PAD).x, kit.button_size("Options", Icon::SETTINGS).x };
 
-	if (advanced)
-		widths.push_back(kit.button_size("Options", Icon::SETTINGS).x);
 	widths.push_back(kit.button_size("Defaults", Icon::DEFAULTS).x);
 	widths.push_back(kit.button_size(clear, state.undo ? Icon::UNDO : Icon::CLEAR).x);
 	if (!state.mapping)
@@ -1755,8 +1812,13 @@ buttons_bar(const MenuKit &kit, MenuState &state, std::span<const InputRow> rows
 
 	size_t i = 0;
 
-	if (advanced && kit.button("Options", places[i++], false, Icon::SETTINGS)) {
+	if (kit.button("Test", places[i++], state.testing, Icon::PAD)) {
+		state.testing = !state.testing;
+		state.stop_catching();
+	}
+	if (kit.button("Options", places[i++], false, Icon::SETTINGS)) {
 		state.advanced = true;
+		state.testing = false;
 		state.stop_catching();
 	}
 	if (kit.button("Defaults", places[i++], false, Icon::DEFAULTS))
@@ -1773,13 +1835,13 @@ buttons_bar(const MenuKit &kit, MenuState &state, std::span<const InputRow> rows
 	return height;
 }
 
-/* The advanced options of the device shown, over its box:
- * the vibration of the game; for a gamepad how hard it shakes, for a
- * joystick the force of the wheel and how far it turns for the steering;
- * in a game where player 1 has a sight, the light gun mode and the white
- * border of a light gun (the only options of the keyboard and the mouse);
- * the dead zone and the trigger
- * threshold of the make and model of a gamepad; Close (B, Escape) */
+/* The advanced options of the device shown, over its box: the vibration
+ * of the game; for a gamepad how hard it shakes, for a joystick the force
+ * of the wheel and how far it turns for the steering; the controls the
+ * player may turn over; for the keyboard and the mouse (and in a game
+ * where player 1 has a sight) Hide cursor; with a sight, the white border
+ * of a light gun; the dead zone and the trigger threshold of the make and
+ * model of a gamepad; Close (B, Escape) */
 void
 advanced_box(const MenuKit &kit, MenuState &state, ImVec2 a, ImVec2 b)
 {
@@ -1790,25 +1852,31 @@ advanced_box(const MenuKit &kit, MenuState &state, ImVec2 a, ImVec2 b)
 	const bool pad = state.on_pad(), keys = !pad && !state.on_joystick();
 	const bool turns = state.steers && !pad && !keys, gun = state.sights[0];
 	/* What applies to this game only, as the rows below show it */
-	std::vector<const char *> game_rows;
+	std::vector<std::string> game_rows;
 
 	if (!keys)
-		game_rows.push_back("Vibration");
+		game_rows.push_back("vibration");
 	if (pad && state.can_shake)
 		game_rows.push_back("its force");
 	if (state.can_force && turns)
 		game_rows.push_back("wheel force");
 	if (turns)
 		game_rows.push_back("wheel rotation");
-	if (gun) {
-		game_rows.push_back(keys ? "Light gun mode" : "light gun mode");
-		game_rows.push_back("Sinden border");
+	for (std::string name : state.invert_names) {
+		name[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(name[0])));
+		game_rows.push_back(name);
 	}
+	if (keys || gun)
+		game_rows.push_back("hide cursor");
+	if (gun)
+		game_rows.push_back("Sinden border");
 
 	std::string foot;
 
 	for (size_t i = 0; i < game_rows.size(); i++)
-		foot += (i == 0 ? "" : i + 1 == game_rows.size() ? " and " : ", ") + std::string(game_rows[i]);
+		foot += (i == 0 ? "" : i + 1 == game_rows.size() ? " and " : ", ") + game_rows[i];
+	if (!foot.empty())
+		foot[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(foot[0])));
 	foot += game_rows.size() > 1 ? " apply to this game only" : " applies to this game only";
 	foot += pad ? "; the dead zone and trigger threshold follow this controller to every game." : ".";
 	ImDrawList *const list = ImGui::GetWindowDrawList();
@@ -1899,22 +1967,41 @@ advanced_box(const MenuKit &kit, MenuState &state, ImVec2 a, ImVec2 b)
 		state.wheel_rotation = WHEEL_ROTATIONS[turn];
 		y += h + apart;
 	}
-	/* The mouse aims and shoots for player 1, no pointer and no bar, or is
-	 * a pointer (the gamepad: left, right or A switches it) */
-	if (gun) {
-		static constexpr char UNDER[] = "the mouse aims and shoots; off, a pointer with the bar";
+	/* A control the player turns over, on every device (the gamepad:
+	 * left, right or A switches it) */
+	for (size_t c = 0; c < state.invert_names.size(); c++) {
+		const ImVec2 cells = kit.segments_size(Menu::OFF_ON);
+		const float h = std::max(line, cells.y);
+		int on = state.inverted[c] ? 1 : 0;
+
+		ImGui::PushID(state.invert_names[c].c_str());
+		list->AddText({ lo.x, y + (h - line) / 2.0f }, palette.ink, state.invert_names[c].c_str());
+		if (kit.focus({ lo.x, y }, { hi.x, y + h }, kit.px(4.0f)) && (kit.side() || kit.pressed()))
+			on = kit.side() ? kit.side() > 0 : !on;
+		kit.segments({ hi.x - cells.x, y + (h - cells.y) / 2.0f }, Menu::OFF_ON, on);
+		state.inverted[c] = on == 1;
+		ImGui::PopID();
+		y += h + apart;
+	}
+	/* The cursor hidden, the mouse controlling the game for player 1 and
+	 * no bar, or a normal pointer (the gamepad: left, right or A switches
+	 * it) */
+	if (keys || gun) {
+		static constexpr char UNDER[] = "On: the mouse controls the game, no cursor, no bar. Off: a normal pointer.";
 		const ImVec2 cells = kit.segments_size(Menu::OFF_ON);
 		const float h = std::max(line + kit.px(2.0f) + note, cells.y);
 
-		list->AddText({ lo.x, y }, palette.ink, "Light gun mode");
+		ImGui::PushID("Hide cursor");
+		list->AddText({ lo.x, y }, palette.ink, "Hide cursor");
 		MenuKit::write(list, { lo.x, y + line + kit.px(2.0f) }, palette.dim, UNDER, note);
 		if (kit.focus({ lo.x, y }, { hi.x, y + h }, kit.px(4.0f)) && (kit.side() || kit.pressed()))
-			state.light_gun = kit.side() ? kit.side() > 0 : !state.light_gun;
+			state.hide_cursor = kit.side() ? kit.side() > 0 : !state.hide_cursor;
 
-		int on = state.light_gun ? 1 : 0;
+		int on = state.hide_cursor ? 1 : 0;
 
 		if (kit.segments({ hi.x - cells.x, y + (h - cells.y) / 2.0f }, Menu::OFF_ON, on))
-			state.light_gun = on == 1;
+			state.hide_cursor = on == 1;
+		ImGui::PopID();
 		y += h + apart;
 	}
 	/* The white border of a light gun that finds the screen by it; once
@@ -2004,13 +2091,11 @@ Menu::page_input(MenuKit &kit, MenuState &state) const
 
 	const std::vector<InputRow> rows = input_rows(state);
 	/* A window wide enough (16:9) has the cabinet beside the device; a
-	 * narrower one shows either. The advanced options of a gamepad or a
-	 * joystick take the place of its box. */
+	 * narrower one shows either. The options of the device shown take the
+	 * place of its box. */
 	const ImVec2 window = ImGui::GetIO().DisplaySize;
 	const bool wide = window.x >= WIDE * window.y;
 	const bool cabinet = !wide && state.cabinet_shown;
-
-	state.advanced = state.advanced && (state.on_pad() || state.on_joystick() || state.sights[0]);
 
 	const bool options = state.advanced && !cabinet;
 
@@ -2041,14 +2126,17 @@ Menu::page_input(MenuKit &kit, MenuState &state) const
 	/* The buttons in the corners of the box: List (the classic view) for a
 	 * gamepad or the keyboard (a joystick has a list alone), the swap of the
 	 * device and the cabinet in a narrow window; in a game of two, the
-	 * player shown */
+	 * player shown; while the controls are tried, Test mode */
 	const char *const swap = cabinet ? "Device" : "Cabinet";
 	const bool classic = !cabinet && !options && !state.on_joystick();
-	const bool players = two && !cabinet && !options;
+	const bool players = two && !cabinet && !options, testing = state.testing && !cabinet && !options;
 	const ImVec2 classic_size = kit.button_size("List", Icon::LIST), swap_size = kit.button_size(swap, Icon::SWAP);
-	const float corner =
-		classic || players || !wide ? std::max(classic_size.y, swap_size.y) + kit.px(5.0f) : 0.0f;
+	/* The other joysticks the list numbers, told in the corner */
+	const std::vector<std::string> numbered = cabinet || options ? std::vector<std::string>() : other_joysticks(rows);
+	const float corner = classic || players || testing || !numbered.empty() || !wide ?
+	                     std::max(classic_size.y, swap_size.y) + kit.px(5.0f) : 0.0f;
 
+	state.hovered_control = -1;
 	kit.frame(ImGui::GetWindowDrawList(), a, b, kit.px(MenuKit::BOX_CUT), 0, palette.line);
 	if (cabinet)
 		cabinet_box(kit, state, a, b, false);
@@ -2075,6 +2163,9 @@ Menu::page_input(MenuKit &kit, MenuState &state) const
 	}
 	if (classic && kit.button("List", { x - classic_size.x, a.y + kit.px(5.0f) }, state.classic, Icon::LIST))
 		state.classic = !state.classic;
+
+	const float edge = classic ? x - classic_size.x : x;
+
 	x = a.x + kit.px(6.0f);
 	for (unsigned player = 0; players && player < 2; player++) {
 		const char *const name = player ? "2P" : "1P";
@@ -2085,6 +2176,19 @@ Menu::page_input(MenuKit &kit, MenuState &state) const
 			state.catch_next.clear();
 		}
 		x += kit.button_size(name).x + kit.px(4.0f);
+	}
+	if (testing) {
+		kit.badge(ImGui::GetWindowDrawList(), { x, a.y + kit.px(5.0f) }, "Test mode");
+		x += kit.button_size("Test mode").x + kit.px(8.0f);
+	}
+	if (!numbered.empty()) {
+		std::string told;
+
+		for (size_t n = 0; n < numbered.size(); n++)
+			told += (n ? "   " : "") + joystick_number(n) + " " + joystick_name(numbered[n], state.joysticks);
+		MenuKit::write(ImGui::GetWindowDrawList(),
+		               { x, a.y + kit.px(5.0f) + (classic_size.y - ImGui::GetTextLineHeight()) / 2.0f }, palette.dim,
+		               MenuKit::fitted(told, std::max(0.0f, edge - x - kit.px(8.0f))).c_str());
 	}
 	if (!cabinet && !options) {
 		ImGui::GetWindowDrawList()->AddLine({ a.x + 1.0f, bar_top }, { b.x - 1.0f, bar_top }, palette.line, kit.stroke());
@@ -2097,11 +2201,25 @@ Menu::page_input(MenuKit &kit, MenuState &state) const
 /* What the page says at the bottom: the part caught, what to
  * do, Skip and Stop while each control is caught in turn; else the control
  * worked now and its inputs, filled as far as it is; else how it works */
+bool
+Menu::input_tells(const MenuState &state)
+{
+	if (!state.panel)
+		return false;
+
+	const std::vector<InputRow> rows = input_rows(state);
+	const std::vector<Group> all = groups(state, rows);
+
+	return (state.hovered_control >= 0 && static_cast<size_t>(state.hovered_control) < all.size()) ||
+	       std::any_of(all.begin(), all.end(), [](const Group &group) { return group.chosen || group.lit; });
+}
+
 float
 Menu::input_foot(const MenuKit &kit, MenuState &state, ImVec2 at, float width, float height, bool draw)
 {
 	/* How it works: on the keyboard drawn, its keys are clicked */
-	const char *const told = state.classic || state.on_pad() || state.on_joystick() || state.gun_of(state.player) ?
+	const char *const told = state.testing ? "Testing: each control lights up, the menu stays still." :
+	                         state.classic || state.on_pad() || state.on_joystick() || state.gun_of(state.player) ?
 	                         "Press or move a control to see it light up. Click a name to change it." :
 	                         "Press or move a control to see it light up. Click a key to change it.";
 	const float line = ImGui::GetTextLineHeight();
@@ -2186,18 +2304,22 @@ Menu::input_foot(const MenuKit &kit, MenuState &state, ImVec2 at, float width, f
 		return height;
 	}
 
-	/* The control the frame of the gamepad is on, else the one worked now:
-	 * its name and its inputs, filled as far as it is worked */
+	/* The control the frame of the gamepad is on, else the one under the
+	 * mouse in the list, else the one worked now: its name and its inputs
+	 * (the other joysticks by name), filled as far as it is worked */
 	const std::vector<Group> all = groups(state, rows);
 	const auto picked = std::find_if(all.begin(), all.end(), [](const Group &group) { return group.chosen; });
 	const auto worked = std::find_if(all.begin(), all.end(), [](const Group &group) { return group.lit; });
+	const auto pointed = state.hovered_control >= 0 && static_cast<size_t>(state.hovered_control) < all.size() ?
+	                     all.begin() + state.hovered_control : all.end();
+	const auto told_of = picked != all.end() ? picked : pointed != all.end() ? pointed : worked;
 
-	if (picked != all.end() || worked != all.end()) {
-		const Group &group = picked != all.end() ? *picked : *worked;
+	if (told_of != all.end()) {
+		const Group &group = *told_of;
 		std::string text;
 
 		for (const Group::Part &part : group.parts)
-			text += (text.empty() ? "" : "  ") + part_text(state, rows, part, kind);
+			text += (text.empty() ? "" : "  ") + part_text(state, rows, part, kind, Others{ {}, state.joysticks });
 		say(group.name, palette.accent);
 
 		const float chip_w = std::min(MenuKit::measure(text.c_str()) + 2.0f * kit.px(7.0f), std::max(0.0f, right - x));

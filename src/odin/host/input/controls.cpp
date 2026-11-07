@@ -26,13 +26,16 @@
 #include "odin/host/input/wheels.hpp"
 
 #include "odin/host/audio/audio_out.hpp"
+#include "odin/host/app/hotkeys.hpp"
 #include "odin/host/app/options.hpp"
 #include "odin/machine/cabinet/drive_board.hpp"
 #include "odin/host/ui/pad_drawing.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string_view>
 
 namespace odin {
 
@@ -74,16 +77,26 @@ guid_text(SDL_GUID guid)
 	return text;
 }
 
+/* The path SDL tells of a device, empty for none */
+std::string
+path_text(const char *path)
+{
+	return path ? path : "";
+}
+
 /* The make a player asks for, by its GUID, and the very one picked (0:
- * any of that make), which the other player lets go of */
+ * any of that make) with its path, which the other player lets go of */
 void
-choose(std::array<std::string, 2> &wanted, std::array<SDL_JoystickID, 2> &picked, unsigned player,
-       const std::string &guid, SDL_JoystickID one)
+choose(std::array<std::string, 2> &wanted, std::array<SDL_JoystickID, 2> &picked, std::array<std::string, 2> &paths,
+       unsigned player, const std::string &guid, SDL_JoystickID one, const std::string &path)
 {
 	wanted[player & 1] = guid;
 	picked[player & 1] = one;
+	paths[player & 1] = path;
 	if (one && picked[~player & 1] == one)
 		picked[~player & 1] = 0;
+	if (same_path(device_path(paths[~player & 1]), path))
+		paths[~player & 1].clear();
 }
 
 /* The device of that id among those open (nullptr: none) */
@@ -120,6 +133,8 @@ Controls::Controls(Keyboard &keys, const std::vector<GameControl> &controls, con
 		}
 	}
 	route_outputs();
+	follow_hotkeys();
+	m_hide_standard = m_panel.takes_mouse();
 	if (all_off())
 		return;
 	for (const auto &[key, value] : settings.section("players." + game)) {
@@ -129,8 +144,19 @@ Controls::Controls(Keyboard &keys, const std::vector<GameControl> &controls, con
 			m_guns[key[3] - '1'] = identity_of(value);
 		} else if (key == "joy1" || key == "joy2") {
 			m_joys_wanted[key[3] - '1'] = identity_of(value);
-		} else if (key == "light_gun_mode" && on_off_named(value)) {
-			m_light_gun_mode = *on_off_named(value);
+		} else if (key == "p1_path" || key == "p2_path") {
+			m_wanted_paths[key[1] - '1'] = value;
+		} else if (key == "joy1_path" || key == "joy2_path") {
+			m_joys_wanted_paths[key[3] - '1'] = value;
+		} else if ((key == "hide_cursor" || key == "light_gun_mode") && on_off_named(value)) {
+			m_hide_cursor = hide_cursor_on(settings, game, false);
+		} else if (key == "invert") {
+			/* The panel turns them over (control_panel.cpp); one
+			 * that the game cannot turn over is said */
+			for (const std::string_view id : list_items(value))
+				if (std::none_of(controls.begin(), controls.end(),
+				                 [id](const GameControl &control) { return control.invertible && control.id == id; }))
+					refuse_setting("players." + game, key, std::string(id));
 		} else if (!player_value_right(key, value)) {
 			refuse_setting("players." + game, key, value);
 		}
@@ -144,15 +170,15 @@ Controls::Controls(Keyboard &keys, const std::vector<GameControl> &controls, con
 		return;
 	}
 	m_on = true;
-	m_sight = sights_of(controls)[0];
 	follow_cursor();
 }
 
-/* No pointer while the mouse aims */
+/* No pointer while the mouse aims; made so again after the bar showed it
+ * (Dear ImGui shows it while it draws) */
 void
 Controls::follow_cursor()
 {
-	if (!m_on || aims() == m_cursor_hidden)
+	if (!m_on)
 		return;
 	m_cursor_hidden = aims();
 	if (m_cursor_hidden)
@@ -221,6 +247,14 @@ Controls::joystick_state(SDL_JoystickID id) const
 	return joy ? &joy->state : nullptr;
 }
 
+std::string
+Controls::joystick_guid(SDL_JoystickID id) const
+{
+	const Joy *const joy = open_one(m_joys, id);
+
+	return joy ? joy->guid : std::string();
+}
+
 const Controls::Joy *
 Controls::joystick(unsigned player) const
 {
@@ -234,15 +268,43 @@ void
 Controls::reseat()
 {
 	std::vector<OpenPad> pads, joys;
+	/* A link each time: it may point to another node since */
+	const std::array<std::string, 2> paths = { device_path(m_wanted_paths[0]), device_path(m_wanted_paths[1]) };
+	const std::array<std::string, 2> joy_paths = { device_path(m_joys_wanted_paths[0]),
+	                                               device_path(m_joys_wanted_paths[1]) };
+	std::vector<int> kinds;
+	std::array<SDL_JoystickID, 2> joys_had = m_joy_seats;
 
 	for (const Pad &pad : m_pads)
-		pads.push_back({ pad.id, pad.guid });
+		pads.push_back({ pad.id, pad.guid, pad.path });
 	for (const Joy &joy : m_joys)
-		if (joystick_fits(SDL_GetJoystickType(joy.handle), m_steers))
-			joys.push_back({ joy.id, joy.guid });
+		if (joystick_fits(SDL_GetJoystickType(joy.handle), m_steers)) {
+			joys.push_back({ joy.id, joy.guid, joy.path });
+			kinds.push_back(SDL_GetJoystickType(joy.handle));
+		}
+	/* A game steered by a wheel: the wheels first; a player who had a
+	 * joystick, not a wheel, takes a wheel nobody has, player 1 first */
+	if (m_steers) {
+		const auto wheel = [this](SDL_JoystickID id) {
+			const Joy *const joy = open_one(m_joys, id);
 
-	const std::array<SDL_JoystickID, 2> seats = seat_pads(pads, m_wanted, m_picked, m_seats);
-	const std::array<SDL_JoystickID, 2> joy_seats = seat_pads(joys, m_joys_wanted, m_joys_picked, m_joy_seats);
+			return joy && SDL_GetJoystickType(joy->handle) == SDL_JOYSTICK_TYPE_WHEEL;
+		};
+		auto free_wheels = std::count(kinds.begin(), kinds.end(), SDL_JOYSTICK_TYPE_WHEEL);
+
+		wheels_first(joys, kinds);
+		for (const SDL_JoystickID had : joys_had)
+			free_wheels -= had && wheel(had);
+		for (SDL_JoystickID &had : joys_had)
+			if (had && !wheel(had) && free_wheels > 0) {
+				had = 0;
+				free_wheels--;
+			}
+	}
+
+	const std::array<SDL_JoystickID, 2> seats = seat_pads(pads, m_wanted, m_picked, m_seats, paths);
+	const std::array<SDL_JoystickID, 2> joy_seats =
+		seat_pads(joys, m_joys_wanted, m_joys_picked, joys_had, joy_paths);
 
 	for (unsigned player = 0; player < 2; player++) {
 		if (joy_seats[player] == m_joy_seats[player])
@@ -251,7 +313,8 @@ Controls::reseat()
 			m_force.reset();
 		m_joy_seats[player] = joy_seats[player];
 		if (const Joy *const now = joystick(player))
-			std::printf("joystick: '%s' for player %u\n", SDL_GetJoystickName(now->handle), player + 1);
+			std::printf("joystick: '%s' (%s) for player %u\n", SDL_GetJoystickName(now->handle), now->path.c_str(),
+			            player + 1);
 	}
 
 	for (unsigned player = 0; player < 2; player++) {
@@ -264,7 +327,8 @@ Controls::reseat()
 		}
 		m_seats[player] = seats[player];
 		if (const Pad *const now = seat(player))
-			std::printf("pad: '%s' for player %u\n", SDL_GetGamepadName(now->handle), player + 1);
+			std::printf("pad: '%s' (%s) for player %u\n", SDL_GetGamepadName(now->handle), now->path.c_str(),
+			            player + 1);
 	}
 }
 
@@ -280,7 +344,7 @@ Controls::plugged() const
 		                pad_kind(SDL_GetGamepadType(pad.handle), SDL_GetGamepadVendor(pad.handle),
 		                         SDL_GetGamepadProduct(pad.handle)),
 		                pad.id, player_seated(pad.id, m_seats),
-		                SDL_GetGamepadConnectionState(pad.handle) });
+		                SDL_GetGamepadConnectionState(pad.handle), pad.path });
 	}
 	return out;
 }
@@ -288,7 +352,9 @@ Controls::plugged() const
 void
 Controls::want(unsigned player, const std::string &guid, SDL_JoystickID picked)
 {
-	choose(m_wanted, m_picked, player, guid, picked);
+	const Pad *const one = find(picked);
+
+	choose(m_wanted, m_picked, m_wanted_paths, player, guid, picked, one ? one->path : std::string());
 	reseat();
 }
 
@@ -302,7 +368,7 @@ Controls::joysticks() const
 
 		out.push_back({ name ? name : "", joy.guid, static_cast<int>(SDL_GetJoystickType(joy.handle)), joy.id,
 		                player_seated(joy.id, m_joy_seats),
-		                SDL_GetJoystickConnectionState(joy.handle) });
+		                SDL_GetJoystickConnectionState(joy.handle), joy.path });
 	}
 	return out;
 }
@@ -310,7 +376,9 @@ Controls::joysticks() const
 void
 Controls::want_joystick(unsigned player, const std::string &guid, SDL_JoystickID picked)
 {
-	choose(m_joys_wanted, m_joys_picked, player, guid, picked);
+	const Joy *const one = find_joystick(picked);
+
+	choose(m_joys_wanted, m_joys_picked, m_joys_wanted_paths, player, guid, picked, one ? one->path : std::string());
 	reseat();
 }
 
@@ -333,6 +401,7 @@ Controls::open(SDL_JoystickID id)
 	pad.handle = handle;
 	pad.id = id;
 	pad.guid = guid_text(SDL_GetGamepadGUIDForID(id));
+	pad.path = path_text(SDL_GetGamepadPathForID(id));
 	pad.tuning = PadTuning::of(m_settings, pad.guid, true);
 	for (unsigned axis = 0; axis < SDL_GAMEPAD_AXIS_COUNT; axis++)
 		pad.axes[axis] = SDL_GetGamepadAxis(handle, static_cast<SDL_GamepadAxis>(axis));
@@ -340,7 +409,8 @@ Controls::open(SDL_JoystickID id)
 	for (unsigned button = 0; button < SDL_GAMEPAD_BUTTON_COUNT; button++)
 		pad.state.buttons[button] = SDL_GetGamepadButton(handle, static_cast<SDL_GamepadButton>(button));
 	m_pads.push_back(std::move(pad));
-	std::printf("pad: '%s' plugged\n", SDL_GetGamepadName(handle));
+	std::printf("pad: '%s' plugged, %s at %s\n", SDL_GetGamepadName(handle), m_pads.back().guid.c_str(),
+	            m_pads.back().path.c_str());
 	reseat();
 	if (m_seats[0] != id && m_seats[1] != id)
 		std::printf("pad: '%s' waits, both players have one\n", SDL_GetGamepadName(handle));
@@ -383,6 +453,7 @@ Controls::open_joystick(SDL_JoystickID id)
 	joy.handle = handle;
 	joy.id = id;
 	joy.guid = guid_text(SDL_GetJoystickGUIDForID(id));
+	joy.path = path_text(SDL_GetJoystickPathForID(id));
 	joy.state.axes.assign(static_cast<size_t>(axes), 0);
 	joy.state.known.assign(static_cast<size_t>(axes), false);
 	joy.state.rest.assign(static_cast<size_t>(axes), 0);
@@ -404,8 +475,9 @@ Controls::open_joystick(SDL_JoystickID id)
 	joy.fresh.assign(static_cast<size_t>(buttons), false);
 	joy.release.assign(static_cast<size_t>(buttons), false);
 	m_joys.push_back(std::move(joy));
-	std::printf("joystick: '%s' plugged, %d axes, %d buttons, %d hats\n", SDL_GetJoystickName(handle), axes, buttons,
-	            hats);
+	std::printf("joystick: '%s' plugged, %s at %s, %d axes, %d buttons, %d hats\n", SDL_GetJoystickName(handle),
+	            m_joys.back().guid.c_str(), m_joys.back().path.c_str(), axes, buttons, hats);
+	list_joysticks();
 	reseat();
 }
 
@@ -419,7 +491,16 @@ Controls::close_joystick(SDL_JoystickID id)
 	std::printf("joystick: '%s' unplugged\n", SDL_GetJoystickName(joy->handle));
 	SDL_CloseJoystick(joy->handle);
 	m_joys.erase(m_joys.begin() + (joy - m_joys.data()));
+	list_joysticks();
 	reseat();
+}
+
+void
+Controls::list_joysticks()
+{
+	m_all_joys.clear();
+	for (const Joy &joy : m_joys)
+		m_all_joys.push_back({ joy.guid, &joy.state });
 }
 
 namespace {
@@ -535,16 +616,19 @@ Controls::event(const SDL_Event &event)
 	case SDL_EVENT_GAMEPAD_BUTTON_UP:
 		if (Pad *const pad = find(event.gbutton.which); pad && event.gbutton.button < SDL_GAMEPAD_BUTTON_COUNT) {
 			const unsigned button = event.gbutton.button;
+			const unsigned hotkey = static_cast<unsigned>(m_hotkey_button);
+			const bool guide = hotkey == SDL_GAMEPAD_BUTTON_GUIDE;
 
 			press(pad->state.buttons[button], pad->fresh[button], pad->release[button], event.gbutton.down);
-			if (event.gbutton.down && button != SDL_GAMEPAD_BUTTON_GUIDE &&
-			    pad->state.buttons[SDL_GAMEPAD_BUTTON_GUIDE]) {
-				pad->state.shortcut[button] = true;
+			/* Another hotkey button: Guide is in no shortcut */
+			if (event.gbutton.down && button != hotkey && (guide || button != SDL_GAMEPAD_BUTTON_GUIDE) &&
+			    pad->state.buttons[hotkey]) {
+				pad->state.shortcut[button] = guide || m_hotkey_with[button];
 				m_guide_combo = static_cast<int>(button);
 			}
 			if (!pad->state.buttons[button])
 				pad->state.shortcut[button] = false;
-			if (button != SDL_GAMEPAD_BUTTON_GUIDE)
+			if (!guide || button != SDL_GAMEPAD_BUTTON_GUIDE)
 				pad->guide_alone = pad->guide_alone && !event.gbutton.down;
 			else if (event.gbutton.down)
 				pad->guide_alone = true;
@@ -714,9 +798,9 @@ Controls::host() const
 		host.pads[player] = seat(player) ? &seat(player)->state : nullptr;
 		host.joys[player] = joystick(player) ? &joystick(player)->state : nullptr;
 	}
-	/* Out of light gun mode the mouse does nothing in a game with a sight */
-	host.mice[0] = m_gun_seen[0]                                   ? &m_gun_aims[0] :
-	               m_mouse_seen && (!m_sight || m_light_gun_mode) ? &m_mouse : nullptr;
+	host.all_joys = &m_all_joys;
+	/* A mouse that does not play does nothing in the game */
+	host.mice[0] = m_gun_seen[0] ? &m_gun_aims[0] : m_mouse_seen && aims() ? &m_mouse : nullptr;
 	host.mice[1] = m_gun_seen[1] ? &m_gun_aims[1] : nullptr;
 	return host;
 }
@@ -726,6 +810,17 @@ Controls::rebind()
 {
 	m_panel = ControlPanel(m_game_controls, m_settings, m_game);
 	m_panel.set_wheel_rotation(m_wheel_rotation);
+	follow_hotkeys();
+	m_hide_standard = m_panel.takes_mouse();
+}
+
+void
+Controls::follow_hotkeys()
+{
+	const Hotkeys hotkeys(m_settings, false);
+
+	m_hotkey_button = hotkeys.button();
+	m_hotkey_with = hotkeys.combos();
 }
 
 void

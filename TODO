@@ -33,6 +33,9 @@ pharrier (Planet Harriers)
 
 - Linked cabinets stay linked only while a frame goes round the ring in
   less than 1 ms, the time its master leaves.
+- EXIT from the SYSTEM MENU stops the game on "I/O BD is not connected to
+  game BD.": a request to the I/O board outlasts its 10 ms, perhaps as the
+  SH-4 takes no bus time (below). Off and on brings the game back.
 
 sgnascar (NASCAR Arcade)
 
@@ -181,6 +184,8 @@ SH-4
   (sh4_ops.cpp).
 - FTRC out of range gives 80000000, where the SH-4 saturates
   (sh4_ops.cpp).
+- A double with an odd register, an undefined code nobody has measured,
+  takes the pair below it (sh4_ops.cpp).
 - FSRRA, FIPR and FTRV are worked out by the host, not with the tables and
   error bounds of the SH-4 (sh4_ops.cpp).
 - FSCA uses frozen sine and cosine values (those of glibc): the table of
@@ -523,6 +528,9 @@ PowerVR Neon 250 (PMX1)
 
 Host and user interface
 
+- The list of the files a game lacks, on its sheet in the library,
+  scrolls with the mouse alone, not with a gamepad or the keys
+  (menu_library.cpp).
 - The filters of the cabinets' screens (filters/lola-retro) take their
   sizes from the manuals; the pitch, mask, beam spots, convergence and
   curvature of their tubes are guessed, none was measured (each .glslp
@@ -533,3 +541,8 @@ Host and user interface
   slow PC is not measured yet (renderer_programs.cpp; to check).
 - Debug key 2 changed nothing in the scenes tried, none of which shows a
   second layer (renderer_debug.cpp; to check).
+- A key is the one that writes its name, not the one at a place: on an
+  AZERTY keyboard, Q, W, A and Z are not where a QWERTY has them, nor
+  where a device that sends keys puts them (keyboard.hpp; to check).
+- On the page Input, X and Y of a gamepad clear a control or set it back
+  at once, with no Undo: only Clear all has one (menu_session_input.cpp).

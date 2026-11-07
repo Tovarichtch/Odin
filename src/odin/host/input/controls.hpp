@@ -55,15 +55,15 @@ namespace odin {
  * system tells where it is when the window opens under it). The gamepads
  * are opened and closed as they are plugged in and out; each player has
  * the one they want for the game ([players.<game>] of the settings, "p1 =
- * <GUID> <name>": the first of that make and model), else the first free
- * one, and keeps it while others come and go (seats.hpp); a joystick the
- * same ("joy1 = <GUID> <name>"). SDL's own driver of the Logitech wheels
+ * <GUID> <name>": the first of that make and model, the one of its path
+ * when two are alike, "p1_path"), else the first free one, and keeps it
+ * while others come and go (seats.hpp); a joystick the same ("joy1 =
+ * <GUID> <name>", "joy1_path"). SDL's own driver of the Logitech wheels
  * is kept off: it would turn the centring spring of the wheel off and set
  * its rotation as soon as it sees it (SDL 3.4, Linux); the wheel stays
  * with the driver of the system. ODIN_CONTROLLERS=none leaves the
- * gamepads, the joysticks and the mouse out. In a
- * game where player 1 has a sight, the pointer of the system is hidden on
- * the window. */
+ * gamepads, the joysticks and the mouse out. The pointer of the system is
+ * hidden on the window while the mouse controls the game (aims). */
 class Controls : public HikaruPanel {
 public:
 	/* ODIN_CONTROLLERS=none: no gamepad, joystick, mouse nor light gun is read (the tests) */
@@ -77,14 +77,17 @@ public:
 	/* An event of a gamepad, of a joystick or of the mouse; false for any
 	 * other. */
 	bool event(const SDL_Event &event);
-	/* The mouse aims in the game (a sight of player 1, in light gun mode):
-	 * no pointer */
-	bool aims() const { return m_sight && m_light_gun_mode; }
-	/* The light gun mode ([players.<game>] light_gun_mode): off, the mouse
-	 * is a pointer again and does nothing in the game; the pointer follows
-	 * at the next follow_cursor (the menu shows it while it is open) */
-	void set_light_gun_mode(bool on) { m_light_gun_mode = on; }
-	bool has_sight() const { return m_sight; }
+	/* The cursor hidden ([players.<game>] hide_cursor, else when a
+	 * control of player 1 or of the cabinet takes the mouse: a sight by
+	 * default): no cursor, no bar, the mouse controls the game; off, it
+	 * is a normal pointer and does nothing in the game. Set, the cursor
+	 * follows at the next follow_cursor (the menu shows it while it is
+	 * open). The setting, and the mouse that aims: only with the controls
+	 * on. */
+	bool hides_cursor() const { return m_hide_cursor.value_or(m_hide_standard); }
+	bool on() const { return m_on; }
+	bool aims() const { return m_on && hides_cursor(); }
+	void set_hide_cursor(std::optional<bool> on) { m_hide_cursor = on; }
 	void follow_cursor();
 	/* The mouse is read where the picture is: in the hole of the bezel
 	 * when there is one (picture.hpp) */
@@ -102,11 +105,13 @@ public:
 	/* The dead zone and the trigger threshold of each gamepad read again
 	 * from the settings (control_panel.hpp: PadTuning) */
 	void retune();
-	/* Guide of a gamepad pressed and let go alone since the last call:
-	 * the menu (with another button, Guide is a shortcut) */
+	/* Guide of a gamepad pressed and let go alone since the last call,
+	 * when it is the hotkey button ([hotkeys] button): the menu (with
+	 * another button, Guide is a shortcut); another one tapped alone is
+	 * the game's */
 	bool guide_tapped() { return std::exchange(m_guide_tapped, false); }
-	/* The button pressed with Guide held since the last call: a shortcut
-	 * (-1: none) */
+	/* The button pressed with the hotkey button held since the last call:
+	 * a shortcut if Hotkeys has it (-1: none) */
 	int guide_combo() { return std::exchange(m_guide_combo, -1); }
 	/* The gamepad of a player: its name, its kind (pad_drawing.hpp: its
 	 * SDL_GamepadType, or the Steam Controller); empty and unknown when
@@ -122,15 +127,18 @@ public:
 	 * (nullptr: none) */
 	const PadState *gamepad_state(SDL_JoystickID id) const;
 	const JoyState *joystick_state(SDL_JoystickID id) const;
+	/* The GUID of a joystick plugged in (guid_text), empty for none */
+	std::string joystick_guid(SDL_JoystickID id) const;
 	/* The gamepads plugged in, in the order they came: name, GUID, kind
 	 * (pad_drawing.hpp), id, the player it is the pad of (-1: none), by a
-	 * wire or not (as SDL knows it) */
+	 * wire or not (as SDL knows it), its path (seats.hpp) */
 	struct Plugged {
 		std::string name, guid;
 		int kind;
 		SDL_JoystickID id;
 		int player;
 		SDL_JoystickConnectionState connection;
+		std::string path;
 	};
 	std::vector<Plugged> plugged() const;
 	/* The gamepad a player wants: its GUID, empty for the first free one,
@@ -237,6 +245,7 @@ private:
 		SDL_Gamepad *handle = nullptr;
 		SDL_JoystickID id = 0;
 		std::string guid;
+		std::string path;	/* as SDL tells it */
 		std::array<int16_t, SDL_GAMEPAD_AXIS_COUNT> axes{};	/* as SDL gives them */
 		PadTuning tuning;
 		PadState state;
@@ -253,6 +262,7 @@ private:
 		SDL_Joystick *handle = nullptr;
 		SDL_JoystickID id = 0;
 		std::string guid;
+		std::string path;	/* as SDL tells it */
 		JoyState state;
 		std::vector<bool> fresh, release;
 		std::vector<uint8_t> hats;	/* as SDL gives them */
@@ -269,6 +279,8 @@ private:
 	void close(SDL_JoystickID id);
 	void open_joystick(SDL_JoystickID id);
 	void close_joystick(SDL_JoystickID id);
+	/* m_all_joys made again, as m_joys changed */
+	void list_joysticks();
 	Pad *find(SDL_JoystickID id);
 	Pad *seat(unsigned player);
 	const Pad *seat(unsigned player) const;
@@ -276,6 +288,8 @@ private:
 	const Joy *joystick(unsigned player) const;
 	/* Each player takes the gamepad and the joystick seats.hpp gives them */
 	void reseat();
+	/* The hotkey button and its shortcuts, from the settings */
+	void follow_hotkeys();
 	HostState host() const;
 	void follow_guns(bool hold);
 	bool wants_guns() const { return !m_guns[0].empty() || !m_guns[1].empty(); }
@@ -303,10 +317,14 @@ private:
 	std::vector<GameOutput> m_outputs;
 	bool m_on;
 	bool m_cursor_hidden;	/* the mouse aims in the game: no cursor */
-	bool m_sight = false;	/* player 1 has a sight */
-	bool m_light_gun_mode = true;
+	std::optional<bool> m_hide_cursor;	/* as the settings say, if they do */
+	bool m_hide_standard = false;	/* player 1 or the cabinet takes the mouse */
 	bool m_guide_tapped = false;
 	int m_guide_combo = -1;
+	/* The hotkey button, and the buttons that are a shortcut with it:
+	 * kept from the game while it is held (with Guide, all of them) */
+	int m_hotkey_button = SDL_GAMEPAD_BUTTON_GUIDE;
+	std::array<bool, SDL_GAMEPAD_BUTTON_COUNT> m_hotkey_with{};
 	bool m_rumble = true;
 	bool m_felt = false;
 	Uint16 m_felt_level = 0;	/* how hard the felt sound shakes, smoothed */
@@ -329,10 +347,13 @@ private:
 	std::array<SDL_JoystickID, 2> m_seats{};	/* that of each player, 0: none */
 	std::array<std::string, 2> m_wanted;
 	std::array<SDL_JoystickID, 2> m_picked{};	/* the very one, 0: any of that make */
+	std::array<std::string, 2> m_wanted_paths;	/* [players.<game>] p1_path, p2_path */
 	std::vector<Joy> m_joys;	/* plugged in, in the order they came */
+	std::vector<PluggedJoy> m_all_joys;	/* the same, for HostState (list_joysticks) */
 	std::array<SDL_JoystickID, 2> m_joy_seats{};
 	std::array<std::string, 2> m_joys_wanted;
 	std::array<SDL_JoystickID, 2> m_joys_picked{};
+	std::array<std::string, 2> m_joys_wanted_paths;	/* joy1_path, joy2_path */
 	/* The force of the wheel of player 1, made at its first torque (none:
 	 * not tried yet, or the joystick changed) */
 	std::unique_ptr<WheelForce> m_force;

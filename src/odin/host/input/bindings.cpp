@@ -25,6 +25,8 @@
 #include "odin/host/input/bindings.hpp"
 
 #include "odin/common/repeats.hpp"
+#include "odin/host/app/hotkeys.hpp"
+#include "odin/host/input/keyboard.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -41,11 +43,10 @@ namespace {
 /* The keys of the cabinet as OPTIONS tells them, and the gamepad of each
  * player: a stick on the keys of the directions, the second stick of
  * player 1 on those of player 2, the gears on the keys of LB and RB.
- * TEST and SERVICE are the buttons of the cabinet, on its I/O board,
- * which the BOOTROM and the games all read: Guide with the left stick
- * pressed for SERVICE, with the right one for TEST (Guide is the key of
- * the shortcuts, as on Batocera); the switches of the main board have no
- * key. The coin of a player is also the SELECT of their pad. */
+ * TEST and SERVICE, the buttons of the cabinet on its I/O board, which
+ * the BOOTROM and the games all read, are those [hotkeys] gives them
+ * (held_inputs); the switches of the main board have no key. The coin of
+ * a player is also the SELECT of their pad. */
 struct Default {
 	Role role;
 	const char *key1;	/* the key of player 1, or of the cabinet */
@@ -55,7 +56,6 @@ struct Default {
 
 const Default DEFAULTS[] = {
 	{ Role::START, "1", "2", "start" },
-	{ Role::SERVICE, "9", nullptr, "guide+leftstick" },
 	{ Role::UP, "Up", "R", "dpup" },
 	{ Role::DOWN, "Down", "F", "dpdown" },
 	{ Role::LEFT, "Left", "D", "dpleft" },
@@ -89,7 +89,6 @@ const Default DEFAULTS[] = {
 	{ Role::GUN_Y, nullptr, nullptr, "lefty" },
 	{ Role::COIN1, "5", nullptr, "back" },
 	{ Role::COIN2, "6", nullptr, "back" },
-	{ Role::TEST, "0", nullptr, "guide+rightstick" },
 	{ Role::BOARD_TEST, nullptr, nullptr, nullptr },
 	{ Role::BOARD_SERVICE, nullptr, nullptr, nullptr },
 };
@@ -127,8 +126,7 @@ const std::pair<Role, const char *> MOUSE_DEFAULTS[] = {
  * on every wheel of the mapping of EmulationStation (Batocera's
  * es_input.cfg: "joystick1left" on axis 0 for all 29). Its pedals, paddles,
  * Start and Select are the parts of a known wheel (wheels.cpp); on another
- * joystick, the user takes those on the page Input, Batocera from its
- * mapping. */
+ * joystick, the user takes those on the page Input. */
 const std::pair<Role, const char *> JOY_DEFAULTS[] = {
 	{ Role::STEER, "axis0" }, { Role::ACCEL, "gas" }, { Role::BRAKE, "brake" }, { Role::GEAR_DOWN, "paddle_left" },
 	{ Role::GEAR_UP, "paddle_right" }, { Role::START, "start" }, { Role::COIN1, "select" },
@@ -168,6 +166,34 @@ size_t
 cabinet_index(Role role)
 {
 	return static_cast<size_t>(role) - static_cast<size_t>(Role::COIN1);
+}
+
+/* The inputs of a held hotkey (Hotkeys::held): its keys, with player 1
+ * alone (`keys`), then its button with the hotkey button held, or Guide
+ * alone */
+std::vector<HostInput>
+held_inputs(const Hotkeys::Binding &binding, bool keys, int hotkey)
+{
+	std::vector<HostInput> out;
+
+	for (const HotKey &key : binding.keys)
+		if (keys && key.key != SDLK_UNKNOWN) {
+			HostInput input{};
+
+			input.kind = HostInput::Kind::KEY;
+			input.key = key.key;
+			out.push_back(input);
+		}
+	if (binding.pad != Hotkeys::NO_PAD) {
+		HostInput input{};
+
+		input.kind = HostInput::Kind::PAD;
+		input.pad = { PadInput::Type::BUTTON, static_cast<uint8_t>(binding.pad) };
+		if (binding.pad != Hotkeys::GUIDE_ALONE)
+			input.pad.with = static_cast<int8_t>(hotkey);
+		out.push_back(input);
+	}
+	return out;
 }
 
 /* The inputs of a button: the keys, then the inputs of the gamepad, of its
@@ -416,7 +442,7 @@ HostInput::parse(std::string_view text)
 		const std::string name(text.substr(4));
 
 		out.kind = Kind::KEY;
-		out.key = SDL_GetKeyFromName(name.c_str());
+		out.key = key_named(name.c_str());
 		if (out.key == SDLK_UNKNOWN)
 			return std::nullopt;
 		return out;
@@ -425,6 +451,19 @@ HostInput::parse(std::string_view text)
 		return parse_mouse(text.substr(6));
 	if (text.substr(0, 4) == "joy:")
 		return parse_joy(text.substr(4));
+	/* Another joystick than the player's: its GUID, 32 hex digits */
+	if (text.substr(0, 4) == "joy@") {
+		const std::string_view guid = text.substr(4, 32);
+		std::optional<HostInput> other;
+
+		if (guid.size() == 32 && text.substr(36, 1) == ":" &&
+		    std::all_of(guid.begin(), guid.end(), [](char c) { return std::isxdigit(static_cast<unsigned char>(c)); }))
+			other = parse_joy(text.substr(37));
+		if (other)
+			std::transform(guid.begin(), guid.end(), std::back_inserter(other->joy.device),
+			               [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
+		return other;
+	}
 	if (text.substr(0, 4) != "pad:")
 		return std::nullopt;
 	return parse_pad(text.substr(4));
@@ -445,7 +484,7 @@ HostInput::text() const
 		                                mouse.type == MouseInput::Type::OFF ? "off" :
 		                                                                      BUTTONS[mouse.button % MOUSE_BUTTONS]);
 	case Kind::JOY:
-		return "joy:" + joy_text(joy);
+		return (joy.device.empty() ? "joy:" : "joy@" + joy.device + ":") + joy_text(joy);
 	case Kind::PAD:
 		break;
 	}
@@ -539,16 +578,19 @@ Bindings::with_kinds(const std::vector<HostInput> &inputs, const std::vector<Hos
 Bindings::Bindings(const std::vector<GameControl> &panel, const Settings &settings, const std::string &game)
 	: m_panel(panel), m_controls(panel.size())
 {
-	set_defaults(game);
+	set_defaults(settings, game);
 	read_settings(settings, game);
 }
 
 /* The inputs of each control and of the cabinet when odin.ini says
- * nothing, kept as such */
+ * nothing, kept as such: TEST and the SERVICE of each player those of the
+ * page Hotkeys ([hotkeys] test, service), the SERVICE of player 2 on its
+ * gamepad alone */
 void
-Bindings::set_defaults(const std::string &game)
+Bindings::set_defaults(const Settings &settings, const std::string &game)
 {
 	const std::vector<GameControl> &panel = m_panel;
+	const Hotkeys hotkeys(settings, false);
 	/* The players with a sight: the mouse aims for them (player 2 with
 	 * their light gun) */
 	const std::array<bool, 2> aims = sights_of(panel);
@@ -561,7 +603,11 @@ Bindings::set_defaults(const std::string &game)
 			m_controls[c][2] = defaults(Role::GEAR_UP, control.player);
 			continue;
 		}
-		m_controls[c][0] = own_inputs(defaults(control.role, control.player), control, game);
+		m_controls[c][0] = own_inputs(control.role == Role::SERVICE ?
+		                                  held_inputs(hotkeys.of(Hotkeys::Action::SERVICE), control.player == 0,
+		                                              hotkeys.button()) :
+		                                  defaults(control.role, control.player),
+		                              control, game);
 		for (const auto &[role, name] : MOUSE_DEFAULTS)
 			if (aims[control.player & 1] && role == control.role)
 				m_controls[c][0].push_back(*HostInput::parse(std::string("mouse:") + name));
@@ -571,7 +617,9 @@ Bindings::set_defaults(const std::string &game)
 		}
 	}
 	for (size_t r = 0; r < m_cabinet.size(); r++)
-		m_cabinet[r] = defaults(cabinet_role(r), 0);
+		m_cabinet[r] = cabinet_role(r) == Role::TEST ?
+		                   held_inputs(hotkeys.of(Hotkeys::Action::TEST), true, hotkeys.button()) :
+		                   defaults(cabinet_role(r), 0);
 	m_defaults = m_controls;
 	m_cabinet_defaults = m_cabinet;
 }

@@ -228,8 +228,20 @@ MenuSession::fill_game_shown(MenuState &state)
 	                           m_game && m_game->shaker_experimental(state.player & 1);
 	state.shake = vibration_on(m_settings, game_shown());
 	state.vibration_force = vibration_force_of(m_settings, game_shown());
-	state.light_gun = light_gun_mode_on(m_settings, game_shown());
+	state.hide_cursor = hide_cursor_on(m_settings, game_shown(), panel_shown().takes_mouse());
 	state.sinden_border = sinden_border_of(m_settings, game_shown());
+	/* What the player shown may turn over, and what is turned over */
+	const std::vector<std::string> inverted = inverted_of(m_settings, game_shown());
+
+	state.invert_names.clear();
+	state.invert_ids.clear();
+	state.inverted.clear();
+	for (const GameControl &control : panel_shown().controls())
+		if (control.invertible && control.player == (state.player & 1)) {
+			state.invert_names.push_back("Invert " + control.name);
+			state.invert_ids.push_back(control.id);
+			state.inverted.push_back(std::find(inverted.begin(), inverted.end(), control.id) != inverted.end());
+		}
 	/* The wheel the drive board turns, and how hard */
 	state.can_force = m_other ? m_other_forces : m_game && (m_game->drive_first_output || m_game->wheel_motor);
 	state.steers = steers_of(panel_shown().controls());
@@ -302,17 +314,27 @@ MenuSession::fill_devices(MenuState &state)
 		std::array<SDL_JoystickID, 2> seats{};
 
 		if (m_other) {
-			std::array<std::string, 2> wanted;
+			std::array<std::string, 2> wanted, paths;
 			std::vector<OpenPad> open;
 
-			for (const auto &[key, value] : m_settings.section("players." + game_shown()))
-				for (unsigned player = 0; player < 2; player++)
+			for (const auto &[key, value] : m_settings.section("players." + game_shown())) {
+				for (unsigned player = 0; player < 2; player++) {
 					if (key == keys + std::to_string(player + 1))
 						wanted[player] = identity_of(value);
+					else if (key == keys + std::to_string(player + 1) + "_path")
+						paths[player] = device_path(value);
+				}
+			}
+			std::vector<int> kinds;
+
 			for (const Controls::Plugged &one : plugged)
-				if (pads || joystick_fits(one.kind, state.steers))
-					open.push_back({ one.id, one.guid });
-			seats = seat_pads(open, wanted, {}, {});
+				if (pads || joystick_fits(one.kind, state.steers)) {
+					open.push_back({ one.id, one.guid, one.path });
+					kinds.push_back(one.kind);
+				}
+			if (!pads && state.steers)
+				wheels_first(open, kinds);
+			seats = seat_pads(open, wanted, {}, {}, paths);
 		}
 		out.clear();
 		for (const Controls::Plugged &one : plugged)
@@ -383,9 +405,17 @@ void
 MenuSession::do_asked(MenuState &state)
 {
 	if (state.hotkeys_default) {
+		m_hotkeys.set_button(SDL_GAMEPAD_BUTTON_GUIDE);
 		m_hotkeys.reset();
 		keep_hotkeys();
 		state.hotkeys_default = false;
+		m_menu_pictures = MENU_PICTURES;
+	}
+	if (state.hotkey_button_asked) {
+		m_hotkeys.set_button(*state.hotkey_button_asked);
+		keep_hotkeys();
+		state.hotkey_button_asked.reset();
+		state.hotkey_moved.reset();
 		m_menu_pictures = MENU_PICTURES;
 	}
 	if (state.choose != MenuState::Folder::NONE) {
@@ -461,6 +491,7 @@ MenuSession::draw_menu()
 	fill_inputs(state);
 	for (size_t a = 0; a < Hotkeys::ACTIONS; a++)
 		state.hotkeys[a] = m_hotkeys.of(static_cast<Hotkeys::Action>(a));
+	state.hotkey_button = m_hotkeys.button();
 	if (m_audio || m_listing)
 		state.devices = AudioOut::devices();
 	fill_game_shown(state);
@@ -626,12 +657,15 @@ MenuSession::apply_game(const MenuState &was)
 		keep_vibration(game_shown(), now.shake, !m_other && m_game);
 	if (now.vibration_force != was.vibration_force && now.can_shake)
 		keep_vibration_force(game_shown(), now.vibration_force, !m_other && m_game);
-	/* Its light gun mode: the pointer follows when the menu closes */
-	if (now.light_gun != was.light_gun && now.sights[0])
-		keep_light_gun(game_shown(), now.light_gun, !m_other && m_game);
+	/* Whether the mouse plays: the pointer follows as the menu closes */
+	if (now.hide_cursor != was.hide_cursor)
+		keep_hide_cursor(game_shown(), now.hide_cursor, !m_other && m_game, panel_shown().takes_mouse());
 	/* Its white border for a light gun, at once too */
 	if (now.sinden_border != was.sinden_border && now.sights[0])
 		keep_sinden_border(game_shown(), now.sinden_border, !m_other && m_game);
+	/* Its controls turned over, at once too */
+	if (now.inverted != was.inverted)
+		keep_inverted(game_shown(), now.invert_ids, now.inverted);
 	/* The force of its wheel, at once too */
 	if (now.wheel_force != was.wheel_force && now.can_force)
 		keep_wheel_force(game_shown(), now.wheel_force, !m_other && m_game);
@@ -694,22 +728,36 @@ MenuSession::clear_inputs()
 }
 
 /* [players.<game>] p1 or p2 (none: the first free gamepad), joy1 or joy2;
- * the very one picked (two of a make) for this run only */
+ * p1_path... the very one picked when another of its make is plugged in,
+ * which the other player lets go of (none: any of that make) */
 void
 MenuSession::want_pad(const std::string &game, unsigned player, const std::string &guid, const std::string &name,
                       bool joystick, bool runs, SDL_JoystickID picked)
 {
 	const std::string section = "players." + game;
+	const std::string own = std::string(joystick ? "joy" : "p") + (player ? "2" : "1");
+	const std::string other = std::string(joystick ? "joy" : "p") + (player ? "1" : "2");
+	const std::vector<Controls::Plugged> plugged = joystick ? m_controls.joysticks() : m_controls.plugged();
+	const auto one = std::find_if(plugged.begin(), plugged.end(),
+	                              [picked](const Controls::Plugged &device) { return picked && device.id == picked; });
+	const auto alike = std::count_if(plugged.begin(), plugged.end(),
+	                                 [&guid](const Controls::Plugged &device) { return device.guid == guid; });
+	const std::string taken = one != plugged.end() ? one->path : std::string();
+	const std::string path = !guid.empty() && alike > 1 ? taken : std::string();
 
 	if (joystick) {
 		if (runs)
 			m_controls.want_joystick(player, guid, picked);
-		keep(section, player ? "joy2" : "joy1", guid + " " + name);
-		return;
+		keep(section, own, guid + " " + name);
+	} else {
+		if (runs)
+			m_controls.want(player, guid, picked);
+		keep(section, own, guid.empty() ? std::nullopt : std::optional(guid + " " + name));
 	}
-	if (runs)
-		m_controls.want(player, guid, picked);
-	keep(section, player ? "p2" : "p1", guid.empty() ? std::nullopt : std::optional(guid + " " + name));
+	keep(section, own + "_path", path.empty() ? std::nullopt : std::optional(path));
+	for (const auto &[key, value] : m_settings.section(section))
+		if (key == other + "_path" && same_path(device_path(value), taken))
+			keep(section, key, std::nullopt);
 }
 
 /* [players.<game>] gun1 or gun2 (none: no light gun) */
@@ -749,13 +797,35 @@ MenuSession::keep_cabinet(const std::string &game, const std::string &id)
 	keep("players." + game, "cabinet", id == "standard" ? std::nullopt : std::optional<std::string>(id));
 }
 
-/* [players.<game>] light_gun_mode: a line only when off */
+/* [players.<game>] hide_cursor: a line only when not as by default
+ * (`standard`, ControlPanel::takes_mouse); light_gun_mode, its name before,
+ * goes */
 void
-MenuSession::keep_light_gun(const std::string &game, bool on, bool runs)
+MenuSession::keep_hide_cursor(const std::string &game, bool on, bool runs, bool standard)
 {
 	if (runs)
-		m_controls.set_light_gun_mode(on);
-	keep("players." + game, "light_gun_mode", on ? std::nullopt : std::optional<std::string>("off"));
+		m_controls.set_hide_cursor(on == standard ? std::nullopt : std::optional(on));
+	keep("players." + game, "hide_cursor", on == standard ? std::nullopt : std::optional<std::string>(on ? "on" : "off"));
+	keep("players." + game, "light_gun_mode", std::nullopt);
+}
+
+/* [players.<game>] invert: the controls of the player shown turned over or
+ * not, those of the other player as they were; the panels made again, as
+ * after a binding */
+void
+MenuSession::keep_inverted(const std::string &game, const std::vector<std::string> &ids, const std::vector<uint8_t> &on)
+{
+	std::vector<std::string> kept = inverted_of(m_settings, game);
+	std::string line;
+
+	std::erase_if(kept, [&ids](const std::string &id) { return std::find(ids.begin(), ids.end(), id) != ids.end(); });
+	for (size_t c = 0; c < ids.size(); c++)
+		if (on[c])
+			kept.push_back(ids[c]);
+	for (const std::string &id : kept)
+		line += (line.empty() ? "" : ", ") + id;
+	keep("players." + game, "invert", line.empty() ? std::nullopt : std::optional<std::string>(line));
+	rebind_panels();
 }
 
 /* [players.<game>] sinden_border, sinden_border_style and

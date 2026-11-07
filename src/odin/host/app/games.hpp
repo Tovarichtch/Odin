@@ -135,6 +135,9 @@ struct GameControl {
 	std::optional<PortSwitch> port;
 	std::optional<std::array<uint8_t, 2>> span;
 	Ball ball = Ball::NONE;
+	/* An analog control that is no pedal the player may turn over
+	 * ("invertible" : true; [players.<game>] invert) */
+	bool invertible = false;
 };
 
 /* The players with a sight among the controls of a game: player 1, then

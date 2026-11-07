@@ -29,16 +29,15 @@
 
 namespace odin {
 
-/* The page Input waits for an input, whatever device it shows (a light
- * gun clicks, sends keys or is a gamepad; a pedal is a key or a
- * joystick): Escape lets it go; a key, or a button of the mouse (or of a
- * light gun that moves the pointer) clicked where the menu has nothing (a
- * click on a button of it, Skip, Stop, a tab or a row, works that), or on
- * the player's gamepad a button (Guide held, then another: both), a stick
- * or a trigger from half its way, or on their joystick a button, a hat or
- * an axis from half its way off where it rested, or for a sight the way
- * the mouse or the light gun aims, is the one. True when the event was
- * taken. */
+/* The page Input waits for an input, whatever device it shows (a light gun
+ * clicks, sends keys or is a gamepad; a pedal is a key or a joystick): Escape
+ * lets it go; a key, or a button of the mouse (or of a light gun that moves
+ * the pointer) clicked where the menu has nothing (a click on a button of it,
+ * Skip, Stop, a tab or a row, works that), or on the player's gamepad a
+ * button (Guide held, then another: both), a stick or a trigger from half its
+ * way, or on a joystick (catch_joystick) a button, a hat or an axis from half
+ * its way off where it was as the catch began, or for a sight the way the
+ * mouse or the light gun aims, is the one. True when the event was taken. */
 bool
 MenuSession::catch_input(const SDL_Event &event)
 {
@@ -142,8 +141,26 @@ MenuSession::catch_input(const SDL_Event &event)
 	case SDL_EVENT_JOYSTICK_HAT_MOTION:
 	case SDL_EVENT_JOYSTICK_ADDED:
 	case SDL_EVENT_JOYSTICK_REMOVED: {
-		/* Where the axis was before this move */
-		const JoyState *const joy = m_controls.joystick_state(joystick_shown(state.player));
+		/* Where the axes were as the catch (or Map all) began, none
+		 * if not known yet, and where this one was before this move;
+		 * the axes caught before and let go since, free again */
+		if (!m_catch_from) {
+			m_catch_from.emplace();
+			for (const Controls::Plugged &one : m_controls.joysticks())
+				if (const JoyState *const state_of = m_controls.joystick_state(one.id))
+					for (size_t a = 0; a < state_of->axes.size(); a++)
+						(*m_catch_from)[one.id].push_back(state_of->known[a] ? std::optional(state_of->axes[a]) :
+						                                                       std::nullopt);
+			std::erase_if(m_catch_held, [this](const auto &held) {
+				const auto [id, axis] = held.first;
+				const JoyState *const state_of = m_controls.joystick_state(id);
+
+				return !state_of || axis >= state_of->axes.size() ||
+				       std::abs(state_of->axes[axis] - held.second) < ControlPanel::PRESSED;
+			});
+		}
+
+		const JoyState *const joy = m_controls.joystick_state(event.jaxis.which);
 		const size_t axis = event.jaxis.axis;
 		const int was = event.type == SDL_EVENT_JOYSTICK_AXIS_MOTION && joy && axis < joy->axes.size() ? joy->axes[axis] : 0;
 
@@ -179,27 +196,34 @@ MenuSession::button_on_analog()
 	}
 }
 
-/* An input of the joystick of the player caught: a button pressed, a way
- * of a hat, an axis moving away from where it rested, from half its way
- * (one coming back, a pedal let go after it was caught, is none): whole
- * on an analog control, turned over for a pedal pressed toward the bottom
- * of its axis (a G29), else its half */
+/* An input of a joystick caught: a button pressed, a way of a hat, an axis
+ * moving away from where it was as the catch began, from half its way (one
+ * coming back, a pedal let go after it was caught, is none): whole on an
+ * analog control, turned over for a pedal pressed toward the bottom of its
+ * axis (a G29), else its half. Another joystick than the player's (a shifter,
+ * pedals of their own) is named by its GUID; that of the other player of a
+ * game of two is theirs. */
 void
 MenuSession::catch_joystick(const SDL_Event &event, int was)
 {
 	MenuState &state = m_menu_state;
+	const SDL_JoystickID which = event.type == SDL_EVENT_JOYSTICK_AXIS_MOTION ? event.jaxis.which :
+	                             event.type == SDL_EVENT_JOYSTICK_HAT_MOTION  ? event.jhat.which :
+	                                                                            event.jbutton.which;
 	const SDL_JoystickID mine = joystick_shown(state.player);
-	const JoyState *const joy = m_controls.joystick_state(mine);
+	const JoyState *const joy = m_controls.joystick_state(which);
 	HostInput input{};
 	JoyInput &in = input.joy;
 
-	if (!state.catching || !mine || !joy)
+	if (!state.catching || !joy)
+		return;
+	if (which != mine && panel_shown().two_players() && which == joystick_shown((state.player & 1) ^ 1))
 		return;
 	input.kind = HostInput::Kind::JOY;
+	if (which != mine)
+		in.device = m_controls.joystick_guid(which);
 	switch (event.type) {
 	case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
-		if (event.jbutton.which != mine)
-			return;
 		in.type = JoyInput::Type::BUTTON;
 		in.index = event.jbutton.button;
 		button_on_analog();
@@ -207,7 +231,7 @@ MenuSession::catch_joystick(const SDL_Event &event, int was)
 	case SDL_EVENT_JOYSTICK_HAT_MOTION: {
 		const uint8_t value = event.jhat.value;
 
-		if (event.jhat.which != mine || !value)
+		if (!value)
 			return;
 		in.type = JoyInput::Type::HAT;
 		in.index = event.jhat.hat;
@@ -218,13 +242,30 @@ MenuSession::catch_joystick(const SDL_Event &event, int was)
 	case SDL_EVENT_JOYSTICK_AXIS_MOTION: {
 		const size_t axis = event.jaxis.axis;
 
-		if (event.jaxis.which != mine || axis >= joy->rest.size())
+		if (axis >= joy->rest.size())
 			return;
 
-		const int moved = event.jaxis.value - joy->rest[axis];
+		/* From where it was as the catch began, else from its rest,
+		 * set by its first value (unknown then, or plugged since) */
+		int from = joy->rest[axis];
+		const auto start = m_catch_from->find(which);
 
-		if (std::abs(moved) < ControlPanel::PRESSED || std::abs(moved) <= std::abs(was - joy->rest[axis]))
+		if (start != m_catch_from->end() && axis < start->second.size() && start->second[axis])
+			from = *start->second[axis];
+
+		/* An axis just caught, as Map all goes on at once or a click
+		 * starts another catch: none until back near where it was */
+		if (const auto held = m_catch_held.find({ which, axis }); held != m_catch_held.end()) {
+			if (std::abs(event.jaxis.value - held->second) >= ControlPanel::PRESSED)
+				return;
+			m_catch_held.erase(held);
+		}
+
+		const int moved = event.jaxis.value - from;
+
+		if (std::abs(moved) < ControlPanel::PRESSED || std::abs(moved) <= std::abs(was - from))
 			return;
+		m_catch_held[{ which, axis }] = from;
 		in.index = event.jaxis.axis;
 		in.type = moved < 0 ? JoyInput::Type::AXIS_NEGATIVE : JoyInput::Type::AXIS_POSITIVE;
 		const GameControl *const control =
@@ -320,8 +361,10 @@ MenuSession::catch_pad(bool axis, int index, int value)
 }
 
 /* The page Hotkeys waits for a key (Ctrl, Alt, Shift or Gui held with it
- * are its own) or for a button pressed with Guide held, or Guide tapped
- * alone; Escape lets it be. True when the event was taken. */
+ * are its own) or for a button pressed with the hotkey button held, or
+ * Guide tapped alone when it is that button; Delete, Backspace or the Clear
+ * of the gamepad (X) empties the place; Escape tapped lets it be, held
+ * ESCAPE_HOLD_MS it is the key. True when the event was taken. */
 bool
 MenuSession::catch_hotkey(const SDL_Event &event)
 {
@@ -334,21 +377,37 @@ MenuSession::catch_hotkey(const SDL_Event &event)
 	case SDL_EVENT_KEY_DOWN:
 	case SDL_EVENT_KEY_UP:
 		m_keys.set(event.key.key, event.key.down);
+		if (event.key.key == SDLK_ESCAPE && slot < Hotkeys::KEYS) {
+			/* Held long enough: seen as the key repeats, else as
+			 * it is let go; one down as another place waited (a
+			 * click ended that catch) is let be */
+			if (m_escape_down && m_escape_down->place != *state.hotkey_catching)
+				m_escape_down.reset();
+
+			const bool held = m_escape_down && SDL_GetTicks() - m_escape_down->since >= ESCAPE_HOLD_MS;
+
+			if (event.key.down && !event.key.repeat)
+				m_escape_down = { SDL_GetTicks(), event.key.mod, *state.hotkey_catching };
+			else if (held)
+				set_hotkey_key(action, slot, { SDLK_ESCAPE, Hotkeys::modifiers(m_escape_down->mods) });
+			else if (m_escape_down && !event.key.down)
+				state.hotkey_catching.reset();
+			if (!state.hotkey_catching)
+				m_escape_down.reset();
+			return true;
+		}
 		if (!event.key.down || event.key.repeat)
 			return true;
 		if (event.key.key == SDLK_ESCAPE) {
 			state.hotkey_catching.reset();
 			return true;
 		}
-		if (slot < Hotkeys::KEYS && !Hotkeys::is_modifier(event.key.key)) {
-			const HotKey key{ event.key.key, Hotkeys::modifiers(event.key.mod) };
-
-			state.hotkey_moved.reset();
-			if (const auto from = m_hotkeys.set_key(action, slot, key))
-				state.hotkey_moved = { static_cast<size_t>(*from), static_cast<size_t>(action), key, Hotkeys::NO_PAD };
-			state.hotkey_catching.reset();
-			keep_hotkeys();
+		if (event.key.key == SDLK_DELETE || event.key.key == SDLK_BACKSPACE) {
+			clear_hotkey(action, slot);
+			return true;
 		}
+		if (slot < Hotkeys::KEYS && !Hotkeys::is_modifier(event.key.key))
+			set_hotkey_key(action, slot, { event.key.key, Hotkeys::modifiers(event.key.mod) });
 		return true;
 	case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
 	case SDL_EVENT_GAMEPAD_BUTTON_UP:
@@ -369,7 +428,11 @@ MenuSession::catch_hotkey(const SDL_Event &event)
 		} else if (std::find(nav.begin(), nav.end(), MenuNav::BACK) != nav.end()) {
 			/* B alone is no shortcut: it lets the catch go */
 			state.hotkey_catching.reset();
+		} else if (std::find(nav.begin(), nav.end(), MenuNav::CLEAR) != nav.end()) {
+			clear_hotkey(action, slot);
 		}
+		if (!state.hotkey_catching)
+			m_escape_down.reset();
 		return true;
 	}
 	default:
@@ -377,22 +440,66 @@ MenuSession::catch_hotkey(const SDL_Event &event)
 	}
 }
 
-/* [hotkeys]: a line for each action not as by default */
+/* The key caught for a place of an action; the action that had it told,
+ * with the key as the action took it (TEST and SERVICE leave the
+ * modifiers) */
+void
+MenuSession::set_hotkey_key(Hotkeys::Action action, size_t slot, const HotKey &key)
+{
+	MenuState &state = m_menu_state;
+
+	state.hotkey_moved.reset();
+	if (const auto from = m_hotkeys.set_key(action, slot, key))
+		state.hotkey_moved = { static_cast<size_t>(*from), static_cast<size_t>(action),
+		                       m_hotkeys.of(action).keys[slot], Hotkeys::NO_PAD };
+	state.hotkey_catching.reset();
+	m_escape_down.reset();
+	keep_hotkeys();
+}
+
+/* The key (slot 0 or 1) or the gamepad (slot KEYS) of an action emptied */
+void
+MenuSession::clear_hotkey(Hotkeys::Action action, size_t slot)
+{
+	MenuState &state = m_menu_state;
+
+	if (slot < Hotkeys::KEYS)
+		m_hotkeys.set_key(action, slot, {});
+	else
+		m_hotkeys.set_pad(action, Hotkeys::NO_PAD);
+	state.hotkey_moved.reset();
+	state.hotkey_catching.reset();
+	m_escape_down.reset();
+	keep_hotkeys();
+}
+
+/* [hotkeys]: the line of the hotkey button and one for each action not as
+ * by default with it, the others back to their comment by default with it;
+ * the menu follows the button, the panels are made again (they take TEST
+ * and SERVICE from there) */
 void
 MenuSession::keep_hotkeys()
 {
+	const int button = m_hotkeys.button();
+
+	m_settings.know(known_settings(m_games, button));
+	keep("hotkeys", "button",
+	     button == SDL_GAMEPAD_BUTTON_GUIDE ? std::nullopt : std::optional(Hotkeys::button_text(button)));
 	for (size_t a = 0; a < Hotkeys::ACTIONS; a++) {
 		const auto action = static_cast<Hotkeys::Action>(a);
 		const Hotkeys::Binding &binding = m_hotkeys.of(action);
-		const std::optional<std::string> line = binding == Hotkeys::standard(action) ? std::nullopt :
+		const std::optional<std::string> line = binding == Hotkeys::standard(action, button) ? std::nullopt :
 		                                        std::optional(Hotkeys::line(binding));
 
 		keep("hotkeys", Hotkeys::id(action), line);
 	}
+	m_nav.hotkey(button, m_hotkeys.combos());
+	rebind_panels();
 }
 
-/* The input caught takes the place of those of its kind on that part; the
- * next part waiting is caught then */
+/* The input caught takes the place of those of its kind on that part (of
+ * a joystick, those of the same joystick); the next part waiting is caught
+ * then */
 void
 MenuSession::caught(const HostInput &input)
 {
@@ -402,7 +509,9 @@ MenuSession::caught(const HostInput &input)
 	std::vector<HostInput> inputs = slot.control < 0 ? bindings.cabinet(slot.role) : bindings.part(c, slot.part);
 
 	m_menu_state.catching.reset();
-	std::erase_if(inputs, [&input](const HostInput &in) { return in.kind == input.kind; });
+	std::erase_if(inputs, [&input](const HostInput &in) {
+		return in.kind == input.kind && (in.kind != HostInput::Kind::JOY || in.joy.device == input.joy.device);
+	});
 	inputs.push_back(input);
 	keep_binding(slot.control < 0 ? bindings.cabinet_line(slot.role, inputs) : bindings.line(c, slot.part, inputs));
 	if (!m_menu_state.catch_next.empty()) {
@@ -501,17 +610,25 @@ MenuSession::undo()
 	m_undo_until = 0;
 }
 
+/* The panels of the game that runs and of the one shown made again from
+ * the settings */
+void
+MenuSession::rebind_panels()
+{
+	m_controls.rebind();
+	if (m_other) {
+		m_other.emplace(m_other_controls, m_settings, game_shown());
+		m_other->set_wheel_rotation(wheel_rotation_of(m_settings, game_shown()));
+	}
+}
+
 void
 MenuSession::keep_binding(const Bindings::Line &line, const std::string &game)
 {
 	const std::string section = "controls." + (game.empty() ? game_shown() : game);
 
 	keep(section, line.key, line.value);
-	m_controls.rebind();
-	if (m_other) {
-		m_other.emplace(m_other_controls, m_settings, game_shown());
-		m_other->set_wheel_rotation(wheel_rotation_of(m_settings, game_shown()));
-	}
+	rebind_panels();
 }
 
 } /* namespace odin */

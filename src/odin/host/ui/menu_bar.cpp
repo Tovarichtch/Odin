@@ -468,8 +468,7 @@ Menu::bar_input(BarItems &b)
 	}
 	if (state.can_shake)
 		toggle("Vibration", {}, state.shake, state.game);
-	if (state.sights[0])
-		toggle("Light gun mode", b.key(Action::LIGHT_GUN), state.light_gun, state.game);
+	toggle("Hide cursor", b.key(Action::LIGHT_GUN), state.hide_cursor, state.game);
 	ImGui::Separator();
 	if (ImGui::BeginMenu("Hotkeys")) {
 		b.framed();

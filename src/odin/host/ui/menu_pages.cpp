@@ -580,7 +580,8 @@ Menu::page_audio(MenuKit &kit, MenuState &state) const
  * Hotkeys::Action */
 constexpr const char *HOTKEY_NAMES[Hotkeys::ACTIONS] = {
 	"Settings (pauses the game)", "Pause", "Save state", "Load state", "Reset", "Full screen",
-	"Insert / remove card (Virtual-On)", "Light gun mode (Brave Firefighters)", "Close game", "Quit",
+	"Insert / remove card (Virtual-On)", "Hide cursor (on / off)", "Test (the cabinet, every game)",
+	"Service (player 1, every game)", "Close game", "Quit",
 };
 
 /* The modifiers as their caps say them */
@@ -709,7 +710,7 @@ hotkeys_keyboard(const MenuKit &kit, const MenuState &state, const Box &box, con
 		others_w += kit.key_size(name.c_str()).x + gap;
 
 	const char caption[] = "Bright outline: Odin's keys. Press one to see it light up.";
-	const char guide[] = "held: the hotkey button, as on Batocera";
+	const char guide[] = "held: the hotkey button";
 	const float text_w = std::min(width, kit.px(260.0f));
 	const float caption_h = centred({}, width, size, caption, 0);
 	const float guide_w = kit.pill_size(guide_name.c_str()).x, guide_text_w = text_w - guide_w - kit.px(8.0f);
@@ -756,18 +757,36 @@ hotkeys_keyboard(const MenuKit &kit, const MenuState &state, const Box &box, con
 
 } /* namespace */
 
-/* Hotkeys: what Odin does itself on a key or with Guide held, each changed
- * by a click and the next key or button */
+/* Hotkeys: what Odin does itself on a key or with the hotkey button held,
+ * each changed by a click and the next key or button; that button */
 void
 Menu::page_hotkeys(MenuKit &kit, MenuState &state) const
 {
 	const ImVec2 top = ImGui::GetCursorScreenPos(), room = ImGui::GetContentRegionAvail();
 	const Box box = left_box(kit, top, room);
 	const int type = state.pad_types[0];
+	const std::string held = button_name(state.hotkey_button, type);
 
-	hotkeys_keyboard(kit, state, box, button_name(SDL_GAMEPAD_BUTTON_GUIDE, type));
+	hotkeys_keyboard(kit, state, box, held);
 	begin_settings(kit, box, top, room);
 
+	kit.begin_group("GAMEPAD");
+
+	const std::span<const int> buttons = Hotkeys::buttons();
+	std::vector<std::string> names;
+	int chosen = 0;
+
+	for (size_t b = 0; b < buttons.size(); b++) {
+		names.push_back(button_name(buttons[b], type));
+		if (buttons[b] == state.hotkey_button)
+			chosen = static_cast<int>(b);
+	}
+	if (kit.dropdown("Hotkey button", "held with another: a shortcut", names, chosen) && chosen >= 0 &&
+	    buttons[static_cast<size_t>(chosen)] != state.hotkey_button) {
+		state.hotkey_button_asked = buttons[static_cast<size_t>(chosen)];
+		state.hotkey_catching.reset();
+	}
+	kit.end_group();
 	kit.begin_group("KEYS");
 	for (size_t a = 0; a < Hotkeys::ACTIONS; a++) {
 		const Hotkeys::Binding &binding = state.hotkeys[a];
@@ -797,7 +816,7 @@ Menu::page_hotkeys(MenuKit &kit, MenuState &state) const
 		if (caught(Hotkeys::KEYS))
 			catching = 2;
 		if (binding.pad != Hotkeys::NO_PAD)
-			pad.push_back(button_name(SDL_GAMEPAD_BUTTON_GUIDE, type));
+			pad.push_back(held);
 		if (binding.pad != Hotkeys::NO_PAD && binding.pad != Hotkeys::GUIDE_ALONE)
 			pad.push_back(button_name(binding.pad, type));
 
@@ -836,7 +855,7 @@ Menu::hotkeys_help(const MenuState &state)
 	if (!state.hotkey_catching && state.hotkey_moved) {
 		const MenuState::HotkeyMoved &moved = *state.hotkey_moved;
 		const int type = state.pad_types[0];
-		const std::string guide = button_name(SDL_GAMEPAD_BUTTON_GUIDE, type);
+		const std::string guide = button_name(state.hotkey_button, type);
 		const std::string what = moved.key ? Hotkeys::text(*moved.key) :
 		                         moved.pad == Hotkeys::GUIDE_ALONE ? guide :
 		                                                             guide + " + " + button_name(moved.pad, type);
@@ -849,11 +868,18 @@ Menu::hotkeys_help(const MenuState &state)
 	const std::string name = HOTKEY_NAMES[state.hotkey_catching->first];
 
 	if (state.hotkey_catching->second == Hotkeys::KEYS) {
-		const std::string guide = button_name(SDL_GAMEPAD_BUTTON_GUIDE, state.pad_types[0]);
+		const std::string guide = button_name(state.hotkey_button, state.pad_types[0]);
+		const std::string alone =
+			state.hotkey_button == SDL_GAMEPAD_BUTTON_GUIDE ? ", or tap " + guide + " alone. " : ". ";
 
-		return name + ": hold " + guide + " and press a button, or tap " + guide + " alone. Esc cancels.";
+		return name + ": hold " + guide + " and press a button" + alone +
+		       button_name(SDL_GAMEPAD_BUTTON_WEST, state.pad_types[0]) + " or Delete empties it. Esc cancels.";
 	}
-	return name + ": press the new key, with Ctrl, Alt or Shift if you like. Esc cancels.";
+	if (Hotkeys::held(static_cast<Hotkeys::Action>(state.hotkey_catching->first)))
+		return name + ": press the new key, held as the button is (no Ctrl, Alt or Shift). Delete empties it. "
+		              "Esc cancels, held a second it is the key.";
+	return name + ": press the new key, with Ctrl, Alt or Shift if you like. Delete empties it. Esc cancels, "
+	              "held a second it is the key.";
 }
 
 namespace {

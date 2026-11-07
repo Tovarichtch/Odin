@@ -56,8 +56,15 @@ scan_library(LibraryState &state, const GameList &games, const Options &options,
 
 		if (std::find(state.systems.begin(), state.systems.end(), system) == state.systems.end())
 			state.systems.push_back(system);
-		for (const RomFiles::File &file : games.missing(files, name))
-			game.missing.push_back(file.name + " (" + file.set_of(name) + ".zip)");
+		/* Each file it lacks; a set that is nowhere, its zip alone */
+		for (const RomFiles::File &file : games.missing(files, name)) {
+			const std::string set = file.set_of(name) + ".zip";
+
+			if (files.set_there(name, file))
+				game.missing.push_back(file.name + " (" + set + ")");
+			else if (std::find(game.missing.begin(), game.missing.end(), set) == game.missing.end())
+				game.missing.push_back(set);
+		}
 		if (!state.filter.shows(system, !entry.parent.empty(), game.missing.empty())) {
 			state.hidden++;
 			continue;

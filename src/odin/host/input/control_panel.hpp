@@ -40,6 +40,11 @@
 
 namespace odin {
 
+/* [players.<game>] invert: the ids of the controls of the game the player
+ * turns over (GameControl::invertible), on every device; none when it does
+ * not say; the last line says */
+std::vector<std::string> inverted_of(const Settings &settings, const std::string &game);
+
 /* The dead zone of the sticks of a gamepad and how far its triggers go
  * before they press a button, in % of their way: [gamepads] of odin.ini,
  * then [gamepad.<GUID>] of its make and model. */
@@ -66,8 +71,9 @@ struct PadTuning {
 struct PadState {
 	std::array<int16_t, SDL_GAMEPAD_AXIS_COUNT> axes{};
 	std::array<bool, SDL_GAMEPAD_BUTTON_COUNT> buttons{};
-	/* Pressed with Guide held: a shortcut of Odin (hotkeys.hpp), not the
-	 * game's, until let go; it still works with Guide (guide+leftstick) */
+	/* Pressed with the hotkey button held: a shortcut of Odin
+	 * (hotkeys.hpp), not the game's, until let go (with Guide, any button
+	 * held with it); it still works in a pair (guide+leftstick) */
 	std::array<bool, SDL_GAMEPAD_BUTTON_COUNT> shortcut{};
 	/* Where a trigger starts to press a button */
 	int16_t trigger_pressed = PadTuning{}.trigger_pressed();
@@ -99,14 +105,22 @@ struct JoyState {
 	WheelParts parts{};	/* a known wheel's (wheels.cpp) */
 };
 
+/* A joystick plugged in, by its GUID (guid_text), and what it holds */
+struct PluggedJoy {
+	std::string guid;
+	const JoyState *state;
+};
+
 /* What the host holds now: the keys down, the pad, the joystick and the
  * mouse of each player (nullptr: none): player 1's light gun, else the
- * mouse of the system; player 2's light gun. */
+ * mouse of the system; player 2's light gun. Every joystick plugged in,
+ * for an input of another one than the player's (JoyInput::device). */
 struct HostState {
 	const std::vector<SDL_Keycode> *keys = nullptr;
 	std::array<const PadState *, 2> pads{};
 	std::array<const JoyState *, 2> joys{};
 	std::array<const MouseState *, 2> mice{};
+	const std::vector<PluggedJoy> *all_joys = nullptr;
 };
 
 /* Where a control is now, for the drawing of the cabinet: worked or not;
@@ -166,6 +180,25 @@ public:
 		                   [](const GameControl &c) { return c.player == 1 && c.role != Role::SERVICE; });
 	}
 	const Bindings &bindings() const { return m_bindings; }
+	/* Whether a control of player 1 or a role of the cabinet takes the
+	 * mouse (a sight by default): the cursor is hidden unless its
+	 * settings say not (hide_cursor) */
+	bool takes_mouse() const
+	{
+		const auto mouse = [](const std::vector<HostInput> &inputs) {
+			return std::any_of(inputs.begin(), inputs.end(),
+			                   [](const HostInput &input) { return input.kind == HostInput::Kind::MOUSE; });
+		};
+
+		for (size_t c = 0; c < m_controls.size(); c++)
+			for (unsigned part = 0; part < 3; part++)
+				if (m_controls[c].player == 0 && mouse(m_bindings.part(c, part)))
+					return true;
+		for (const Role role : { Role::COIN1, Role::COIN2, Role::TEST, Role::BOARD_TEST, Role::BOARD_SERVICE })
+			if (mouse(m_bindings.cabinet(role)))
+				return true;
+		return false;
+	}
 	/* Whether an input of a control of the panel, or of a role of the
 	 * cabinet, is held now: a stick of an analog control from half its
 	 * way */

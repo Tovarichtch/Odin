@@ -497,21 +497,23 @@ Menu::build(MenuState &state)
 	 * as it takes, under a line: the page above it; the tip of the row the
 	 * gamepad frames in its place. Input says it with the names and inputs
 	 * of its controls. While an input is caught, Input says what to do
-	 * there, keys and all. The keys are those the user set for the menu, to
-	 * close the game (over one) and to quit. */
+	 * there, keys and all, and while it says a control, all of it. The
+	 * keys are those the user set for the menu, to close the game (over
+	 * one) and to quit. */
 	const std::string back = first_key(state, Hotkeys::Action::MENU), quit = first_key(state, Hotkeys::Action::QUIT);
 	const std::string close = state.library ? std::string() : first_key(state, Hotkeys::Action::CLOSE_GAME);
 	std::string keys_said;
 
 	if (!back.empty())
-		keys_said = back + (state.library ? ": back to the library" : ": back to the game");
+		keys_said = back + (state.testing ? ": stop the test" :
+		                    state.library ? ": back to the library" : ": back to the game");
 	if (!close.empty())
 		keys_said += (keys_said.empty() ? "" : "    ") + close + ": close game";
 	if (!quit.empty())
 		keys_said += (keys_said.empty() ? "" : "    ") + quit + ": quit";
 
 	const char *const keys = keys_said.c_str();
-	const bool keys_shown = m_page != INPUT || !state.catching;
+	const bool keys_shown = m_page != INPUT || (!state.catching && !input_tells(state));
 	const float keys_w = ImGui::CalcTextSize(keys).x, help_w = std::max(0.0f, w - 3.0f * pad - keys_w);
 	const std::string help = m_page == INPUT ? std::string() :
 	                         framed_tip.empty() ? this->help(m_page, state) :
@@ -545,9 +547,9 @@ Menu::build(MenuState &state)
 	ImGui::EndChild();
 	ImGui::PopID();
 	m_focus.last = m_focus.count;
-	/* The advanced options of the page Input close with it */
+	/* The advanced options and the test of the page Input end with it */
 	if (m_page != INPUT)
-		state.advanced = false;
+		state.advanced = state.testing = false;
 
 	list->AddLine({ a.x, foot_top - foot_pad }, { b.x, foot_top - foot_pad }, palette.line, kit.stroke());
 	if (m_page == INPUT)

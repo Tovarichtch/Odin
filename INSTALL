@@ -111,23 +111,25 @@ Keyboard (all keys can be changed, page Hotkeys and page Input):
  Escape, F10   menu (the game pauses)
  1, 2          Start of player 1, 2
  5, 6          coins
- 0, 9          TEST and SERVICE (the test menus)
+ 0, 9          TEST and SERVICE (the test menus), with any device
  P             pause
  F2, F4        save, load the state
  Ctrl+R        reset
  F11           full screen
  F6            Virtual-On card in or out
- F7            light gun mode (Brave Firefighters)
+ F7            hide the cursor or show it
  Ctrl+C        close the game (back to the library)
  Ctrl+Q        quit
 
 Gamepad: Guide opens the menu, Select puts in a coin. Guide held with
 Start quits, with Back pauses, with RB saves, with LB loads, with B
-closes the game.
+closes the game. A gamepad without Guide (or whose Guide another program
+takes) holds another button instead, set on the page Hotkeys; the menu is
+then that button with A.
 
 Moving the mouse over the window shows a bar at its top: it sets the same
-things as the menu, without pausing the game (not while the mouse aims in
-Brave Firefighters: F7 turns light gun mode off).
+things as the menu, without pausing the game (not while the cursor is
+hidden, as when the mouse aims in Brave Firefighters: F7 shows it).
 
 
 LIGHT GUNS
@@ -155,14 +157,13 @@ WHEELS
 NASCAR, ATV Track and Smashing Drive steer with a wheel: one player per
 cabinet, so one wheel per Odin (link cabinets to race each other). Choose
 the wheel on the page Input. A known wheel (Logitech G25 to G923,
-Thrustmaster T150 or T300, MOZA R12 and others, from Batocera's list; only
-the G29 was tried) comes with its pedals, paddles, Start and Select set. On
-another, only the steering: click a control there, then move the pedal or
-press the button you want for it. A wheel with force feedback turns as the
-game asks. Set how far it turns (Wheel rotation: Full, its whole turn,
-unless you choose an angle) and how hard (Wheel force) in its options on
-the page Input. On Linux your user must be in the group input for the
-force feedback.
+Thrustmaster T150 or T300, MOZA R12 and others; only the G29 was tried)
+comes with its pedals, paddles, Start and Select set. On another, only the
+steering: click a control there, then move the pedal or press the button
+you want for it. A wheel with force feedback turns as the game asks. Set
+how far it turns (Wheel rotation: Full, its whole turn, unless you choose
+an angle) and how hard (Wheel force) in its options on the page Input. On
+Linux your user must be in the group input for the force feedback.
 
 Other joysticks (a flight stick for Planet Harriers) are set the same way.
 
