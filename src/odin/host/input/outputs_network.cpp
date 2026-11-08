@@ -27,13 +27,14 @@
 #include <cstdio>
 
 #include "odin/host/input/sockets.hpp"
+#include "odin/machine/cabinet/drive_board.hpp"
 
 namespace odin {
 
 using namespace sockets;
 
 std::unique_ptr<OutputsNetwork>
-OutputsNetwork::open(const std::string &game, const std::vector<GameOutput> &outputs)
+OutputsNetwork::open(const std::string &game, const std::vector<GameOutput> &outputs, unsigned drive_first_output)
 {
 	if (!network_up()) {
 		std::fprintf(stderr, "ERROR: outputs: no network on this computer\n");
@@ -49,11 +50,13 @@ OutputsNetwork::open(const std::string &game, const std::vector<GameOutput> &out
 		return nullptr;
 	}
 	std::printf("outputs: for other programs on 127.0.0.1:%u\n", PORT);
-	return std::unique_ptr<OutputsNetwork>(new OutputsNetwork(listener, game, outputs));
+	return std::unique_ptr<OutputsNetwork>(new OutputsNetwork(listener, game, outputs, drive_first_output));
 }
 
-OutputsNetwork::OutputsNetwork(intptr_t listener, const std::string &game, const std::vector<GameOutput> &outputs)
-	: m_listener(listener), m_game(game), m_outputs(outputs), m_was(outputs.size(), false)
+OutputsNetwork::OutputsNetwork(intptr_t listener, const std::string &game, const std::vector<GameOutput> &outputs,
+                               unsigned drive_first_output)
+	: m_listener(listener), m_game(game), m_outputs(outputs), m_was(outputs.size(), false),
+	  m_drive_first_output(drive_first_output)
 {
 }
 
@@ -84,6 +87,15 @@ OutputsNetwork::changes(const std::vector<GameOutput> &list, std::vector<bool> &
 	return lines;
 }
 
+std::string
+OutputsNetwork::drive_line(uint8_t command)
+{
+	char line[16];
+
+	std::snprintf(line, sizeof line, "m3ffb = %02X\r", command);
+	return line;
+}
+
 void
 OutputsNetwork::welcome()
 {
@@ -103,7 +115,8 @@ OutputsNetwork::accept_all()
 			close_socket(client);
 			continue;
 		}
-		m_clients.push_back({ client, "mame_start = " + m_game + "\r" });
+		m_clients.push_back({ client, "mame_start = " + m_game + "\r" +
+		                              (m_drive < 0 ? "" : drive_line(static_cast<uint8_t>(m_drive))) });
 	}
 }
 
@@ -112,8 +125,16 @@ OutputsNetwork::show(std::span<const uint8_t> outputs)
 {
 	accept_all();
 
-	const std::string lines = changes(m_outputs, m_was, outputs);
+	std::string lines = changes(m_outputs, m_was, outputs);
 
+	if (m_drive_first_output) {
+		const uint8_t command = DriveBoard::command(outputs, m_drive_first_output);
+
+		if (command != m_drive) {
+			m_drive = command;
+			lines += drive_line(command);
+		}
+	}
 	for (Client &client : m_clients)
 		client.queued += lines;
 	flush();

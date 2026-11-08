@@ -979,7 +979,7 @@ Menu::page_outputs(MenuKit &kit, MenuState &state) const
 
 	kit.begin_group("OUTPUT PROGRAMS");
 	kit.next_tip("Sends the cabinet's outputs to LEDBlinky, MAMEHooker or DOFLinx, as MAME's network output does: "
-	             "this computer, port 8000.");
+	             "this computer, port 8000. NASCAR's drive board goes too (m3ffb).");
 	kit.choice("Send outputs", nullptr, OFF_ON, state.network);
 	if (state.network)
 		kit.text("Connected programs", state.network_failed ? "port 8000 is used by another program: nothing is sent" :
