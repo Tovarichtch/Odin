@@ -1056,6 +1056,69 @@ smashing_drive(Pen &pen, const Controls &c)
 	pen.light();
 }
 
+/* Speed Up: the wheel, a two-position shifter with LOW up and HIGH down,
+ * and the pedals */
+void
+speed_up(Pen &pen, const Controls &c)
+{
+	const float cx = 230, cy = 240, R = 144, r = 118;
+
+	pen.curve({ 30, 86 }, { 210, 71.3f }, { 390, 71.3f }, { 570, 86 }, Ink::DETAIL, 0.0f);
+	push_button(pen, c, "start", 120, 44, 14, "START", 'r');
+	push_button(pen, c, "view", 300, 44, 14, "VIEW", 'r');
+	pen.light(c.light("wheel"));
+	pen.push();
+	pen.turn(c.value("wheel") * 135.0f, cx, cy);
+	pen.ring(cx, cy, R, r);
+	pen.line(cx, cy - R + 3, cx, cy - r - 3, Ink::INK, 4.0f);
+	pen.shape({ { cx - r, cy - 12 }, { cx - 40, cy - 18 }, { cx - 40, cy + 16 }, { cx - r, cy + 12 } }, true, Ink::PART);
+	pen.shape({ { cx + r, cy - 12 }, { cx + 40, cy - 18 }, { cx + 40, cy + 16 }, { cx + r, cy + 12 } }, true, Ink::PART);
+	pen.shape({ { cx - 16, cy + 38 }, { cx + 16, cy + 38 }, { cx + 10, cy + r }, { cx - 10, cy + r } }, true, Ink::PART);
+	pen.circle(cx, cy, 44, Ink::PART);
+	pen.pop();
+	pen.light();
+
+	const float sx = 486, sy = 250;
+	const float ky = c.position("gear") > 0 ? 44.0f : -44.0f;
+
+	pen.light(c.light("gear"));
+	pen.rect(sx - 44, sy - 82, 88, 164, 14, Ink::BODY);
+	pen.line(sx, sy - 44, sx, sy + 44, Ink::THICK, 7.0f);
+	pen.text(sx, sy - 62, "LOW", Align::CENTRE);
+	pen.text(sx, sy + 72, "HIGH", Align::CENTRE);
+	pen.circle(sx, sy + ky, 15, Ink::PART);
+	if (c.on("gear"))
+		pen.circle(sx, sy + ky, 14, Ink::LIT);
+	pen.text(sx, sy - 96, "SHIFTER", Align::CENTRE);
+	pen.light(c.light("brake_pedal"));
+	pedal(pen, 150, 440, 64, 74, c.on("brake_pedal") ? 1.0f : 0.0f, "BRAKE");
+	pen.light(c.light("gas_pedal"));
+	pedal(pen, 252, 426, 48, 88, c.value("gas_pedal"), "GAS");
+	pen.light();
+}
+
+/* Surf Planet: the board the player stands on, seen from behind, rocking
+ * left and right, and START on the stand */
+void
+surf_planet(Pen &pen, const Controls &c)
+{
+	const float cx = 300, cy = 330;
+
+	push_button(pen, c, "start", 300, 70, 14, "START", 'r');
+	pen.line(cx, cy + 40, cx, cy + 120, Ink::THICK, 8.0f);
+	pen.shape({ { cx - 70, cy + 120 }, { cx + 70, cy + 120 }, { cx + 50, cy + 136 }, { cx - 50, cy + 136 } }, true,
+	          Ink::BODY);
+	pen.light(c.light("board"));
+	pen.push();
+	pen.turn(c.value("board") * 20.0f, cx, cy + 40);
+	pen.rect(cx - 200, cy + 14, 400, 26, 13, Ink::PART);
+	pen.rect(cx - 150, cy - 2, 70, 16, 4, Ink::DETAIL);
+	pen.rect(cx + 80, cy - 2, 70, 16, 4, Ink::DETAIL);
+	pen.pop();
+	pen.text(cx, cy - 60, "SURFBOARD", Align::CENTRE);
+	pen.light();
+}
+
 /* A football: a pentagon in the middle, its seams to the edge */
 void
 ball_pattern(Pen &pen, float x, float y, float r)
@@ -1133,6 +1196,47 @@ football(Pen &pen, const Controls &c)
 	}
 }
 
+void
+radikal_bikers(Pen &pen, const Controls &c)
+{
+	const float cx = 290, base = 196;
+	const float cy = base + (c.on("handle_up") ? -14.0f : 0.0f);
+
+	pen.arc(cx, base, 118, -PI * 118.0f / 180.0f, -PI * 62.0f / 180.0f, Ink::DETAIL, 0.0f);
+	pen.light(c.light("handlebar"));
+	pen.text(cx, base - 142, "HANDLEBAR", Align::CENTRE);
+	pen.push();
+	pen.turn(c.value("handlebar") * 20.0f, cx, cy);
+	std::vector<ImVec2> bar = { { cx - 172, cy + 16 } };
+
+	add_curve(bar, bar[0], { cx - 115, cy - 1 }, { cx - 58, cy - 7 }, { cx, cy - 7 });
+	add_curve(bar, bar.back(), { cx + 66, cy - 7 }, { cx + 133, cy - 1 }, { cx + 200, cy + 16 });
+	tube(pen, bar, 6.5f, Ink::PART);
+	pen.rect(cx - 26, cy - 16, 52, 30, 6, Ink::PART);
+	pen.line(cx, cy - 106, cx, cy - 128, Ink::INK, 4.0f);
+	pen.light();
+
+	pen.light(c.light("brake"));
+	grip(pen, cx - 232, cy + 1, 64, 30);
+	if (c.on("brake"))
+		pen.rect(cx - 231, cy + 2, 62, 28, 12, Ink::LIT, 0.9f);
+	pen.text(cx - 232, cy - 38, "BRAKE", Align::LEFT);
+	pen.light(c.light("accelerator"));
+	grip(pen, cx + 200, cy + 1, 64, 30);
+	if (c.on("accelerator"))
+		pen.rect(cx + 201, cy + 2, 62, 28, 12, Ink::LIT, 0.9f);
+	pen.text(cx + 264, cy - 38, "ACCELERATOR", Align::RIGHT);
+	pen.light();
+	push_button(pen, c, "view", cx - 110, cy + 60, 9.0f, "VIEW", 'b');
+	push_button(pen, c, "start", cx + 110, cy + 60, 9.0f, "START", 'b');
+	pen.pop();
+	pen.light(c.light("handle_up"));
+	pen.text(cx, base + 186, "HANDLE UP", Align::CENTRE);
+	if (c.on("handle_up"))
+		pen.text(cx, base + 210, "PULLED", Align::CENTRE);
+	pen.light();
+}
+
 using Drawing = void (*)(Pen &, const Controls &);
 
 Drawing
@@ -1143,7 +1247,13 @@ drawing_of(const std::string &game)
 		{ "swracer", racer }, { "airtrix", air_trix }, { "airtrixo", air_trix }, { "von4", virtual_on },
 		{ "atvtrack", atv_track }, { "atvtracka", atv_track }, { "smashdrv", smashing_drive },
 		{ "smashdrvb", smashing_drive }, { "smashdrvs", smashing_drive },
-		{ "gfootbal", football },
+		{ "gfootbal", football }, { "radikalb", radikal_bikers }, { "radikalba", radikal_bikers },
+		{ "footbpow", football }, { "footbpow14", football }, { "footbpow12", football }, { "footbpow11", football },
+		{ "speedup", speed_up }, { "speedup21", speed_up }, { "speedup20", speed_up }, { "speedup20a", speed_up },
+		{ "speedup12", speed_up }, { "speedup10", speed_up },
+		{ "surfplnt", surf_planet }, { "surfplnt40", surf_planet }, { "surfplnt31", surf_planet },
+		{ "surfplnt30", surf_planet }, { "surfplnt20", surf_planet }, { "surfplnt12", surf_planet },
+		{ "surfplnt10", surf_planet },
 	};
 
 	for (const auto &[name, drawing] : DRAWINGS)

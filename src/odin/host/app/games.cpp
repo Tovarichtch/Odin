@@ -303,7 +303,7 @@ parse_control(const json_t *control)
 	    !parsed_role || !player_right(player) ||
 	    (keys && (!button || !json_array_size(keys))) || (pad && (!button || !json_array_size(pad))) ||
 	    (wheel && (!button || !json_is_string(wheel))) ||
-	    (pin && !button) || ((span || ball) && !analog) || (span && ball) ||
+	    (pin && !button && !positions) || ((span || ball) && !analog) || (span && ball) ||
 	    (invertible && (!analog || !json_is_boolean(invertible))))
 		return std::nullopt;
 	if (pin) {
@@ -450,7 +450,7 @@ parse_link(const json_t *link, Game::Link &out)
 	const json_t *const letter = json_object_get(seat, "letter");
 
 	const bool known = in && (!std::strcmp(in, "mie") || !std::strcmp(in, "backup") || !std::strcmp(in, "flash") ||
-	                          !std::strcmp(in, "nand"));
+	                          !std::strcmp(in, "nand") || !std::strcmp(in, "eeprom"));
 
 	if (!known || !byte || !shift || !bits || !first || *bits == 0 || *shift + *bits > 8 ||
 	    (letter && !json_is_boolean(letter)))
@@ -458,6 +458,7 @@ parse_link(const json_t *link, Game::Link &out)
 	out.seat_in = !std::strcmp(in, "mie")   ? Game::Link::In::MIE
 	              : !std::strcmp(in, "flash") ? Game::Link::In::FLASH
 	              : !std::strcmp(in, "nand")  ? Game::Link::In::NAND
+	              : !std::strcmp(in, "eeprom") ? Game::Link::In::EEPROM
 	                                          : Game::Link::In::BACKUP;
 	out.seat_byte = *byte;
 	out.seat_shift = *shift;
@@ -641,10 +642,8 @@ goes_right(const GameControl &control, bool gaelco)
 
 	if (!gaelco)
 		return !control.port && !control.span && !ball;
-	if (control.type == GameControl::Type::BUTTON)
-		return control.port.has_value();
 	if (control.type != GameControl::Type::ANALOG)
-		return false;
+		return control.port.has_value();
 	if (control.span)
 		return control.analog < 4;
 	return ball && control.low == (control.ball == GameControl::Ball::SIDE ? GameControl::Low::LEFT
@@ -656,7 +655,9 @@ goes_right(const GameControl &control, bool gaelco)
 bool
 wired(const Game &game)
 {
-	const bool gaelco = game.machine == "atvtrack" || game.machine == "smashdrv";
+	const bool gaelco = game.machine == "atvtrack" || game.machine == "smashdrv" || game.machine == "gaelco3d" ||
+	                    game.machine == "footbpow" || game.machine == "speedup" ||
+	                    game.machine == "surfplnt";
 	unsigned halves[2][2] = {};	/* [player][side, forward] */
 
 	for (const GameControl &control : game.controls) {
@@ -876,7 +877,8 @@ read_sound_parts(const json_t *rom, Game &game)
 	static const std::pair<const char *, Place> PLACES[] = {
 		{ "front_left", Place::FRONT_LEFT }, { "front_right", Place::FRONT_RIGHT }, { "base", Place::BASE },
 		{ "panel", Place::PANEL }, { "seat_left", Place::SEAT_LEFT }, { "seat_right", Place::SEAT_RIGHT },
-		{ "seat", Place::SEAT },
+		{ "seat", Place::SEAT }, { "front", Place::FRONT }, { "rear_left", Place::REAR_LEFT },
+		{ "rear_right", Place::REAR_RIGHT },
 	};
 	const char *const name = game.name.c_str();
 	const json_t *const parts = json_object_get(rom, "sound_parts");

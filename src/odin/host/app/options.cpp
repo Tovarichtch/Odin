@@ -176,6 +176,8 @@ read_paths(const Settings &settings, Options &options)
 		if (key == "roms" && !value.empty()) {
 			if (!options.given.roms)
 				options.rom_path = value;
+		} else if (key == "gaelco" && !value.empty()) {
+			options.gaelco_path = value;
 		} else if (key == "bios" && !value.empty()) {
 			if (!options.given.bios)
 				options.bios_path = value;
@@ -696,7 +698,7 @@ known_settings(const GameList &games, int button)
 	out.insert(out.end(), { { "outputs", "network", "off" }, { "network", "board", "none" },
 	                        { "network", "port", std::to_string(NetCable::PORT) }, { "network", "next", "" },
 	                        { "network", "cabinet", "1" },
-	                        { "paths", "roms", "" }, { "paths", "bios", "" },
+	                        { "paths", "roms", "" }, { "paths", "gaelco", "" }, { "paths", "bios", "" },
 	                        { "paths", "saves", SaveFolder::root() }, { "paths", "states", default_states() },
 	                        { "paths", "artwork", artwork_folder() }, { "paths", "log", odin_data_dir() },
 	                        { "log", "verbose", "off" }, { "library", "owned_only", "off" },

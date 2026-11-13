@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "odin/host/app/ball_kick.hpp"
 #include "odin/host/app/options.hpp"
 #include "odin/host/app/user_files.hpp"
 #include "odin/host/audio/audio_out.hpp"
@@ -64,18 +65,6 @@ constexpr int DAC_RATE = AtvTrack::DAC_RATE;
 constexpr unsigned VOLUME_UP_FRAMES[] = { 0, 96, 122, 147, 180 };
 static_assert(std::size(VOLUME_UP_FRAMES) == std::size(START_VOLUMES));
 constexpr unsigned VOLUME_FROM = 60, VOLUME_DOWN_FRAMES = 200, VOLUME_GAP = 10;
-/* Kick on the right stick: past KICK_FROM, power is the peak within
- * KICK_RISE frames, then back under KICK_REST to rearm. Pulling back first
- * lifts the ball, until the stick rests BACKSWING_FRAMES. HEURISTIC: all of
- * these, and the ball's height below (no dump of the sensors' PIC). */
-constexpr unsigned KICK_FRAMES = 3, KICK_RISE = 3, BACKSWING_FRAMES = 20;
-constexpr float KICK_FROM = 0.3f, KICK_REST = 0.2f;
-/* The program's kick power, up to 127: the root of both side sensors
- * squared, times the gain (0x8C02F5E0); Odin gives it 10 to 127.
- * HEURISTIC: a real foot's values are unknown. Up to 50
- * passes and past 80 clears the field, so travel is cubed. */
-constexpr float KICK_SOFT = 10.0f, KICK_HARD = 127.0f, KICK_GAIN = 1.2f;
-
 class AtvGame final : public Board {
 public:
 	AtvGame(const Game &game, Controls &controls, Display &display, const std::string &kept,
@@ -131,13 +120,6 @@ public:
 	}
 
 private:
-	struct Kick {
-		float x = 0.0f, forward = 0.0f, back = 0.0f;
-		unsigned rise = 0, frames = 0, rested = 0;
-		bool spent = false;
-		AtvTrack::BallSensors::value_type sensors = AtvTrack::BALL_AT_REST;
-	};
-
 	void read_controls();
 	void read_kick(const CabinetInputs &in, unsigned player);
 
@@ -155,7 +137,7 @@ private:
 	/* The frames VOLUME - then VOLUME + are held at power-on (0: not) */
 	unsigned m_volume_down, m_volume_up;
 	unsigned m_coin = 0;
-	Kick m_kick[2];
+	BallKick m_kick[2]{ { AtvTrack::BALL_AT_REST, 200.0f }, { AtvTrack::BALL_AT_REST, 200.0f } };
 	/* The outputs as JVS counts them: output n is bit n - 1 of the
 	 * system pins, then a channel of the motor DAC that runs (GameOutput) */
 	std::array<uint8_t, 3> m_outputs{};
@@ -226,49 +208,14 @@ adc_value(const std::array<uint8_t, 2> &span, uint16_t channel)
 	return static_cast<uint8_t>(std::lround(span[0] + (span[1] - span[0]) * (channel / 65535.0)));
 }
 
-/* Right stick: forward sets power, sideways direction, pull-back height. The
- * game reads power from the side sensors, height from the middle one,
- * direction from right minus left (BallTest page). */
 void
 AtvGame::read_kick(const CabinetInputs &in, unsigned player)
 {
-	Kick &kick = m_kick[player];
 	const auto axis = [&](unsigned half) {
 		return (static_cast<float>(in.jvs_analog[(*m_balls[player])[half]]) - 32768.0f) / 32768.0f;
 	};
-	const float x = axis(0), forward = -axis(1), far = std::hypot(x, forward);
 
-	kick.back = std::max(kick.back, -forward);
-	kick.rested = far < KICK_REST ? kick.rested + 1 : 0;
-	if (kick.rested >= BACKSWING_FRAMES)
-		kick.back = 0.0f;
-
-	if (kick.frames > 0) {
-		if (--kick.frames == 0)
-			kick.sensors = AtvTrack::BALL_AT_REST;
-	} else if (kick.spent) {
-		kick.spent = forward > KICK_REST;
-	} else if (forward > KICK_FROM) {
-		if (forward >= kick.forward) {
-			kick.forward = forward;
-			kick.x = x;
-		}
-		if (++kick.rise >= KICK_RISE) {
-			const float travel = std::clamp((std::hypot(kick.x, kick.forward) - KICK_FROM) / (1.0f - KICK_FROM), 0.0f, 1.0f);
-			const float power = KICK_SOFT + (KICK_HARD - KICK_SOFT) * travel * travel * travel;
-			const float force = power / KICK_GAIN / std::sqrt(2.0f * (1.0f + kick.x * kick.x));
-			const auto side = [&](float turned) { return static_cast<uint8_t>(128.0f + force * (1.0f + turned)); };
-
-			kick.sensors = { static_cast<uint8_t>(0x30 + static_cast<int>(kick.back * 200.0f)), side(-kick.x), side(kick.x) };
-			kick.frames = KICK_FRAMES;
-			kick.spent = true;
-			kick.back = kick.forward = 0.0f;
-			kick.rise = 0;
-		}
-	} else {
-		kick.forward = 0.0f;
-		kick.rise = 0;
-	}
+	m_kick[player].read(axis(0), -axis(1));
 }
 
 void
@@ -313,8 +260,8 @@ AtvGame::read_controls()
 		for (unsigned player = 0; player < 2; player++)
 			if (m_balls[player])
 				read_kick(in, player);
-		m_board->set_ball_sensors({ m_kick[0].sensors, m_kick[1].sensors },
-		                          { m_kick[0].frames > 0, m_kick[1].frames > 0 });
+		m_board->set_ball_sensors({ m_kick[0].sensors(), m_kick[1].sensors() },
+		                          { m_kick[0].kicked(), m_kick[1].kicked() });
 	}
 	m_board->set_switches(switches);
 	m_board->set_analog(analog);
