@@ -424,6 +424,26 @@ ControlPanel::touched(const HostState &host, size_t control) const
 	return false;
 }
 
+void
+ControlPanel::move_levers(const HostState &host)
+{
+	for (size_t c = 0; c < m_controls.size(); c++) {
+		const GameControl &control = m_controls[c];
+
+		if (control.type != GameControl::Type::POSITIONS)
+			continue;
+
+		const bool down = pressed(host, m_bindings.lever(c, false), control.player);
+		const bool up = pressed(host, m_bindings.lever(c, true), control.player);
+
+		if (down && !m_levers_were[c][0] && m_positions[c] > 0)
+			m_positions[c]--;
+		if (up && !m_levers_were[c][1] && m_positions[c] + 1 < control.positions.size())
+			m_positions[c]++;
+		m_levers_were[c] = { down, up };
+	}
+}
+
 ControlNow
 ControlPanel::now(const HostState &host, size_t control) const
 {
@@ -557,6 +577,7 @@ ControlPanel::update(const HostState &host)
 		m_mouse_seen[player] = m_mouse_seen[player] || mouse;
 	}
 
+	move_levers(host);
 	inputs.mainboard_test = pressed(host, m_bindings.cabinet(Role::BOARD_TEST), 0);
 	inputs.mainboard_service = pressed(host, m_bindings.cabinet(Role::BOARD_SERVICE), 0);
 	inputs.jvs_system = pressed(host, m_bindings.cabinet(Role::TEST), 0) ? 0x80 : 0;
@@ -570,14 +591,6 @@ ControlPanel::update(const HostState &host)
 				inputs.jvs_player[control.button.player] |= control.button.mask;
 			break;
 		case GameControl::Type::POSITIONS: {
-			const bool down = pressed(host, m_bindings.lever(c, false), control.player);
-			const bool up = pressed(host, m_bindings.lever(c, true), control.player);
-
-			if (down && !m_levers_were[c][0] && m_positions[c] > 0)
-				m_positions[c]--;
-			if (up && !m_levers_were[c][1] && m_positions[c] + 1 < control.positions.size())
-				m_positions[c]++;
-			m_levers_were[c] = { down, up };
 			for (const JvsSwitch &sw : control.positions[m_positions[c]].switches)
 				inputs.jvs_player[sw.player] |= sw.mask;
 			break;

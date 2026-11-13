@@ -8,12 +8,15 @@
 Odin (ᚨ), Copyright (C) 2026 Réda Chérif-Touil
 Released under the GNU GPL, version 3 or later (see LICENSE).
 
-Odin emulates two arcade systems, for Linux, Windows and macOS, drawing with
-OpenGL or Vulkan:
+Odin emulates three arcade systems, for Linux, Windows and macOS, drawing
+with OpenGL or Vulkan:
 
  SEGA Hikaru       low-level, running the real chips' programs where known
  Gaelco ATV Track  low-level too, the Neon 250's microcoded core running its
                    own code (its 3D drawn from the scene it builds)
+ Gaelco 3D         low-level: the 68EC020 or 68000, the TMS320C31 that
+                   builds the polygons and the ADSP-2115 that plays the
+                   sound
 
 Odin runs the six Hikaru games, two of them in two versions, and the Gaelco
 games. They play with a keyboard, gamepads, wheels with force feedback
@@ -44,6 +47,26 @@ Gaelco ATV Track (see INSTALL)
  smashdrvb  Smashing Drive (UK)
  smashdrvs  Smashing Drive (Spain, Portugal)
 
+Gaelco 3D (see INSTALL)
+ footbpow   Football Power (version 4.6)
+ footbpow14 Football Power (version 1.4)
+ footbpow12 Football Power (version 1.2)
+ footbpow11 Football Power (version 1.1)
+ radikalb   Radikal Bikers
+ radikalba  Radikal Bikers (Atari license)
+ speedup    Speed Up (version 2.20)
+ speedup21  Speed Up (version 2.10)
+ speedup20  Speed Up (version 2.00, 18 February)
+ speedup20a Speed Up (version 2.00, 17 February)
+ speedup12  Speed Up (version 1.20)
+ speedup10  Speed Up (version 1.00)
+ surfplnt   Surf Planet (version 4.1)
+ surfplnt40 Surf Planet (version 4.0)
+ surfplnt31 Surf Planet (version 3.1)
+ surfplnt30 Surf Planet (version 3.0)
+ surfplnt20 Surf Planet (version 2.0)
+ surfplnt12 Surf Planet (version 1.2)
+ surfplnt10 Surf Planet (version 1.0)
 
 Each name is a MAME set. The Hikaru games also need the shared sets hikaru
 and mie; jvs13551, 18wheelr and srally2 are optional.
@@ -55,8 +78,9 @@ rights to these pictures are reserved by SEGA.
 INSTALL tells how to build and start Odin, OPTIONS lists every option and
 setting, TODO what is missing or guessed.
 
-The three Gaelco games use Odin's controls. In Gaelco Football the right
-stick kicks: pull it back first to lift the ball.
+The Gaelco games use Odin's controls. In Gaelco Football and Football
+Power the right stick kicks: in Gaelco Football pull it back first to lift
+the ball.
 
 
 REPORTING A PROBLEM
@@ -82,9 +106,13 @@ Odin is a hard fork of Valkyrie, the Hikaru emulator by Stefano Teso,
 Copyright (C) 2011-2013, GNU GPL version 3 or later.
 The ATV Track board follows MAME's atvtrack driver; its boot program stays
 under the BSD-3-Clause licence, Copyright (c) Samuele Zannoli.
+The Gaelco 3D board, its TMS320C31 and ADSP-2115 follow MAME's gaelco3d,
+tms320c3x and adsp2100 (BSD-3-Clause, Aaron Giles); the 68EC020, the
+M68020 User's Manual and MAME's Musashi (BSD-3-Clause, Karl Stenerud).
 
 Daniel Martin (dmanlfc) contributed to Odin and brought it the Gaelco
-boards: ATV Track, Gaelco Football and Smashing Drive.
+boards: ATV Track, Gaelco Football, Smashing Drive, Radikal Bikers,
+Football Power, Speed Up and Surf Planet.
 
 Thanks to the developers of MAME (its Hikaru driver) and Flycast, and to
 Neill Corlett for his documentation of the AICA.

@@ -241,7 +241,7 @@ GlDrawing::make_pmx(const std::function<void(unsigned, unsigned)> &progress)
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glGenTextures(1, &m_pmx->fog);
 	glBindTexture(GL_TEXTURE_2D, m_pmx->fog);
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RG8, 128, 1);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RG8, 256, 129);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -304,6 +304,8 @@ GlDrawing::draw_pmx(const PmxScene &scene, unsigned anisotropy)
 		pmx.fog_table = scene.fog_table;
 		pmx.fog_loaded = true;
 	}
+	if (!scene.palette.empty())
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 1, 256, 128, GL_RG, GL_UNSIGNED_BYTE, scene.palette.data());
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -446,7 +448,8 @@ GlDrawing::draw_pmx(const PmxScene &scene, unsigned anisotropy)
 		const PmxDraw &draw = scene.draws[k];
 		const bool listed = sorting && draw.per_pixel;
 		const int flags = (draw.image ? 1 : 0) | (draw.use_alpha ? 2 : 0) | (draw.ignore_texture_alpha ? 4 : 0) |
-		                  (draw.offset ? 8 : 0) | draw.shading << 4 | draw.fog << 6;
+		                  (draw.offset ? 8 : 0) | draw.shading << 4 | draw.fog << 6 | (draw.alpha_test ? 256 : 0) |
+		                  (draw.indexed ? 512 : 0) | draw.bank << 16;
 
 		if (listed && !collecting)
 			begin_lists();

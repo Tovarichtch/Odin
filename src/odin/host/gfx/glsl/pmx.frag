@@ -190,6 +190,36 @@ table_fog(float w)
 	return mix(ends.r, ends.g, fract(step));
 }
 
+/* A texel of an indexed image: its colour in the bank's palette, no
+ * alpha where masked, half where the palette says */
+vec4
+palette_texel(ivec2 at, int bank)
+{
+	vec4 texel = texelFetch(u_texture, at, 0);
+	ivec2 bytes = ivec2(round(texelFetch(u_fog, ivec2(int(round(texel.r * 255.0)), 1 + bank), 0).rg * 255.0));
+	int c = bytes.x | bytes.y << 8;
+	float alpha = (texel.g > 0.5 ? 0.0 : 1.0) * ((c & 0x8000) != 0 ? 0.5 : 1.0);
+
+	return vec4(vec3(float((c >> 10) & 31), float((c >> 5) & 31), float(c & 31)) / 31.0, alpha);
+}
+
+/* Filtered after the palette, as the chip does */
+vec4
+indexed_texel(vec2 uv)
+{
+	ivec2 size = textureSize(u_texture, 0), top = size - 1;
+	vec2 at = uv * vec2(size) - 0.5;
+	ivec2 i = ivec2(floor(at));
+	vec2 f = at - floor(at);
+	int bank = (FLAGS >> 16) & 127;
+	vec4 a = palette_texel(clamp(i, ivec2(0), top), bank);
+	vec4 b = palette_texel(clamp(i + ivec2(1, 0), ivec2(0), top), bank);
+	vec4 c = palette_texel(clamp(i + ivec2(0, 1), ivec2(0), top), bank);
+	vec4 d = palette_texel(clamp(i + ivec2(1, 1), ivec2(0), top), bank);
+
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
 void
 main()
 {
@@ -218,16 +248,19 @@ main()
 #endif
 	/* Bits 0-3: textured, use alpha, ignore texture alpha, offset. Bits
 	 * 4-5: shading. Bits 6-7: fog (PmxDraw::fog; by the vertex: the offset
-	 * colour's alpha). */
+	 * colour's alpha). Bit 8: the alpha test. Bit 9: an indexed image, its
+	 * bank in bits 16-22. */
 	vec4 color = v_color;
 	int fog = (FLAGS >> 6) & 3;
 
 	if ((FLAGS & 2) == 0)
 		color.a = 1.0;
 	if ((FLAGS & 1) != 0) {
-		vec4 texel = texture(u_texture, v_uv, LOD_BIAS);
+		vec4 texel = (FLAGS & 512) != 0 ? indexed_texel(v_uv) : texture(u_texture, v_uv, LOD_BIAS);
 		int shading = (FLAGS >> 4) & 3;
 
+		if ((FLAGS & 256) != 0 && texel.a < 0.25)
+			discard;
 		if ((FLAGS & 4) != 0)
 			texel.a = 1.0;
 		if (shading == 0) {

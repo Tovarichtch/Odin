@@ -155,6 +155,7 @@ MenuSession::MenuSession(const Options &options, Display &display, Keyboard &key
 	state.kept = !settings_file.empty();
 	state.roms = options.rom_path;
 	state.roms_given = options.given.roms;
+	state.gaelco = options.gaelco_path;
 	state.bios = options.bios_path;
 	state.bios_given = options.given.bios;
 	state.saves = SaveFolder::root(options.saves);
@@ -1031,6 +1032,10 @@ MenuSession::take_folder()
 		state.roms = folder;
 		keep("paths", "roms", folder);
 		break;
+	case Folder::GAELCO:
+		state.gaelco = folder;
+		keep("paths", "gaelco", folder);
+		break;
 	case Folder::BIOS:
 		state.bios = folder;
 		keep("paths", "bios", folder);
@@ -1062,8 +1067,8 @@ MenuSession::take_folder()
 	return std::nullopt;
 }
 
-/* The picker opened where the folder is now; that of the BIOS, else where
- * the games are */
+/* The picker opened where the folder is now; that of the Gaelco games or of
+ * the BIOS, else where the games are */
 void
 MenuSession::ask_folder(MenuState::Folder folder)
 {
@@ -1072,6 +1077,7 @@ MenuSession::ask_folder(MenuState::Folder folder)
 
 	state.no_picker = false;
 	m_dialog.ask(m_display.window(), folder == Folder::ROMS ? state.roms :
+	             folder == Folder::GAELCO ? (state.gaelco.empty() ? state.roms : state.gaelco) :
 	             folder == Folder::BIOS ? (state.bios.empty() ? state.roms : state.bios) :
 	             folder == Folder::SAVES ? state.saves :
 	             folder == Folder::ARTWORK ? state.artwork :

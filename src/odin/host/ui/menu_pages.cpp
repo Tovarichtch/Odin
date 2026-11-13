@@ -454,6 +454,10 @@ cabinet_sound(MenuKit &kit, SoundGame &game, const SoundScene &scene)
 		const bool speakers = has([](const SoundPart &part) {
 			return part.option && part.kind == SoundPart::Kind::SPEAKER;
 		});
+		const bool rear = has([](const SoundPart &part) {
+			return part.option && (part.at == SoundPart::Place::REAR_LEFT || part.at == SoundPart::Place::REAR_RIGHT);
+		});
+		const char *const which = rear ? "rear" : "seat";
 		const bool fourth = has([](const SoundPart &part) { return part.kind == SoundPart::Kind::UNWIRED; });
 		/* A cabinet that does not wire the optional board plays the main one */
 		const bool unwired = has([](const SoundPart &part) {
@@ -464,8 +468,8 @@ cabinet_sound(MenuKit &kit, SoundGame &game, const SoundScene &scene)
 			game.woofer ? std::string("Main: without the woofer. Both: with its lows, mixed into your two speakers. "
 			                          "Quad: with the woofer") +
 			                      (fourth ? " and the fourth channel" : "") + ", on a rear pair of speakers." :
-			speakers ? "Main: without the seat speakers. Both: with them, mixed into your two speakers. Quad: with "
-			           "them, on a rear pair of speakers." :
+			speakers ? std::string("Main: without the ") + which + " speakers. Both: with them, mixed into your two "
+			                   "speakers. Quad: with them, on a rear pair of speakers." :
 			           "Main: without the panel shaker's signal. Both: with it, mixed into your two speakers. Quad: "
 			           "with it, on a rear pair of speakers.";
 
@@ -487,11 +491,13 @@ cabinet_sound(MenuKit &kit, SoundGame &game, const SoundScene &scene)
 			kit.choice("Woofer cutoff", only_both, CUTOFFS, game.cutoff, nullptr, game.played != 1);
 		} else if (!unwired) {
 			const std::string about =
-				std::string(speakers ? "How loud the seat speakers are" : "How loud the panel shaker's signal is") +
+				(speakers ? std::string("How loud the ") + which + " speakers are" :
+				            std::string("How loud the panel shaker's signal is")) +
 				" in your two speakers, from -60 to +12 dB" + knob_of(game.name) + ".";
 
 			kit.next_tip(about.c_str());
-			kit.slider(speakers ? "Seat speakers" : "Panel shaker", only_both, game.level, -60.0f, 12.0f, 1.0f,
+			kit.slider(speakers ? (rear ? "Rear speakers" : "Seat speakers") : "Panel shaker", only_both, game.level,
+			           -60.0f, 12.0f, 1.0f,
 			           level.c_str(), nullptr, game.played != 1);
 		}
 	}
@@ -1099,11 +1105,15 @@ Menu::page_paths(MenuKit &kit, MenuState &state) const
 
 	kit.begin_group("GAMES");
 	kit.next_tip("One zip, 7z or folder per game, named as in MAME.");
-	if (kit.value("Games (ROMs)", "at the next launch", shown_path(state.roms, "not set").c_str(), change, nullptr,
+	if (kit.value("Hikaru ROMs", "at the next launch", shown_path(state.roms, "not set").c_str(), change, nullptr,
 	              state.roms_given ? "set on the command line: -R" : nullptr))
 		state.choose = MenuState::Folder::ROMS;
-	kit.next_tip("hikaru and mie, named as in MAME; jvs13551, 18wheelr and srally2 are optional.");
-	if (kit.value("BIOS", "at the next launch", shown_path(state.bios, "the games folder").c_str(), change, nullptr,
+	kit.next_tip("One zip, 7z or folder per game, named as in MAME; not set: with the Hikaru ROMs.");
+	if (kit.value("Gaelco ROMs", "at the next launch", shown_path(state.gaelco, "the Hikaru ROMs").c_str(), change,
+	              nullptr, state.roms_given ? "set on the command line: -R" : nullptr))
+		state.choose = MenuState::Folder::GAELCO;
+	kit.next_tip("hikaru, mie and tms320c31, named as in MAME; jvs13551, 18wheelr and srally2 are optional.");
+	if (kit.value("BIOS", "at the next launch", shown_path(state.bios, "with the ROMs").c_str(), change, nullptr,
 	              state.bios_given ? "set on the command line: -B" : nullptr))
 		state.choose = MenuState::Folder::BIOS;
 	kit.next_tip("Files named after the game's MAME name: swracer_title.png for the library (swracer_logo.png "
