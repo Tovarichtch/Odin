@@ -474,7 +474,8 @@ Session::frames()
 		m_board.run_frame();
 		if (const std::string news = m_menus.card_news(); !news.empty())
 			say(news);
-		m_controls.show(m_board.io_outputs(), m_board.output_levels(), shaker_sound(), m_board.drive_torque());
+		m_controls.show(m_board.io_outputs(), m_board.output_levels(), shaker_sound(), m_board.drive_torque(),
+		                m_board.pad_shake());
 		if (OutputsNetwork *const outputs = m_menus.outputs())
 			outputs->show(m_board.io_outputs());
 		if (m_audio)

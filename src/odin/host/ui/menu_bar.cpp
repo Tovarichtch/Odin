@@ -528,6 +528,13 @@ Menu::bar_display(BarItems &b)
 		state.upscale_mode = static_cast<unsigned>(mode);
 	if (b.choose("Anisotropic filtering", FILTERS, filter, !state.anisotropy_given))
 		state.anisotropy = ANISOTROPY[filter];
+	/* A Gaelco 3D board's own, while one of its games runs */
+	if (state.own_picture) {
+		int fields = state.gaelco3d_board_fields ? 1 : 0;
+
+		if (b.choose("Interlaced picture", FIELDS_SHOWN, fields))
+			state.gaelco3d_board_fields = fields == 1;
+	}
 	if (b.choose("Vertical sync", SYNCS, sync, !state.vsync_locked))
 		state.vsync = static_cast<unsigned>(sync);
 	ImGui::Separator();
@@ -607,6 +614,13 @@ Menu::bar_audio(BarItems &b)
 		if (!ImGui::BeginMenu(game.title.c_str()))
 			continue;
 		b.framed();
+		/* As on the page Audio: the cabinet's two speakers, nothing to
+		 * choose */
+		if (game.no_woofer) {
+			ImGui::TextDisabled("This cabinet has no woofer: only its two speakers are heard.");
+			ImGui::EndMenu();
+			continue;
+		}
 		ImGui::BeginDisabled(game.locked);
 		for (int how = 0; how < static_cast<int>(std::size(PLAYED)); how++)
 			if (item(PLAYED[how], {}, game.played == how))

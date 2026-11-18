@@ -44,6 +44,8 @@ struct CabinetNow {
 	std::span<const ControlNow> now;
 	bool coin = false, service = false, test = false;
 	std::string_view chosen = {};
+	/* The cabinet chosen on the page, "standard" or one of the list's */
+	std::string_view cabinet = "standard";
 };
 
 /* The cabinet of a game drawn in a box, as large as it fits

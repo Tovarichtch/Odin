@@ -518,6 +518,7 @@ M68000::interrupt(unsigned level)
 	const uint32_t return_pc = m_pc;
 
 	m_stopped = false;
+	m_wait_last = m_wait_turn = 0;
 	idle(6);
 	int vector = m_bus.int_ack(level);
 	m_cycles += 4;
@@ -616,9 +617,34 @@ M68000::run(uint32_t cycles)
 	const uint64_t start = m_cycles;
 
 	m_run_end = start + cycles;
-	while (m_cycles < m_run_end)
+	if (m_wait_pc == 0xFFFFFFFFu) {
+		while (m_cycles < m_run_end)
+			step();
+		return static_cast<uint32_t>(m_cycles - start);
+	}
+	/* Other chips ran since the last run: a pass is measured again */
+	m_wait_last = m_wait_turn = 0;
+	while (m_cycles < m_run_end) {
+		if (m_pc == m_wait_pc)
+			wait_turn();
 		step();
+	}
 	return static_cast<uint32_t>(m_cycles - start);
+}
+
+void
+M68000::wait_turn()
+{
+	if (m_halted || m_stopped || (m_sr & SR_T) || interrupt_pending() || !m_bus.waiting(m_pc)) {
+		m_wait_last = m_wait_turn = 0;
+		return;
+	}
+	const uint64_t turn = m_wait_last ? m_cycles - m_wait_last : 0;
+
+	if (turn && turn == m_wait_turn)
+		m_cycles += (m_run_end - m_cycles - 1) / turn * turn;
+	m_wait_turn = turn;
+	m_wait_last = m_cycles;
 }
 
 void

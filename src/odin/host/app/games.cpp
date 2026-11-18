@@ -109,7 +109,7 @@ file_of(const json_t *datum, const std::string &parent)
 std::optional<std::vector<uint8_t>>
 load_datum(const json_t *datum, RomFiles &files, const Game &game)
 {
-	const std::optional<RomFiles::File> file = file_of(datum, game.parent);
+	const std::optional<RomFiles::File> file = file_of(datum, game.cloneof);
 	std::string where;
 
 	if (!file)
@@ -386,13 +386,14 @@ parse_control(const json_t *control)
 }
 
 /* An output: {"name": ..., "id": ..., "output": 1 to 32, "role":
- * "rumble", "mute", "lamp", "lock" or "counter", and "player" when it is
+ * "rumble", "mute", "lamp", "lock", "coin_lock" or "counter", and "player" when it is
  * 2}. */
 std::optional<GameOutput>
 parse_output(const json_t *output)
 {
 	static const std::pair<const char *, GameOutput::Role> ROLES[] = {
 		{ "lamp", GameOutput::Role::LAMP }, { "lock", GameOutput::Role::LOCK },
+		{ "coin_lock", GameOutput::Role::COIN_LOCK },
 		{ "rumble", GameOutput::Role::RUMBLE }, { "mute", GameOutput::Role::MUTE },
 		{ "counter", GameOutput::Role::COUNTER },
 	};
@@ -430,6 +431,22 @@ parse_link(const json_t *link, Game::Link &out)
 		return false;
 	out.cabinets = static_cast<unsigned>(json_integer_value(cabinets));
 
+	const json_t *const names = json_object_get(link, "names"), *const off = json_object_get(link, "off");
+
+	if (names && (!json_is_array(names) || json_array_size(names) != out.cabinets))
+		return false;
+	for (size_t i = 0; i < json_array_size(names); i++) {
+		const char *const name = json_string_value(json_array_get(names, i));
+
+		if (!name || !name[0])
+			return false;
+		out.names.emplace_back(name);
+	}
+	if (off && (!json_is_string(off) || !json_string_value(off)[0]))
+		return false;
+	if (off)
+		out.off = json_string_value(off);
+
 	const json_t *const seat = json_object_get(link, "seat");
 
 	if (!seat)
@@ -455,11 +472,11 @@ parse_link(const json_t *link, Game::Link &out)
 	if (!known || !byte || !shift || !bits || !first || *bits == 0 || *shift + *bits > 8 ||
 	    (letter && !json_is_boolean(letter)))
 		return false;
-	out.seat_in = !std::strcmp(in, "mie")   ? Game::Link::In::MIE
-	              : !std::strcmp(in, "flash") ? Game::Link::In::FLASH
-	              : !std::strcmp(in, "nand")  ? Game::Link::In::NAND
+	out.seat_in = !std::strcmp(in, "mie")    ? Game::Link::In::MIE
+	              : !std::strcmp(in, "flash")  ? Game::Link::In::FLASH
+	              : !std::strcmp(in, "nand")   ? Game::Link::In::NAND
 	              : !std::strcmp(in, "eeprom") ? Game::Link::In::EEPROM
-	                                          : Game::Link::In::BACKUP;
+	                                           : Game::Link::In::BACKUP;
 	out.seat_byte = *byte;
 	out.seat_shift = *shift;
 	out.seat_bits = *bits;
@@ -632,9 +649,9 @@ grounded_of(const json_t *list, std::vector<JvsSwitch> &out, std::vector<PortSwi
 }
 
 /* Whether a control goes where its board takes it: on a Gaelco board
- * (atvtrack.hpp) a switch to a pin, an analog control to a channel of the
- * ADC or to half a ball, the side with its low end left, the forward half
- * with it up; on the Hikaru to none of those */
+ * (atvtrack.hpp) a button or a lever (Speed Up's gear) to a pin, an analog
+ * control to a channel of the ADC or to half a ball, the side with its low
+ * end left, the forward half with it up; on the Hikaru to none of those */
 bool
 goes_right(const GameControl &control, bool gaelco)
 {
@@ -655,9 +672,7 @@ goes_right(const GameControl &control, bool gaelco)
 bool
 wired(const Game &game)
 {
-	const bool gaelco = game.machine == "atvtrack" || game.machine == "smashdrv" || game.machine == "gaelco3d" ||
-	                    game.machine == "footbpow" || game.machine == "speedup" ||
-	                    game.machine == "surfplnt";
+	const bool gaelco = game.machine == "atvtrack" || game.machine == "smashdrv" || gaelco3d_machine(game.machine);
 	unsigned halves[2][2] = {};	/* [player][side, forward] */
 
 	for (const GameControl &control : game.controls) {
@@ -775,6 +790,18 @@ read_cabinet(const json_t *rom, const json_t *cabinet, size_t c, Game &game)
 			return false;
 		kept.seated = on;
 	}
+	if (const json_t *const woofer = json_object_get(cabinet, "woofer")) {
+		bool on = false;
+
+		if (json_is_string(woofer) && !std::strcmp(json_string_value(woofer), "optional")) {
+			kept.woofer = true;
+			kept.woofer_optional = true;
+		} else if (!read_true_false(cabinet, "woofer", name, on)) {
+			return false;
+		} else {
+			kept.woofer = on;
+		}
+	}
 	if (const json_t *const outputs = json_object_get(cabinet, "outputs")) {
 		kept.outputs.emplace();
 		for (size_t i = 0; json_is_array(outputs) && i < json_array_size(outputs); i++) {
@@ -877,8 +904,7 @@ read_sound_parts(const json_t *rom, Game &game)
 	static const std::pair<const char *, Place> PLACES[] = {
 		{ "front_left", Place::FRONT_LEFT }, { "front_right", Place::FRONT_RIGHT }, { "base", Place::BASE },
 		{ "panel", Place::PANEL }, { "seat_left", Place::SEAT_LEFT }, { "seat_right", Place::SEAT_RIGHT },
-		{ "seat", Place::SEAT }, { "front", Place::FRONT }, { "rear_left", Place::REAR_LEFT },
-		{ "rear_right", Place::REAR_RIGHT },
+		{ "seat", Place::SEAT }, { "dash_left", Place::DASH_LEFT }, { "dash_right", Place::DASH_RIGHT },
 	};
 	const char *const name = game.name.c_str();
 	const json_t *const parts = json_object_get(rom, "sound_parts");
@@ -1012,7 +1038,7 @@ Game::shaker(unsigned player) const
 			out += (out.empty() ? "from output " : ", ") + output.name;
 	if (out.empty() && player == 0 && option_vibration)
 		out = option_wired() ? "from the panel shaker" : "from the seat shaker (the main board's lows)";
-	if (out.empty() && player == 0 && drive_first_output)
+	if (out.empty() && player == 0 && (drive_first_output || wheel_motor))
 		out = "from the jolts of the cabinet's wheel";
 	return out;
 }
@@ -1023,13 +1049,13 @@ Game::shaker_experimental(unsigned player) const
 	for (const GameOutput &output : outputs)
 		if (output.role == GameOutput::Role::RUMBLE && output.player == player)
 			return false;
-	return player == 0 && (option_vibration || drive_first_output);
+	return player == 0 && (option_vibration || drive_first_output || wheel_motor);
 }
 
 bool
 Game::option_wired() const
 {
-	return std::none_of(sound_parts.begin(), sound_parts.end(), [this](const SoundPart &part) {
+	return woofer_wired && std::none_of(sound_parts.begin(), sound_parts.end(), [this](const SoundPart &part) {
 		return part.option && part.kind == SoundPart::Kind::UNWIRED &&
 		       (part.cabinet.empty() || part.cabinet == cabinet);
 	});
@@ -1048,6 +1074,8 @@ Game::use_cabinet(const std::string &id)
 				motion_platform = *other.motion_platform;
 			if (other.seated)
 				seated = *other.seated;
+			if (other.woofer)
+				woofer_wired = *other.woofer;
 			if (other.outputs)
 				outputs = *other.outputs;
 			grounded_analog = other.grounded_analog;
@@ -1251,7 +1279,8 @@ GameList::missing(RomFiles &files, const std::string &name) const
 {
 	const json_t *const rom = find(name);
 	const json_t *const sections = json_object_get(rom, "sections");
-	const char *const parent = json_string_value(json_object_get(rom, "parent"));
+	const char *const cloneof = json_string_value(json_object_get(rom, "cloneof"));
+	const char *const parent = cloneof ? cloneof : json_string_value(json_object_get(rom, "parent"));
 	std::vector<RomFiles::File> out;
 
 	for (size_t i = 0; i < json_array_size(sections); i++) {
@@ -1328,6 +1357,8 @@ GameList::describe(const std::string &name) const
 	game.machine = json_string_value(json_object_get(rom, "mach"));
 	if (const char *const parent = json_string_value(json_object_get(rom, "parent")))
 		game.parent = parent;
+	const char *const cloneof = json_string_value(json_object_get(rom, "cloneof"));
+	game.cloneof = cloneof ? cloneof : game.parent;
 	const char *const io = json_string_value(json_object_get(rom, "io"));
 	game.io_board = io ? io : "837-13551";
 	if (!read_title(rom, game) || !read_controls(rom, game) || !read_outputs(rom, game) || !ids_once(game) ||
@@ -1335,6 +1366,15 @@ GameList::describe(const std::string &name) const
 	    !read_boards(rom, game) ||
 	    !read_chips(rom, game))
 		return std::nullopt;
+	if (const char *const first = json_string_value(json_object_get(rom, "cabinet"))) {
+		const auto named = [first](const Game::Cabinet &c) { return c.id == first; };
+
+		if (std::strcmp(first, "standard") && std::none_of(game.cabinets.begin(), game.cabinets.end(), named)) {
+			std::fprintf(stderr, "ERROR: game '%s': \"cabinet\": no cabinet '%s'\n", name.c_str(), first);
+			return std::nullopt;
+		}
+		game.first_cabinet = first;
+	}
 	return game;
 }
 

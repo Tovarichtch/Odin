@@ -364,11 +364,17 @@ input_rows(const MenuState &state)
 		case GameControl::Type::BUTTON:
 			add(control.name, { i, 0, control.role }, bindings.part(c, 0), lit, true);
 			break;
-		case GameControl::Type::POSITIONS:
-			/* Its two ways, as in odin.ini (gear_up: GEAR UP) */
-			add(MenuKit::capitals(control.id) + " UP", { i, 2, control.role }, bindings.part(c, 2), lit, true);
-			add(MenuKit::capitals(control.id) + " DOWN", { i, 1, control.role }, bindings.part(c, 1), lit, true);
+		case GameControl::Type::POSITIONS: {
+			/* Its two ways, as in odin.ini (gear_up: GEAR UP), each lit by
+			 * its own inputs */
+			const ControlNow now = c < state.now.size() ? state.now[c] : ControlNow{};
+
+			add(MenuKit::capitals(control.id) + " UP", { i, 2, control.role }, bindings.part(c, 2), lit && now.up,
+			    true);
+			add(MenuKit::capitals(control.id) + " DOWN", { i, 1, control.role }, bindings.part(c, 1),
+			    lit && now.down, true);
 			break;
+		}
 		case GameControl::Type::ANALOG: {
 			const char *const left = GameControl::half(control.low, false);
 			const char *const right = GameControl::half(control.low, true);
@@ -1132,6 +1138,9 @@ cabinet_box(const MenuKit &kit, MenuState &state, ImVec2 a, ImVec2 b, bool frame
 	                                  [](const GameControl &c) { return c.role == Role::SERVICE && c.player == 0; });
 	CabinetNow now{ controls, state.now };
 
+	if (state.cabinet >= 0 && static_cast<size_t>(state.cabinet) < state.cabinet_ids.size())
+		now.cabinet = state.cabinet_ids[static_cast<size_t>(state.cabinet)];
+
 	if (state.touched.size() == n + MenuState::TOUCHED_ROLES) {
 		now.coin = state.touched[n + MenuState::TOUCHED_COIN1];
 		now.test = state.touched[n + MenuState::TOUCHED_TEST];
@@ -1148,10 +1157,36 @@ cabinet_box(const MenuKit &kit, MenuState &state, ImVec2 a, ImVec2 b, bool frame
 	}
 
 	float top = a.y + kit.px(MenuKit::BOX_INSIDE);
+	const float pad = kit.px(8.0f);
+	/* The cabinets to choose from, at the top right of the box, framed or
+	 * not (a narrow window) */
+	const auto choose = [&](float y) {
+		std::vector<const char *> names;
+
+		for (const std::string &name : state.cabinet_names)
+			names.push_back(name.c_str());
+
+		const ImVec2 cells = kit.segments_size(names);
+		const ImVec2 at = { b.x - pad - cells.x, y };
+
+		/* The gamepad: left or right, or A, takes the next one */
+		if (kit.focus(at, { at.x + cells.x, at.y + cells.y }, kit.px(4.0f)) && (kit.side() || kit.pressed()))
+			state.cabinet = (state.cabinet + (kit.side() < 0 ? static_cast<int>(names.size()) - 1 : 1)) %
+			                static_cast<int>(names.size());
+		kit.segments(at, names, state.cabinet);
+		top = at.y + cells.y;
+		if (state.cabinet_later) {
+			static constexpr char LATER[] = "Reset the game to apply";
+			const float note = MenuKit::font(MenuKit::NOTE);
+
+			MenuKit::write(list, { b.x - pad - MenuKit::measure(LATER, note), top + kit.px(3.0f) }, palette.dim, LATER,
+			               note);
+			top += kit.px(3.0f) + note;
+		}
+	};
 
 	if (framed) {
 		const std::string &title = state.games[state.shown].second;
-		const float pad = kit.px(8.0f);
 
 		const float tiny = MenuKit::font(MenuKit::TINY), small = MenuKit::font(MenuKit::SMALL);
 
@@ -1159,33 +1194,13 @@ cabinet_box(const MenuKit &kit, MenuState &state, ImVec2 a, ImVec2 b, bool frame
 		MenuKit::write(list, { a.x + pad, a.y + kit.px(6.0f) + small - tiny }, palette.cabinet, "THE CABINET", tiny,
 		               tiny * 0.14f);
 		top = a.y + kit.px(6.0f) + small;
-		if (state.cabinet_names.size() > 1) {
-			std::vector<const char *> names;
-
-			for (const std::string &name : state.cabinet_names)
-				names.push_back(name.c_str());
-
-			const ImVec2 cells = kit.segments_size(names);
-			const ImVec2 at = { b.x - pad - cells.x, a.y + kit.px(6.0f) };
-
-			/* The gamepad: left or right, or A, takes the next one */
-			if (kit.focus(at, { at.x + cells.x, at.y + cells.y }, kit.px(4.0f)) && (kit.side() || kit.pressed()))
-				state.cabinet = (state.cabinet + (kit.side() < 0 ? static_cast<int>(names.size()) - 1 : 1)) %
-				                static_cast<int>(names.size());
-			kit.segments(at, names, state.cabinet);
-			top = at.y + cells.y;
-			if (state.cabinet_later) {
-				static constexpr char LATER[] = "Reset the game to apply";
-				const float note = MenuKit::font(MenuKit::NOTE);
-
-				MenuKit::write(list, { b.x - pad - MenuKit::measure(LATER, note), top + kit.px(3.0f) }, palette.dim,
-				               LATER, note);
-				top += kit.px(3.0f) + note;
-			}
-		} else {
+		if (state.cabinet_names.size() > 1)
+			choose(a.y + kit.px(6.0f));
+		else
 			MenuKit::write(list, { b.x - pad - MenuKit::measure(title.c_str(), small), a.y + kit.px(6.0f) },
 			               palette.dim, title.c_str(), small);
-		}
+	} else if (state.cabinet_names.size() > 1) {
+		choose(top);
 	}
 	draw_cabinet(kit, state.games[state.shown].first, now, { a.x + kit.px(4.0f), top },
 	             { b.x - kit.px(4.0f), b.y - kit.px(6.0f) });
@@ -1858,7 +1873,7 @@ advanced_box(const MenuKit &kit, MenuState &state, ImVec2 a, ImVec2 b)
 		game_rows.push_back("vibration");
 	if (pad && state.can_shake)
 		game_rows.push_back("its force");
-	if (state.can_force && turns)
+	if (state.can_force && !pad)
 		game_rows.push_back("wheel force");
 	if (turns)
 		game_rows.push_back("wheel rotation");

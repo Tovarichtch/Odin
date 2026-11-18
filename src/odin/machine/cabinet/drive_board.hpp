@@ -86,10 +86,13 @@ struct DriveBoard {
 	 * suspensions, the walls, a buzz of 5 at most, the draft). A wall makes
 	 * it jump by up to 51 with the wheel still (measured in Odin).
 	 * HEURISTIC: 4 of a jump goes, and what the move of the
-	 * wheel can give, the rest twice over against MOST. */
-	static uint16_t jolt_of(int jump, double wheel_moved)
+	 * wheel can give, the rest twice over against MOST. A jump over
+	 * `frames` frames: that many times the 4 and the wheel's move, so a
+	 * force that glides gives no more than frame by frame. */
+	static uint16_t jolt_of(int jump, double wheel_moved, int frames = 1)
 	{
-		const double shock = std::abs(jump) - 4 - std::min(MOST_FROM_WHEEL, FROM_WHEEL * wheel_moved);
+		const double shock = std::abs(jump) - 4.0 * frames -
+		                     std::min(MOST_FROM_WHEEL * frames, FROM_WHEEL * frames * wheel_moved);
 
 		return shock <= 0 ? 0 : static_cast<uint16_t>(std::lround(std::min(1.0, 2 * shock / MOST) * 0xFFFF));
 	}

@@ -27,7 +27,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstdio>
 #include <memory>
 #include <span>
@@ -35,11 +34,11 @@
 #include <vector>
 
 #include "odin/host/app/ball_kick.hpp"
+#include "odin/host/app/gaelco_play.hpp"
 #include "odin/host/app/options.hpp"
 #include "odin/host/app/user_files.hpp"
 #include "odin/host/audio/audio_out.hpp"
 #include "odin/host/input/controls.hpp"
-#include "odin/host/input/outputs_network.hpp"
 #include "odin/host/ui/menu_session.hpp"
 #include "odin/machine/boards/atvtrack/atvtrack.hpp"
 #include "odin/machine/cabinet/drive_board.hpp"
@@ -65,6 +64,7 @@ constexpr int DAC_RATE = AtvTrack::DAC_RATE;
 constexpr unsigned VOLUME_UP_FRAMES[] = { 0, 96, 122, 147, 180 };
 static_assert(std::size(VOLUME_UP_FRAMES) == std::size(START_VOLUMES));
 constexpr unsigned VOLUME_FROM = 60, VOLUME_DOWN_FRAMES = 200, VOLUME_GAP = 10;
+
 class AtvGame final : public Board {
 public:
 	AtvGame(const Game &game, Controls &controls, Display &display, const std::string &kept,
@@ -90,18 +90,7 @@ public:
 	bool load_state(const std::string &path) override;
 	std::span<const uint8_t> io_outputs() const override { return m_outputs; }
 	std::span<const uint8_t> output_levels() const override { return m_levels; }
-	LinkStatus link_status() const override
-	{
-		const GaelcoLink *const link = m_board->link();
-		LinkStatus status;
-
-		status.failed = m_board->link_failed();
-		status.board = link || status.failed;
-		status.linked = link != nullptr;
-		status.previous = link && link->previous_linked();
-		status.next = link && link->next_linked();
-		return status;
-	}
+	LinkStatus link_status() const override { return link_status_of(m_board->link(), m_board->link_failed()); }
 	const std::vector<int16_t> &sound(bool optional) const override
 	{
 		return optional ? m_board->woofer() : m_board->sound();
@@ -121,7 +110,6 @@ public:
 
 private:
 	void read_controls();
-	void read_kick(const CabinetInputs &in, unsigned player);
 
 	std::string m_name, m_kept;
 	std::unique_ptr<AtvTrack> m_board;
@@ -131,12 +119,11 @@ private:
 	std::vector<GameControl> m_wiring;
 	std::vector<PortSwitch> m_grounded;
 	std::vector<unsigned> m_grounded_analog;
-	/* The channels of CabinetInputs of the stick that kicks each ball, side
-	 * then forward; none for a game without balls */
-	std::array<std::optional<std::array<uint8_t, 2>>, 2> m_balls;
+	BallSticks m_balls;
 	/* The frames VOLUME - then VOLUME + are held at power-on (0: not) */
 	unsigned m_volume_down, m_volume_up;
 	unsigned m_coin = 0;
+	/* HEURISTIC: the lift of the ball */
 	BallKick m_kick[2]{ { AtvTrack::BALL_AT_REST, 200.0f }, { AtvTrack::BALL_AT_REST, 200.0f } };
 	/* The outputs as JVS counts them: output n is bit n - 1 of the
 	 * system pins, then a channel of the motor DAC that runs (GameOutput) */
@@ -169,17 +156,9 @@ AtvGame::AtvGame(const Game &game, Controls &controls, Display &display, const s
                  std::optional<unsigned> volume_frames, bool verbose)
 	: m_name(game.name), m_kept(kept), m_board(make_board(game)), m_controls(controls), m_display(display),
 	  m_wiring(game.controls), m_grounded(game.grounded_pins), m_grounded_analog(game.grounded_analog),
-	  m_volume_down(volume_frames ? VOLUME_DOWN_FRAMES : 0), m_volume_up(volume_frames.value_or(0)),
-	  m_wheel_motor(game.wheel_motor)
+	  m_balls(ball_sticks(game.controls)), m_volume_down(volume_frames ? VOLUME_DOWN_FRAMES : 0),
+	  m_volume_up(volume_frames.value_or(0)), m_wheel_motor(game.wheel_motor)
 {
-	for (const GameControl &control : m_wiring)
-		if (control.ball != GameControl::Ball::NONE) {
-			std::optional<std::array<uint8_t, 2>> &stick = m_balls[control.player];
-
-			if (!stick)
-				stick.emplace();
-			(*stick)[control.ball == GameControl::Ball::FORWARD] = control.analog;
-		}
 	m_board->set_name(m_name);
 	m_board->set_verbose(verbose);
 	m_board->set_motion_platform(game.motion_platform);
@@ -198,24 +177,6 @@ bool
 AtvGame::load_state(const std::string &path)
 {
 	return m_board->load_state(path);
-}
-
-/* The value of a channel of the ADC for a channel of CabinetInputs, from
- * span[0] at the low end of the control to span[1] at its high end */
-uint8_t
-adc_value(const std::array<uint8_t, 2> &span, uint16_t channel)
-{
-	return static_cast<uint8_t>(std::lround(span[0] + (span[1] - span[0]) * (channel / 65535.0)));
-}
-
-void
-AtvGame::read_kick(const CabinetInputs &in, unsigned player)
-{
-	const auto axis = [&](unsigned half) {
-		return (static_cast<float>(in.jvs_analog[(*m_balls[player])[half]]) - 32768.0f) / 32768.0f;
-	};
-
-	m_kick[player].read(axis(0), -axis(1));
 }
 
 void
@@ -259,7 +220,7 @@ AtvGame::read_controls()
 	if (m_balls[0] || m_balls[1]) {
 		for (unsigned player = 0; player < 2; player++)
 			if (m_balls[player])
-				read_kick(in, player);
+				m_kick[player].read(in, *m_balls[player]);
 		m_board->set_ball_sensors({ m_kick[0].sensors(), m_kick[1].sensors() },
 		                          { m_kick[0].kicked(), m_kick[1].kicked() });
 	}
@@ -303,35 +264,10 @@ Ended
 play_atvtrack(const Options &options, const Game &game, const GameList &games, Settings &settings,
               const std::string &settings_file, Display &display, Keyboard &keys, Pointers *pointers, Opened &opened)
 {
-	Controls controls(keys, game.controls, game.outputs, settings, game.name);
+	GaelcoPlay play(options, game, games, settings, settings_file, display, keys, pointers, opened, DAC_RATE);
 
-	controls.set_pointers(pointers);
-	controls.set_wheel_rotation(wheel_rotation_of(settings, game.name));
-	/* The pads shake and the wheel turns unless [players.<game>] says off */
-	controls.feel_game(game, vibration_on(settings, game.name));
-	controls.set_wheel_force(wheel_force_of(settings, game.name));
-	controls.set_vibration_force(vibration_force_of(settings, game.name));
-
-	const bool network = network_on(settings);
-	std::unique_ptr<OutputsNetwork> outputs =
-		network ? OutputsNetwork::open(game.name, game.outputs) : nullptr;
-
-	/* The DAC's rate, its woofer as game_sound says. None at unthrottled
-	 * frames, which do not keep time (-u). */
-	Options sound_options = options;
-	const GameSound sound = game_sound(sound_options, game, settings);
-	std::unique_ptr<AudioOut> audio;
-
-	if (sound_options.sound && options.unthrottled && options.sound_asked)
-		std::fprintf(stderr, "sound: not with -u\n");
-	else if (sound_options.sound && !options.unthrottled)
-		audio = AudioOut::make(*sound_options.sound, sound.level, options.sound_device, DAC_RATE);
-	if (audio && game.woofer)
-		audio->set_woofer(sound.woofer_hz);
-	if (audio && options.volume != 100)
-		audio->set_volume(static_cast<float>(options.volume) / 100.0f);
-	if (audio && sound_options.sound == AudioOut::Mode::MIX && sound.level != 0)
-		std::printf("sound: the woofer at %+g dB in the mix\n", sound.level);
+	if (play.audio && play.sound_options.sound == AudioOut::Mode::MIX && play.sound.level != 0)
+		std::printf("sound: the woofer at %+g dB in the mix\n", play.sound.level);
 
 	std::optional<unsigned> volume_frames;
 
@@ -350,12 +286,10 @@ play_atvtrack(const Options &options, const Game &game, const GameList &games, S
 		                                                               : at - std::begin(START_VOLUMES)];
 	}
 
-	AtvGame running(game, controls, display, SaveFolder::of_game(game.name, options.saves).path("kept.bin"),
+	AtvGame running(game, play.controls, display, SaveFolder::of_game(game.name, options.saves).path("kept.bin"),
 	                volume_frames, options.verbose);
 
-	display.attach_scenes(game.name, game.title);
-
-	bool started = true;
+	play.attach();
 
 	/* The link cable of the games that have one (Game::Link) */
 	const NetLinkSettings link = link_settings(settings);
@@ -398,26 +332,7 @@ play_atvtrack(const Options &options, const Game &game, const GameList &games, S
 			std::fprintf(stderr, "cabinet: %s keeps no settings yet: set its %s cabinet once in its test menu\n",
 			             game.name.c_str(), model.name.c_str());
 	}
-
-	if (!options.state_path.empty()) {
-		started = running.load_state(options.state_path);
-		if (started)
-			std::printf("loaded state '%s', frame %u\n", options.state_path.c_str(), running.frame());
-	}
-
-	Ended ended = Ended::FAILED;
-
-	if (started) {
-		Session session(sound_options, game, running, nullptr, display, keys, controls, audio.get(),
-		                std::move(outputs), network, settings, settings_file, games);
-
-		std::printf("Running\n");
-		ended = session.run();
-		opened = session.opened();
-	}
-	std::printf("Finalizing\n");
-	display.detach();
-	return ended;
+	return play.run(running);
 }
 
 } /* namespace odin */

@@ -66,7 +66,7 @@ std::string shown_path(const std::string &path, const char *none);
 
 /* A folder the library or the menu asks the system for (the library the
  * first two only) */
-enum class MenuFolder { NONE, ROMS, GAELCO, BIOS, SAVES, STATES, ARTWORK, LOG };
+enum class MenuFolder { NONE, ROMS, BIOS, SAVES, STATES, ARTWORK, LOG };
 
 /* The library, what Odin shows when it starts without a game (as a double
  * click starts it): the games of the list, each with the files it lacks
@@ -84,7 +84,11 @@ struct LibraryState {
 		std::string name, title, parent;
 		std::vector<std::string> missing;
 		bool gaelco;
-		std::string system;	/* "hikaru", "gaelco" */
+		std::string system;	/* "hikaru", "gaelco" (PowerVR), "gaelco3d" */
+		/* It lacks a file from a set that is not a game of the list
+		 * (tms320c31 for the Gaelco 3D games), which may be in the BIOS
+		 * folder */
+		bool lacks_shared = false;
 	};
 
 	std::vector<Game> games;
@@ -92,9 +96,7 @@ struct LibraryState {
 	LibraryFilter filter;
 	std::vector<std::string> systems;
 	size_t hidden = 0;
-	/* The folders of the games, of the Gaelco games (empty: that of the
-	 * games) and of the BIOS */
-	std::string roms, gaelco, bios;
+	std::string roms, bios;
 	bool roms_given = false, bios_given = false;
 	using Folder = MenuFolder;
 	Folder choose = Folder::NONE;
@@ -138,6 +140,12 @@ struct SoundGame {
 	int cutoff = 1, cutoff_standard = 1;
 	/* The part `level` is the level of, as the page Audio names it */
 	const char *level_name = "Woofer";
+	/* The game that runs is set to a cabinet without a woofer (an Atari
+	 * Radikal Bikers): only its main pair plays */
+	bool no_woofer = false;
+	/* Speed Up: its seat woofer plays through the seat speakers, cut off
+	 * at `cutoff` from the next start */
+	bool seat_woofer = false;
 };
 
 /* The settings the pages and the bar both change: MenuState has them, the
@@ -160,6 +168,11 @@ struct BarSettings {
 	/* Only Vulkan can be told which card, with more than one to tell */
 	bool picks_gpu() const { return gpus.size() > 1 && static_cast<DisplayApi>(api) == DisplayApi::VULKAN; }
 	bool unthrottled = false, show_speed = true;
+	/* Gaelco 3D: both fields as the board keeps them ([display] gaelco3d_fields) */
+	bool gaelco3d_board_fields = false;
+	/* The game that runs draws its own picture (Gaelco 3D): the 3D quality
+	 * settings do not change it */
+	bool own_picture = false;
 	/* Audio: the device chosen (empty: the system's), the volume of Odin
 	 * from 0 to 100, its sound kept while its window is in the background */
 	std::string device;
@@ -348,6 +361,13 @@ struct MenuState : BarSettings {
 	std::string link_shown_title;
 	unsigned link_shown_cabinets = 0;
 	int link_shown_seat = SEAT_NONE;
+	/* What the game shown calls each cabinet, and what it sets when the
+	 * link is off (none: master, slaves, seats); whether it takes its
+	 * cabinet number at once, restarting by itself, or only when it next
+	 * starts */
+	std::vector<std::string> link_shown_names;
+	std::string link_shown_off;
+	bool link_shown_restarts = true;
 	/* The next cabinet as kept and as being written (not an address: not
 	 * kept); ODIN_NETBD sets the link. Then the game that runs: it runs, it
 	 * has the board, linked, its port taken, each end of the cable plugged
@@ -357,13 +377,13 @@ struct MenuState : BarSettings {
 	bool link_running = false, link_board_now = false, link_linked = false, link_failed = false;
 	bool link_previous = false, link_next_plugged = false;
 
-	/* Paths: the folders of the games, of the Gaelco games and of the files
-	 * they share (the BIOS; both empty: that of the games) and of their saves, at the next launch
+	/* Paths: the folders of the games, of the files they share (the BIOS:
+	 * empty, that of the games) and of their saves, at the next launch
 	 * (those the command line or ODIN_SAVES gives are shown, not changed),
 	 * of the save states; the settings file and the lists of the 3D
 	 * programs (empty: none). The board saying each access
 	 * (BarSettings::verbose) given on the command line. */
-	std::string roms, gaelco, bios, saves, states, artwork, settings_file, shader_lists, log_file;
+	std::string roms, bios, saves, states, artwork, settings_file, shader_lists, log_file;
 	bool roms_given = false, bios_given = false, saves_given = false, artwork_given = false;
 	/* The folder of the log from the next launch ([paths] log; empty: by
 	 * default), and ODIN_LOG giving the file instead */
@@ -386,12 +406,13 @@ struct MenuState : BarSettings {
 	std::vector<bool> game_gaelco;
 	/* Each game of `games`: the parts of its sound for the page Audio (those
 	 * of the list, or a left and a right speaker of its main board), whether
-	 * it is played seated (and on which of its other cabinets not), how its
-	 * boards reach the user's speakers */
+	 * it is played seated (and on which of its other cabinets not), which of
+	 * its other cabinets have no woofer, how its boards reach the user's
+	 * speakers */
 	struct GameAudio {
 		std::vector<SoundPart> parts;
 		bool seated = false;
-		std::vector<std::string> standing;
+		std::vector<std::string> standing, no_woofer, optional_woofer;
 		SoundFamily family = SoundFamily::ONE;
 	};
 	std::vector<GameAudio> game_audio;
@@ -604,9 +625,10 @@ public:
 	 * screen; its sizes shorter where the row is narrow; Custom among them:
 	 * the size the user gives the window by hand), how frames wait for the
 	 * display, the screens of the cabinets, or none (PRESETS: the filters
-	 * they name), the speed limit */
+	 * they name), the speed limit; on a Gaelco 3D board, its two fields */
 	static constexpr const char *SCALES[] = { "1×", "2×", "3×", "4×", "5×", "6×" };
 	static constexpr const char *UPSCALE_MODES_SHOWN[] = { "Raw", "Snap 2D", "Native 2D" };
+	static constexpr const char *FIELDS_SHOWN[] = { "One picture", "Both fields" };
 	static constexpr const char *FILTERS[] = { "Off", "2×", "4×", "8×", "16×" };
 	static constexpr unsigned ANISOTROPY[] = { 1, 2, 4, 8, 16 };
 	/* The place of an anisotropy among them; -1 for another */
@@ -711,13 +733,15 @@ private:
 	/* The pictures of the page Display (menu_pictures.S): real captures
 	 * of Odin, the same place at each scale and at each filter, a frame
 	 * whole and torn, the timer of VON4 at 1× and in each upscaling mode
-	 * at 4×, a close-up of each CRT screen (in the order of PRESETS) */
+	 * at 4×, a close-up of each CRT screen (in the order of PRESETS), a
+	 * Gaelco 3D player running with both fields and in one picture */
 	enum Picture { UPSCALE = 0, FILTER = UPSCALE + 6, SCREEN = FILTER + 5, WHOLE, TORN, MODE, CRT = MODE + 4,
-	               PICTURES = CRT + 5 };
+	               FIELDS = CRT + 5, PICTURES = FIELDS + 2 };
 	/* What the left of the page Display shows: what the row pointed at
 	 * or in the frame does */
 	enum Preview {
-		PREVIEW_CARD, PREVIEW_UPSCALE, PREVIEW_MODE, PREVIEW_FILTER, PREVIEW_SCREEN, PREVIEW_VSYNC, PREVIEW_CRT
+		PREVIEW_CARD, PREVIEW_UPSCALE, PREVIEW_MODE, PREVIEW_FILTER, PREVIEW_SCREEN, PREVIEW_VSYNC, PREVIEW_CRT,
+		PREVIEW_FIELDS
 	};
 
 	void follow_scale();

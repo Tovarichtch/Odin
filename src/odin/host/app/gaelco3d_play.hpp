@@ -31,9 +31,13 @@
 #include "odin/host/app/session.hpp"
 
 namespace odin {
+
+/* Runs a Gaelco 3D game in Odin's window, with the Hikaru menu, bar and
+ * controls. */
 Ended play_gaelco3d(const Options &options, const Game &game, const GameList &games, Settings &settings,
                     const std::string &settings_file, Display &display, Keyboard &keys, Pointers *pointers,
                     Opened &opened);
-}
+
+} /* namespace odin */
 
 #endif

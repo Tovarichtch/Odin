@@ -1,3 +1,5 @@
+// license:BSD-3-Clause
+// copyright-holders:Aaron Giles
 /*
  *  ██████╗ ██████╗ ██╗███╗   ██╗
  * ██╔═══██╗██╔══██╗██║████╗  ██║
@@ -232,7 +234,7 @@ private:
 	std::array<uint32_t, 16> m_pc_stack{};
 	std::array<uint32_t, 4> m_cntr_stack{}, m_loop_stack{};
 	std::array<std::array<uint16_t, 3>, 4> m_stat_stack{};
-	uint32_t m_pc = 0, m_ppc = 0, m_loop = 0xFFFF, m_loop_condition = 0, m_cntr = 0;
+	uint32_t m_pc = 0, m_loop = 0xFFFF, m_loop_condition = 0, m_cntr = 0;
 	uint32_t m_astat = 0, m_sstat = 0x55, m_mstat = 0, m_mstat_prev = 0;
 	uint32_t m_astat_clear = ~(CFLAG | VFLAG | NFLAG | ZFLAG);
 	int32_t m_pc_sp = 0, m_cntr_sp = 0, m_stat_sp = 0, m_loop_sp = 0;
@@ -242,8 +244,9 @@ private:
 	uint64_t m_cycles = 0;
 	int64_t m_icount = 0;
 
-	bool m_spin = false;
 	uint32_t m_wait_pc = 0xFFFFFFFFu;
+	/* As in M68020: whole passes of a proven wait are counted, not run */
+	uint64_t m_wait_last = 0, m_wait_turn = 0;
 };
 }
 

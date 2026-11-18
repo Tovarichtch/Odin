@@ -28,6 +28,9 @@
 #include <algorithm>
 #include <cmath>
 
+#include "odin/host/app/games.hpp"
+#include "odin/machine/boards/hikaru/hikaru_host.hpp"
+
 namespace odin {
 
 namespace {
@@ -35,21 +38,40 @@ namespace {
 /* A kick on the right stick: once past KICK_FROM, its power is the peak
  * within KICK_RISE frames, and the stick must fall back under KICK_REST to
  * rearm. Pulling back first lifts the ball, until the stick has rested for
- * BACKSWING_FRAMES. HEURISTIC: all of these, and the ball's height below
- * (the sensors' PIC is not dumped). */
+ * BACKSWING_FRAMES. HEURISTIC: all of these, and the ball's height (the
+ * lift each game gives): Gaelco Football's sensor PIC is not dumped;
+ * Football Power's runs on its board, from the levels these give. */
 constexpr unsigned KICK_FRAMES = 3, KICK_RISE = 3, BACKSWING_FRAMES = 20;
 constexpr float KICK_FROM = 0.3f, KICK_REST = 0.2f;
 /* The program's kick power, up to 127: the root of the sum of both side
- * sensors squared, times the gain (0x8C02F5E0); Odin gives it 10 to 127.
+ * sensors squared, times the gain (0x8C02F5E0); Odin gives it values from
+ * the game's softest (10 by default) to 127.
  * HEURISTIC: a real foot's values are unknown. Up to 50 passes and past 80
  * clears the field, so the stick's travel is cubed. */
-constexpr float KICK_SOFT = 10.0f, KICK_HARD = 127.0f, KICK_GAIN = 1.2f;
+constexpr float KICK_HARD = 127.0f, KICK_GAIN = 1.2f;
 
 } /* namespace */
 
+BallSticks
+ball_sticks(const std::vector<GameControl> &controls)
+{
+	BallSticks sticks;
+
+	for (const GameControl &control : controls)
+		if (control.ball != GameControl::Ball::NONE) {
+			std::optional<std::array<uint8_t, 2>> &stick = sticks[control.player];
+
+			if (!stick)
+				stick.emplace();
+			(*stick)[control.ball == GameControl::Ball::FORWARD] = control.analog;
+		}
+	return sticks;
+}
+
 /* Forward sets the power, sideways the direction and pulling back the
  * height. The game reads the power from the side sensors, the height from
- * the middle one and the direction from right minus left. */
+ * the middle one and the direction from right minus left (Gaelco Football's
+ * BallTest page). */
 void
 BallKick::read(float x, float forward)
 {
@@ -72,7 +94,7 @@ BallKick::read(float x, float forward)
 		}
 		if (++m_rise >= KICK_RISE) {
 			const float travel = std::clamp((std::hypot(m_x, m_forward) - KICK_FROM) / (1.0f - KICK_FROM), 0.0f, 1.0f);
-			const float power = KICK_SOFT + (KICK_HARD - KICK_SOFT) * travel * travel * travel;
+			const float power = m_soft + (KICK_HARD - m_soft) * travel * travel * travel;
 			const float force = power / KICK_GAIN / std::sqrt(2.0f * (1.0f + m_x * m_x));
 			const auto side = [&](float turned) { return static_cast<uint8_t>(128.0f + force * (1.0f + turned)); };
 
@@ -87,6 +109,16 @@ BallKick::read(float x, float forward)
 		m_forward = 0.0f;
 		m_rise = 0;
 	}
+}
+
+void
+BallKick::read(const CabinetInputs &in, const std::array<uint8_t, 2> &stick)
+{
+	const auto axis = [&](unsigned half) {
+		return (static_cast<float>(in.jvs_analog[stick[half]]) - 32768.0f) / 32768.0f;
+	};
+
+	read(axis(0), -axis(1));
 }
 
 } /* namespace odin */

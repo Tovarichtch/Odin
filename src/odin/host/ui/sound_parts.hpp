@@ -55,6 +55,11 @@ unsigned your_speakers(SoundFamily family, int played);
 struct SoundScene {
 	std::vector<SoundPart> parts;
 	bool seated = false;
+	/* The cabinet has no woofer: only the main pair is played; or its
+	 * woofer is optional */
+	bool no_woofer = false, woofer_optional = false;
+	/* Another cabinet is chosen for the game that runs: applies at reset */
+	bool cabinet_later = false;
 	SoundFamily family = SoundFamily::ONE;
 	int played = 0;
 	/* The woofer plays only its lows in the mix */

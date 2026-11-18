@@ -77,6 +77,10 @@ system_name(const std::string &system)
 {
 	if (system == "hikaru")
 		return "SEGA Hikaru";
+	if (system == "gaelco3d")
+		return "Gaelco 3D";
+	if (system == "gaelco")
+		return "Gaelco PowerVR";
 
 	std::string name = system;
 
@@ -125,11 +129,6 @@ filter_button(const MenuKit &kit, LibraryState &state, ImVec2 at, float right)
 		return filter.systems.empty() || std::find(filter.systems.begin(), filter.systems.end(), system) !=
 		                                 filter.systems.end();
 	};
-	const auto title = [](std::string name) {
-		if (!name.empty())
-			name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
-		return name;
-	};
 	std::vector<std::string> names = { "Owned only", "Variants" };
 
 	at.x = right - size.x;
@@ -137,7 +136,7 @@ filter_button(const MenuKit &kit, LibraryState &state, ImVec2 at, float right)
 		ImGui::OpenPopup("filter");
 	if (systems)
 		for (const std::string &system : state.systems)
-			names.push_back(title(system));
+			names.push_back(system_name(system));
 
 	float widest = 0.0f;
 
@@ -460,12 +459,13 @@ Menu::build_library(LibraryState &state, BarState &bar_state)
 
 		/* Under a game that lacks files, the folders to choose, one
 		 * above the other, unless the command line gives them */
-		const char *const games = game.gaelco ? "Gaelco ROMs folder..." : "Hikaru ROMs folder...";
+		const char games[] = "Games folder...";
 		const char bios[] = "BIOS folder...";
 		const bool lacks = !game.missing.empty();
 		const bool choose_games = lacks && !state.roms_given && !state.choosing;
-		const bool choose_bios =
-			lacks && !game.gaelco && !state.bios_given && !state.choosing && !state.roms.empty();
+		/* Its files may be in the BIOS folder too: a Hikaru game's, or a shared set's */
+		const bool uses_bios = !game.gaelco || game.lacks_shared;
+		const bool choose_bios = lacks && uses_bios && !state.bios_given && !state.choosing && !state.roms.empty();
 		const float apart = kit.px(6.0f);
 		const float buttons = (choose_games ? kit.button_size(games).y : 0.0f) +
 		                      (choose_bios ? kit.button_size(bios).y : 0.0f) +
@@ -486,12 +486,11 @@ Menu::build_library(LibraryState &state, BarState &bar_state)
 		if (state.failed == game.name)
 			at += wrapped(text, { x, at }, width, size, palette.danger,
 			              "It failed to start: see odin.log for why.") + line;
-		const std::string &roms = game.gaelco && !state.gaelco.empty() ? state.gaelco : state.roms;
+		const std::string &roms = state.roms;
 
 		if (roms.empty()) {
 			at += wrapped(text, { x, at }, width, size, palette.ink,
-			              std::string("Choose your ") + (game.gaelco ? "Gaelco" : "Hikaru") +
-			                      " ROMs folder: one folder, zip or 7z per game, named as in MAME.") + line;
+			              "Choose your games folder: one folder, zip or 7z per game, named as in MAME.") + line;
 		} else if (lacks) {
 			at += wrapped(text, { x, at }, width, size, palette.ink, "Missing files:") + kit.px(4.0f);
 			for (const std::string &file : game.missing)
@@ -499,7 +498,7 @@ Menu::build_library(LibraryState &state, BarState &bar_state)
 			at += line;
 			at += wrapped(text, { x, at }, width, size, palette.faint,
 			              "Searched in " + shown_path(roms, "") +
-			              (game.gaelco || state.bios.empty() ? std::string() : " and " + shown_path(state.bios, "")));
+			              (!uses_bios || state.bios.empty() ? std::string() : " and " + shown_path(state.bios, "")));
 		}
 		ImGui::SetCursorScreenPos({ x, start });
 		ImGui::Dummy({ width, at - start });
@@ -510,7 +509,7 @@ Menu::build_library(LibraryState &state, BarState &bar_state)
 
 		if (choose_games) {
 			if (kit.button(games, { x, button_y }, false))
-				state.choose = game.gaelco ? LibraryState::Folder::GAELCO : LibraryState::Folder::ROMS;
+				state.choose = LibraryState::Folder::ROMS;
 			button_y += kit.button_size(games).y + apart;
 		}
 		if (choose_bios && kit.button(bios, { x, button_y }, false))

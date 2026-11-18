@@ -46,20 +46,25 @@ scan_library(LibraryState &state, const GameList &games, const Options &options,
 	state.selected = 0;
 	state.hidden = 0;
 
-	RomFiles hikaru(options.rom_path, options.bios_path), gaelco(options.roms_of("gaelco"), options.bios_path);
+	RomFiles files(options.rom_path, options.bios_path);
 
 	for (const GameList::Entry &entry : games.entries()) {
 		const std::string &name = entry.name;
 		const bool theirs = entry.machine != "hikaru";
-		const std::string system = theirs ? "gaelco" : entry.machine;
+		/* Gaelco's two systems: its own 3D chips, or PowerVR (ATV Track's) */
+		const std::string system = !theirs ? entry.machine : gaelco3d_machine(entry.machine) ? "gaelco3d" : "gaelco";
 		LibraryState::Game game{ name, entry.title, entry.parent, {}, theirs, system };
-		RomFiles &files = theirs ? gaelco : hikaru;
 
 		if (std::find(state.systems.begin(), state.systems.end(), system) == state.systems.end())
 			state.systems.push_back(system);
 		/* Each file it lacks; a set that is nowhere, its zip alone */
 		for (const RomFiles::File &file : games.missing(files, name)) {
 			const std::string set = file.set_of(name) + ".zip";
+
+			/* A set that is not a game (a BIOS, a chip's ROM), nor another
+			 * version */
+			if (!games.has(file.set_of(name)))
+				game.lacks_shared = true;
 
 			if (files.set_there(name, file))
 				game.missing.push_back(file.name + " (" + set + ")");
@@ -86,7 +91,6 @@ scan_library(LibraryState &state, const GameList &games, const Options &options,
 		if (state.games[i].name == chosen)
 			state.selected = static_cast<int>(i);
 	state.roms = options.rom_path;
-	state.gaelco = options.gaelco_path;
 	state.bios = options.bios_path;
 	state.roms_given = options.given.roms;
 	state.bios_given = options.given.bios;

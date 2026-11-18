@@ -57,14 +57,16 @@ inline constexpr const char *APIS[] = { "opengl", "vulkan" };
 /* The names of the upscaling modes in odin.ini (DisplayUpscaleMode), raw
  * by default */
 inline constexpr const char *UPSCALE_MODES[] = { "raw", "snap", "native" };
+/* [display] gaelco3d_fields: one picture a field (by default) or both
+ * fields as the board keeps them */
+inline constexpr const char *GAELCO3D_FIELDS[] = { "one_picture", "board" };
 
 /* What Odin runs with: the command line, and odin.ini where it says
  * nothing (with_settings) */
 struct Options {
-	/* The folders of the games, of the Gaelco games (empty: that of the
-	 * games) and of the sets of files they share (the BIOS...),
-	 * rom_files.hpp */
-	std::string rom_path, gaelco_path, bios_path;
+	/* The folders of the games and of the sets of files they share (the
+	 * BIOS...), rom_files.hpp */
+	std::string rom_path, bios_path;
 	/* The folder of the saves of the games and that of the save states
 	 * odin.ini gives (empty: by default) */
 	std::string saves, states;
@@ -105,12 +107,6 @@ struct Options {
 		bool scale = false, anisotropy = false, window = false, fullscreen = false, unthrottled = false;
 		bool roms = false, bios = false, verbose = false;
 	} given;
-
-	/* The folder of the games of this machine; that of -R for all */
-	const std::string &roms_of(const std::string &machine) const
-	{
-		return machine == "hikaru" || given.roms || gaelco_path.empty() ? rom_path : gaelco_path;
-	}
 };
 
 /* RUN: go on; HELP_ASKED or WRONG: the help is to be shown (exit 0 or 1),
@@ -164,7 +160,7 @@ bool vibration_on(const Settings &settings, const std::string &game);
  * those whose files are all there (off, when it does not say, or on);
  * variants, the versions of a game ("parent" in the list) too (on, when it
  * does not say, or off); systems, those of these systems ("hikaru",
- * "gaelco", apart by commas; all, when it does not say). The last right line of
+ * "gaelco", "gaelco3d", apart by commas; all, when it does not say). The last right line of
  * each says. */
 struct LibraryFilter {
 	bool owned_only = false, variants = true;
@@ -241,7 +237,7 @@ std::optional<InputDevice> device_named(const std::string &value);
 std::optional<InputDevice> device_chosen(const Settings &settings, const std::string &game, unsigned player);
 /* [players.<game>] cabinet: the id of the cabinet of the game played
  * (Game::cabinets; "standard": that of the list, when it does not say) */
-std::string cabinet_of(const Settings &settings, const std::string &game);
+std::string cabinet_of(const Settings &settings, const std::string &game, const std::string &first = "standard");
 
 /* The way of playing of the page Audio: 0 the main board, 1 both, 2 four
  * channels, -1 the optional board alone */

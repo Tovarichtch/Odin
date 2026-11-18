@@ -44,9 +44,9 @@ COMMAND LINE
  -r <game>        Play this game (its MAME name: airtrix, braveff...).
                   Without -r, Odin opens its library.
  -R <folder>      Folder of the games (one folder, zip or 7z per game).
- -B <folder>      Folder of the shared sets (hikaru, mie; optional:
-                  jvs13551, 18wheelr, srally2). Default: the folder of the
-                  games.
+ -B <folder>      Folder of the shared sets (hikaru, mie, tms320c31;
+                  optional: jvs13551, 18wheelr, srally2). Default: the
+                  folder of the games.
  -c <file>        The settings file to use instead of odin.ini.
  -x <1 to 6>      Draw the 3D this many times finer than 640 x 480.
  -a <2 to 16>     Anisotropic filtering of the textures (the board has none).
@@ -89,6 +89,12 @@ apart by commas (see INPUTS below).
                                snap: corners on the board's pixels;
                                native: as on the board. Default raw.
  anisotropy    1 to 16         Texture filtering. Default 1 (none).
+ gaelco3d_fields
+               one_picture,    Gaelco 3D, interlaced: one_picture shows
+               board           the new field, the older one only where
+                               nothing moved (experimental); board shows
+                               both fields as the board keeps them, what
+                               moves seen twice. Default one_picture.
  window        1 to 6, or      Window size: times 640 x 480, or a size.
                <w>x<h>         Default 1.
  fullscreen    on, off         Default off.
@@ -188,17 +194,15 @@ apart by commas (see INPUTS below).
                                Default off.
  variants      on, off         Also show versions of a game (airtrixo...).
                                Default on.
- systems       hikaru, gaelco  Only these systems, apart by commas.
+ systems       hikaru, gaelco, Only these systems, apart by commas
+               gaelco3d        (gaelco: the PowerVR boards of ATV Track,
+                               Gaelco Football and Smashing Drive).
                                Default: all.
 
 [paths]
 
- roms          a folder        Hikaru ROMs (Hikaru ROMs in the menu).
-                               Default: none (choose it in the library
-                               or with -R).
- gaelco        a folder        Gaelco ROMs (Gaelco ROMs in the menu;
-                               -R puts all games in its folder).
-                               Default: roms.
+ roms          a folder        Games. Default: none (choose it in the
+                               library or with -R).
  bios          a folder        Shared sets (hikaru, mie, tms320c31...).
                                Default: roms.
  saves         a folder        What each game keeps without power.
@@ -231,8 +235,7 @@ apart by commas (see INPUTS below).
 
  Link cabinets (Virtual-On, NASCAR, Star Wars Racer, Planet Harriers, ATV
  Track, Smashing Drive, Radikal Bikers, Speed Up, Surf Planet): each
- cabinet requires one Odin instance. Speed Up links up to four in a ring by
- cabinet number.
+ cabinet is one Odin. Speed Up links up to four, numbered 1UP to 4UP.
 
  board         none, loop,     none: no link. loop: the cable looped back
                ring            on itself (a Gaelco game: as none). ring:
@@ -248,18 +251,21 @@ PER GAME
 --------
 
 <game> is the MAME name: airtrix, braveff, pharrier, sgnascar, swracer,
-von4; atvtrack, gfootbal, smashdrv; footbpow, radikalb, speedup, surfplnt.
+von4; atvtrack, gfootbal, smashdrv; footbpow14, radikalb, speedup, surfplnt.
 A version of a game (airtrixo, sgnascaro, atvtracka, smashdrvb, smashdrvs,
-footbpow14, radikalba, speedup21, surfplnt40...) shares the sections of its
+footbpow, radikalba, speedup21, surfplnt40...) shares the sections of its
 parent; the lines of a section of its own (an older Odin wrote one) still
-count, after its parent's.
+count, after its parent's. Football Power is footbpow14 (version 1.4):
+footbpow, the 4.6 prototype that MAME takes as the parent, is one of its
+versions.
 
 [players.<game>]
 
  p1, p2           <GUID> <name>   Gamepad of player 1, 2.
  joy1, joy2       <GUID> <name>   Wheel or other joystick of player 1, 2
                                   (a wheel: NASCAR, ATV Track, Smashing
-                                  Drive, one player).
+                                  Drive, Speed Up, Radikal Bikers, one
+                                  player; it steers Surf Planet too).
  p1_path,         <path>          The very gamepad of player 1, 2 when two
  p2_path,                         alike share a GUID: its path, as the log
  joy1_path,                       names it ("pad: ... plugged, <GUID> at
@@ -294,7 +300,8 @@ count, after its parent's.
                                   Default on.
  vibration_force  0 to 200        Shake strength, in %. Default 100.
  wheel_force      0 to 200        Force feedback strength, in % (NASCAR,
-                                  ATV Track, Smashing Drive). Default 100.
+                                  ATV Track, Smashing Drive, Speed Up).
+                                  Default 100.
  wheel_rotation   0, 270, 360,    How far the wheel turns from one end to
                   540, 900, 1080  the other (0: all the way). Default 0.
  invert           <id>, ...       Controls turned the other way, on every
@@ -305,22 +312,29 @@ count, after its parent's.
                   deluxe,         minideluxe (Star Wars Racer), vibrator
                   minideluxe,     (ATV Track: Odin sets its MOTION SYSTEM
                   vibrator,       to VIBRATOR; on another cabinet, a
-                  upright         VIBRATOR goes back to PLATFORM HARD),
-                                  upright (Smashing Drive). Default
-                                  standard.
+                  upright, atari  VIBRATOR goes back to PLATFORM HARD),
+                                  upright (Smashing Drive), atari (Radikal
+                                  Bikers, Surf Planet: the cabinet or kit
+                                  Atari sold). Default standard
+                                  (radikalba: atari).
  card             <name>          Virtual-On card in hand (von4).
 
 [sound.<game>]
 
- Games with a second sound board: pharrier, sgnascar, swracer and speedup.
+ Games with a second sound board: pharrier, sgnascar and swracer; on
+ speedup, the seat speakers (with their woofer) count as one.
 
  mode             main, mix, quad  main: main board only. mix: both on two
                                    speakers. quad: four channels.
                                    Default mix (swracer: main).
  option_level     -60 to 12       Level of the second board, in dB.
                                   Default 0 (NASCAR -12, swracer -13).
+ woofer_cutoff    80, 120, 160,   speedup: the seat woofer's lows below
+                  200, off        that many Hz (off: all of its sound).
+                                  Default 120.
 
- Games with a woofer: the Gaelco games (atvtrack, gfootbal, smashdrv).
+ Games with a woofer: atvtrack, gfootbal, smashdrv, footbpow14, radikalb
+ and surfplnt.
 
  mode             main, mix, quad  main: left and right only. mix: the
                                    woofer's lows in both. quad: left,
@@ -459,8 +473,8 @@ count, after its parent's.
   2p_button1    key:A, pad:a
   2p_button2    key:S, pad:b
   2p_button3    key:Q, pad:x
-  2p_kick_x     pad:rightx
-  2p_kick_y     pad:righty
+  2p_kick_x     pad:rightx           (_left key:J, _right key:L)
+  2p_kick_y     pad:righty           (_up key:I, _down key:K)
   2p_start      key:2, pad:start
   volume_up     key:=, pad:leftshoulder
   volume_down   key:-, pad:rightshoulder
@@ -470,6 +484,35 @@ count, after its parent's.
   gas_pedal     key:Up, pad:righttrigger, joy:gas
   brake_pedal   key:Down, pad:lefttrigger, joy:brake
   horn          key:1, pad:start, joy:start
+  volume_up     key:=, pad:dpup
+  volume_down   key:-, pad:dpdown
+
+ footbpow14: those of gfootbal, but 1p_button3 and 2p_button3.
+
+ radikalb:
+  handlebar     pad:leftx, joy:axis0 (_left key:Left, _right key:Right)
+  accelerator   key:Up, pad:righttrigger, joy:gas
+  brake         key:Down, pad:lefttrigger, joy:brake
+  view          key:Left Shift, pad:x
+  handle_up     key:Left Ctrl, pad:a
+  start         key:1, pad:start, joy:start
+  volume_up     key:=, pad:dpup
+  volume_down   key:-, pad:dpdown
+
+ speedup:
+  wheel         pad:leftx, joy:axis0 (_left key:Left, _right key:Right)
+  gas_pedal     pad:righttrigger, joy:gas, key:Up
+  brake_pedal   key:Down, pad:lefttrigger, joy:brake
+  gear_down     key:X, pad:leftshoulder, joy:paddle_left
+  gear_up       key:C, pad:rightshoulder, joy:paddle_right
+  view          key:Left Shift, pad:x
+  start         key:1, pad:start, joy:start
+  volume_up     key:=, pad:dpup
+  volume_down   key:-, pad:dpdown
+
+ surfplnt:
+  joystick      pad:leftx, joy:axis0 (_left key:Left, _right key:Right)
+  start         key:1, pad:start, joy:start
   volume_up     key:=, pad:dpup
   volume_down   key:-, pad:dpdown
 

@@ -125,6 +125,7 @@ AudioOut::change(Mode mode, const std::string &device)
 	SDL_DestroyAudioStream(m_stream);
 	m_stream = stream;
 	m_mode = mode;
+	m_primed = false;
 	follow_gain();
 	if (!m_paused)
 		SDL_ResumeAudioStreamDevice(m_stream);
@@ -172,12 +173,28 @@ AudioOut::play(std::span<const int16_t> main, std::span<const int16_t> option)
 		return;
 
 	const uint32_t frame_bytes = n * uint32_t{sizeof(int16_t)};
-	const uint32_t queued = static_cast<uint32_t>(std::max(SDL_GetAudioStreamQueued(m_stream), 0)) / frame_bytes;
+	uint32_t queued = static_cast<uint32_t>(std::max(SDL_GetAudioStreamQueued(m_stream), 0)) / frame_bytes;
 	const uint32_t low = static_cast<uint32_t>(m_rate) * 30 / 1000, high = static_cast<uint32_t>(m_rate) * 120 / 1000;
 
 	/* After a pause or a stall, start again from what is due now */
-	if (queued > 4 * high)
+	if (queued > 4 * high) {
 		SDL_ClearAudioStream(m_stream);
+		queued = 0;
+		m_primed = false;
+	}
+	/* A stream starts halfway between the two, with silence: adding one
+	 * made-up sample per frame would take seconds to get there */
+	if (!m_primed) {
+		const uint32_t half = (low + high) / 2;
+
+		m_primed = true;
+		if (queued < half) {
+			const std::vector<int16_t> silence((half - queued) * n, 0);
+
+			SDL_PutAudioStreamData(m_stream, silence.data(), static_cast<int>(silence.size() * sizeof(int16_t)));
+			queued = half;
+		}
+	}
 	if (queued > high)
 		m_frames.resize(m_frames.size() - n);
 	else if (queued < low) {

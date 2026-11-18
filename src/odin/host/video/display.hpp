@@ -134,6 +134,10 @@ public:
 	bool draws_native() const { return m_own_native; }
 	bool sorts_per_pixel() const { return m_own_sorts; }
 	unsigned anisotropy() const { return m_anisotropy; }
+	/* Gaelco 3D: both fields as the board keeps them, not one picture per
+	 * field */
+	bool board_fields() const { return m_board_fields; }
+	void set_board_fields(bool on) { m_board_fields = on; }
 	void detach();
 
 	/* A frame of the board: begin_frame before the board runs it,
@@ -319,6 +323,7 @@ private:
 	unsigned m_frame;
 	unsigned m_scale, m_anisotropy;
 	DisplayUpscaleMode m_upscale_mode;
+	bool m_board_fields;
 	std::string m_filter;	/* the path of its preset */
 	bool m_logged;
 	HostPicture m_picture;

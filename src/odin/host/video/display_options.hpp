@@ -78,6 +78,9 @@ struct DisplayOptions {
 	/* The card Vulkan draws on by its name (HostGraphics::gpus); empty: the
 	 * best one */
 	std::string gpu;
+	/* Gaelco 3D: both fields of the interlaced picture as the board keeps
+	 * them, instead of one picture a field (the default, experimental) */
+	bool board_fields = false;
 };
 
 } /* namespace odin */

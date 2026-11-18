@@ -241,6 +241,7 @@ Display::Display(const Keyboard &keys, const Options &options, SDL_Window *windo
 	  m_show_speed(options.show_speed), m_vsync(options.vsync),
 	  m_wait_on_time(false), m_wait_late(false), m_waits(false),
 	  m_frame(0), m_scale(options.scale), m_anisotropy(options.anisotropy), m_upscale_mode(options.upscale_mode),
+	  m_board_fields(options.board_fields),
 	  m_filter(find_filter(options.filter)), m_logged(false),
 	  m_picture{ 0, Renderer::WIDTH, Renderer::HEIGHT },
 	  m_late(env_flag("ODIN_LATE_DRAW")), m_held(false), m_late_draw(0),
@@ -819,6 +820,7 @@ Display::end_frame(unsigned frame, bool late, BarState *bar)
 			draw_own(late, static_cast<unsigned>(w), static_cast<unsigned>(h), over);
 		});
 		show_speed();
+		print_speed();
 		return;
 	}
 	m_renderer->take_frame(frame, static_cast<unsigned>(w), static_cast<unsigned>(h), m_hole);

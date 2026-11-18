@@ -57,5 +57,7 @@ PICTURE(crt_sega_monitor_29, "pictures/crt-sega-monitor-29.png")
 PICTURE(crt_sega_projector_50, "pictures/crt-sega-projector-50.png")
 PICTURE(crt_gaelco_monitor_28, "pictures/crt-gaelco-monitor-28.png")
 PICTURE(crt_gaelco_monitor_34, "pictures/crt-gaelco-monitor-34.png")
+PICTURE(fields_board, "pictures/fields-board.png")
+PICTURE(fields_one, "pictures/fields-one.png")
 
 	STACK_NOTE
