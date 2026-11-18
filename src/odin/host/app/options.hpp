@@ -57,8 +57,8 @@ inline constexpr const char *APIS[] = { "opengl", "vulkan" };
 /* The names of the upscaling modes in odin.ini (DisplayUpscaleMode), raw
  * by default */
 inline constexpr const char *UPSCALE_MODES[] = { "raw", "snap", "native" };
-/* [display] gaelco3d_fields: one picture a field (by default) or both
- * fields as the board keeps them */
+/* [display] gaelco3d_fields: one picture per field, or both fields as the
+ * board keeps them (the default) */
 inline constexpr const char *GAELCO3D_FIELDS[] = { "one_picture", "board" };
 /* [display] gaelco3d_edges, above the board's resolution: each polygon on
  * its own outline (the default), or half a board pixel wider on every side,

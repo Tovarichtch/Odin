@@ -79,8 +79,9 @@ struct DisplayOptions {
 	 * best one */
 	std::string gpu;
 	/* Gaelco 3D: both fields of the interlaced picture as the board keeps
-	 * them, instead of one picture a field (the default, experimental) */
-	bool board_fields = false;
+	 * them (the default), instead of one picture per field
+	 * (experimental) */
+	bool board_fields = true;
 	/* Gaelco 3D above the board's resolution: each polygon half a board
 	 * pixel wider on every side, instead of its own outline (the
 	 * default) */

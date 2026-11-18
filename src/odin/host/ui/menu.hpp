@@ -169,7 +169,7 @@ struct BarSettings {
 	bool picks_gpu() const { return gpus.size() > 1 && static_cast<DisplayApi>(api) == DisplayApi::VULKAN; }
 	bool unthrottled = false, show_speed = true;
 	/* Gaelco 3D: both fields as the board keeps them ([display] gaelco3d_fields) */
-	bool gaelco3d_board_fields = false;
+	bool gaelco3d_board_fields = true;
 	/* Gaelco 3D above the board's resolution: polygons half a board pixel
 	 * wider ([display] gaelco3d_edges) */
 	bool gaelco3d_wide_edges = false;

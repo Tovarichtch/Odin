@@ -689,7 +689,7 @@ known_settings(const GameList &games, int button)
 		{ "display", "bezel", SIDES_NAMES[static_cast<unsigned>(SIDES)] },
 		{ "display", "unthrottled", "off" }, { "display", "show_speed", "on" }, { "display", "filter", "none" },
 		{ "display", "api", APIS[static_cast<unsigned>(API)] }, { "display", "gpu", "" },
-		{ "display", "gaelco3d_fields", GAELCO3D_FIELDS[0] }, { "display", "gaelco3d_edges", GAELCO3D_EDGES[0] },
+		{ "display", "gaelco3d_fields", GAELCO3D_FIELDS[1] }, { "display", "gaelco3d_edges", GAELCO3D_EDGES[0] },
 		{ "sound", "device", "" }, { "sound", "volume", "100" }, { "sound", "background", "on" },
 	};
 

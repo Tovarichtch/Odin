@@ -553,7 +553,7 @@ MenuSession::apply_display(const MenuState &was)
 	}
 	if (now.gaelco3d_board_fields != was.gaelco3d_board_fields) {
 		m_display.set_board_fields(now.gaelco3d_board_fields);
-		keep("gaelco3d_fields", now.gaelco3d_board_fields ? std::optional<std::string>(GAELCO3D_FIELDS[1]) : std::nullopt);
+		keep("gaelco3d_fields", now.gaelco3d_board_fields ? std::nullopt : std::optional<std::string>(GAELCO3D_FIELDS[0]));
 	}
 	if (now.gaelco3d_wide_edges != was.gaelco3d_wide_edges) {
 		m_display.set_wide_edges(now.gaelco3d_wide_edges);

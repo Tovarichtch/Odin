@@ -94,10 +94,11 @@ apart by commas (see INPUTS below).
  anisotropy    1 to 16         Texture filtering. Default 1 (none).
  gaelco3d_fields
                one_picture,    Gaelco 3D, interlaced: one_picture shows
-               board           the new field, the older one only where
-                               nothing moved (experimental); board shows
-                               both fields as the board keeps them, what
-                               moves seen twice. Default one_picture.
+               board           the new field, and the older one only
+                               where nothing moved (experimental); board
+                               shows both fields as the board keeps
+                               them, so anything moving is seen twice.
+                               Default board.
  gaelco3d_edges
                fine, wide      Gaelco 3D above scale 1: fine draws each
                                polygon on its own outline; wide makes it
