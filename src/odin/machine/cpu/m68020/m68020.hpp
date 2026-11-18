@@ -61,6 +61,8 @@ public:
 		return -1;
 	}
 	virtual void reset_devices() {}
+	/* At the wait the machine set (set_wait_pc): whether a pass through
+	 * its loop starting now changes nothing and stays in the loop */
 	virtual bool waiting(uint32_t pc)
 	{
 		(void)pc;
@@ -68,7 +70,7 @@ public:
 	}
 };
 
-/* HEURISTIC: clocks, 2 an instruction and 3 a data cycle */
+/* HEURISTIC: clocks, 2 per instruction and 3 per data cycle */
 class M68020 {
 public:
 	explicit M68020(M68020Bus &bus);
@@ -79,6 +81,7 @@ public:
 	void set_ipl(unsigned level);
 
 	void end_run() { m_run_end = m_cycles; }
+	/* The first instruction of a wait the machine proved (none: ~0) */
 	void set_wait_pc(uint32_t pc) { m_wait_pc = pc; }
 
 	void save(M68020State &out) const;
@@ -136,9 +139,14 @@ private:
 	uint32_t alu(unsigned kind, Size s, uint32_t dst, uint32_t src);
 	uint32_t bcd(bool add, uint32_t dst, uint32_t src);
 	uint32_t extend(bool add, Size s, uint32_t dst, uint32_t src);
+	uint32_t shift_rotate(unsigned kind, bool left, Size s, uint32_t v, unsigned count);
 
 	void exception(unsigned vector, uint32_t return_pc, bool format2 = false);
 	void interrupt(unsigned level);
+	/* A proven wait (the board's tables): once two passes through its loop
+	 * take the same time within one run, the whole passes left are counted,
+	 * not run; the pass in which the run ends runs as usual */
+	void wait_turn();
 	void illegal(unsigned vector = 4) { exception(vector, m_ppc); }
 	void privilege() { exception(8, m_ppc); }
 
@@ -153,6 +161,7 @@ private:
 	void op_1011();
 	void op_1100();
 	void op_1110();
+	void op_movep();
 	void op_bit(unsigned kind, bool dynamic);
 	void op_immediate();
 	void op_cmp2_chk2();
@@ -176,6 +185,9 @@ private:
 	static uint32_t mask(Size s) { return s == BYTE ? 0xFFu : s == WORD ? 0xFFFFu : 0xFFFFFFFFu; }
 	static uint32_t msb(Size s) { return s == BYTE ? 0x80u : s == WORD ? 0x8000u : 0x80000000u; }
 	static uint32_t bytes(Size s) { return s == BYTE ? 1u : s == WORD ? 2u : 4u; }
+	/* What (An)+ and -(An) move An by: a byte on A7 moves it by 2, the stack
+	 * staying even */
+	static uint32_t an_step(Size s, unsigned reg) { return s == BYTE && reg == 7 ? 2u : bytes(s); }
 	static uint32_t sext(Size s, uint32_t v)
 	{
 		return s == BYTE ? static_cast<uint32_t>(static_cast<int8_t>(v))
@@ -201,6 +213,7 @@ private:
 	uint64_t m_cycles = 0;
 	uint64_t m_run_end = 0;
 	uint32_t m_wait_pc = 0xFFFFFFFFu;
+	uint64_t m_wait_last = 0, m_wait_turn = 0;
 };
 }
 

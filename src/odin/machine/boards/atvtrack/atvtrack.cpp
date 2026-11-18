@@ -478,6 +478,99 @@ void AtvTrack::control_write(uint32_t value)
 	m_slave_running = run;
 }
 
+namespace {
+/* Where ATV Track and Smashing Drive keep the ranges they learn for their
+ * analog channels (preuves/calibrage-volant-20261116): four 32-bit records
+ * {low, reading, high, value}, read once the first words of one of its
+ * routines show that the program in RAM is the known one. A record holds
+ * at least the game's own window: ATV Track's routine sets 114 to 142
+ * after boot (before that, the records hold 100 to 156 and no reading);
+ * Smashing Drive's program comes with 100 to 156 */
+struct LearnedAt {
+	uint32_t code;
+	std::array<uint16_t, 8> words;
+	uint32_t records;
+	int low, high;
+};
+constexpr LearnedAt PMX_RANGES[] = {
+	/* ATV Track, both sets: the routine that sets the window */
+	{ 0x0C04C614, { 0xD535, 0x9768, 0x6153, 0x6453, 0x6673, 0x7140, 0x3412, 0x760E }, 0x0C0A1DC0, 114, 142 },
+	/* Smashing Drive, the three sets: the routine that widens it */
+	{ 0x0C0077B4, { 0x2FE6, 0xEE00, 0x2FD6, 0xC741, 0x2FC6, 0xEC04, 0xD43E, 0xE600 }, 0x0C0765E4, 100, 156 },
+};
+
+/* `size` bytes of the master's SDRAM at `addr` */
+uint32_t sdram(const std::vector<uint8_t> &ram, uint32_t addr, size_t size)
+{
+	uint32_t value = 0;
+
+	std::memcpy(&value, ram.data() + (addr - SDRAM) % ram.size(), size);
+	return value;
+}
+
+/* The known program in RAM: all the words of its routine are there */
+const LearnedAt *known_program(const std::vector<uint8_t> &ram)
+{
+	for (const LearnedAt &at : PMX_RANGES) {
+		bool known = true;
+
+		for (size_t i = 0; i < at.words.size() && known; i++)
+			known = sdram(ram, at.code + 2 * static_cast<uint32_t>(i), 2) == at.words[i];
+		if (known)
+			return &at;
+	}
+	return nullptr;
+}
+}
+
+/* The game's records, when they hold at least its window and a reading:
+ * never a memory test's patterns */
+std::optional<LearnedRanges> AtvTrack::learned_ranges() const
+{
+	const LearnedAt *const at = known_program(m_master_ram);
+
+	if (!at)
+		return std::nullopt;
+
+	LearnedRanges ranges;
+	bool read = false;
+
+	for (unsigned i = 0; i < ranges.size(); i++) {
+		const uint32_t record = at->records + 16 * i;
+		const int low = static_cast<int32_t>(sdram(m_master_ram, record, 4));
+		const int reading = static_cast<int32_t>(sdram(m_master_ram, record + 4, 4));
+		const int high = static_cast<int32_t>(sdram(m_master_ram, record + 8, 4));
+
+		if (low < 0 || low > at->low || high < at->high || high > 255 || reading < 0 || reading > 255)
+			return std::nullopt;
+		read = read || reading != 0;
+		ranges[i] = { low, high };
+	}
+	if (!read)
+		return std::nullopt;
+	return ranges;
+}
+
+/* Writes into the records of the same program learned_ranges reads */
+void AtvTrack::widen_ranges(const LearnedRanges &kept)
+{
+	const LearnedAt *const at = known_program(m_master_ram);
+	const std::optional<LearnedRanges> now = learned_ranges();
+
+	if (!at || !now)
+		return;
+
+	const LearnedRanges wide = widened(*now, kept);
+
+	for (unsigned i = 0; i < wide.size(); i++) {
+		uint8_t *const record = m_master_ram.data() + (at->records + 16 * i - SDRAM) % m_master_ram.size();
+		const int32_t low = wide[i].low, high = wide[i].high;
+
+		std::memcpy(record, &low, 4);
+		std::memcpy(record + 8, &high, 4);
+	}
+}
+
 /* SDRAM mirrored further into area 3: the boot program sizes it this way */
 bool AtvTrack::mirror(std::vector<uint8_t> &ram, uint32_t addr, uint32_t size, uint64_t *read, uint64_t value)
 {

@@ -66,6 +66,13 @@ public:
 	}
 	/* The RESET instruction: the reset line of the devices pulses. */
 	virtual void reset_devices() {}
+	/* At the wait the machine set (set_wait_pc): whether a pass through
+	 * its loop starting now changes nothing and stays in the loop */
+	virtual bool waiting(uint32_t pc)
+	{
+		(void)pc;
+		return false;
+	}
 };
 
 /* Motorola 68000: instructions, exceptions and bus cycles as the M68000
@@ -94,6 +101,8 @@ public:
 	/* Clocks a machine bills without running them: turns of a wait it
 	 * proved the program goes round, nothing changing. */
 	void skip(uint64_t clocks) { m_cycles += clocks; }
+	/* The first instruction of a wait the machine proved (none: ~0) */
+	void set_wait_pc(uint32_t pc) { m_wait_pc = pc; }
 	/* Whether the next step takes an interrupt */
 	bool interrupt_pending() const { return m_nmi_edge || m_ipl > ((m_sr & SR_I) >> 8); }
 	/* For a machine that sets an event in the middle of a run (a write of
@@ -273,6 +282,12 @@ private:
 	Kept m_at_fault{};
 	uint64_t m_cycles;
 	uint64_t m_run_end;	/* where the run in progress stops */
+	/* A proven wait: once two passes through its loop take the same time
+	 * within one run, the whole passes left are counted, not run; the pass
+	 * in which the run ends runs as usual */
+	void wait_turn();
+	uint32_t m_wait_pc = 0xFFFFFFFFu;
+	uint64_t m_wait_last = 0, m_wait_turn = 0;
 };
 
 } /* namespace odin */

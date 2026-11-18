@@ -86,8 +86,12 @@ void
 MenuSession::show_game(size_t game)
 {
 	MenuState &state = m_menu_state;
-	const std::optional<Game> other = game < state.games.size() && game != state.running ?
-	                                        m_games.describe(state.games[game].first) : std::nullopt;
+	std::optional<Game> other = game < state.games.size() && game != state.running ?
+	                                  m_games.describe(state.games[game].first) : std::nullopt;
+
+	/* As on the cabinet chosen for it: its outputs, its controls */
+	if (other)
+		other->use_cabinet(cabinet_of(m_settings, other->name, other->first_cabinet));
 
 	state.shown = other ? game : state.running;
 	state.catching.reset();
@@ -103,10 +107,13 @@ MenuSession::show_game(size_t game)
 	m_other_outputs = other->outputs;
 	m_other_shakes = other->shakes();
 	m_other_forces = other->drive_first_output != 0 || other->wheel_motor;
+	m_other_learns = other->learns_range;
 	m_other_cabinets = other->cabinets;
+	m_other_first_cabinet = other->first_cabinet;
 	m_other_shakers = { other->shaker(0), other->shaker(1) };
 	m_other_experimental = { other->shaker_experimental(0), other->shaker_experimental(1) };
 	m_other_link = other->link;
+	m_other_machine = other->machine;
 	m_other_title = other->title;
 	m_other.emplace(m_other_controls, m_settings, other->name);
 	m_other->set_wheel_rotation(wheel_rotation_of(m_settings, other->name));
@@ -163,7 +170,6 @@ MenuSession::fill_inputs(MenuState &state)
 	{
 		const HostState host = host_shown();
 
-		panel_shown().move_levers(host);
 		for (size_t c = 0; c < state.panel->controls().size(); c++) {
 			state.now.push_back(state.panel->now(host, c));
 			state.touched.push_back(state.now.back().on);
@@ -248,11 +254,14 @@ MenuSession::fill_game_shown(MenuState &state)
 	state.steers = steers_of(panel_shown().controls());
 	state.wheel_force = wheel_force_of(m_settings, game_shown());
 	state.wheel_rotation = wheel_rotation_of(m_settings, game_shown());
+	/* The ranges it learns at each power-on, kept for its next start */
+	state.learns_range = m_other ? m_other_learns : m_game && m_game->learns_range;
+	state.keep_calibration = keeps_calibration_of(m_settings, game_shown());
 	/* Its cabinets, and the one chosen; the game that runs plays the one it
 	 * started with */
 	static const std::vector<Game::Cabinet> NONE;
 	const std::vector<Game::Cabinet> &cabinets = m_other ? m_other_cabinets : m_game ? m_game->cabinets : NONE;
-	const std::string chosen = cabinet_of(m_settings, game_shown());
+	const std::string chosen = cabinet_of(m_settings, game_shown(), first_cabinet_shown());
 
 	state.cabinet_ids = { "standard" };
 	state.cabinet_names = { "Standard" };
@@ -271,6 +280,11 @@ MenuSession::fill_game_shown(MenuState &state)
 	state.link_shown_cabinets = shown_link.cabinets;
 	state.link_shown_seat = shown_link.seat_in == Game::Link::In::NONE ? MenuState::SEAT_NONE :
 	                        shown_link.seat_letter ? MenuState::SEAT_LETTER : MenuState::SEAT_NUMBER;
+	state.link_shown_names = shown_link.names;
+	state.link_shown_off = shown_link.off;
+	state.own_picture = m_game && gaelco3d_machine(m_game->machine);
+	/* A Gaelco 3D game reads its EEPROM once, as it starts (Gaelco3dGame) */
+	state.link_shown_restarts = !(m_other ? gaelco3d_machine(m_other_machine) : state.own_picture);
 	/* The outputs of the game shown, lit as the board left them; the light
 	 * gun a vibration goes to */
 	state.outputs.clear();
@@ -541,6 +555,14 @@ MenuSession::apply_display(const MenuState &was)
 		keep("upscale_mode", now.upscale_mode == 0 ? std::nullopt :
 		                     std::optional<std::string>(UPSCALE_MODES[now.upscale_mode]));
 	}
+	if (now.gaelco3d_board_fields != was.gaelco3d_board_fields) {
+		m_display.set_board_fields(now.gaelco3d_board_fields);
+		keep("gaelco3d_fields", now.gaelco3d_board_fields ? std::nullopt : std::optional<std::string>(GAELCO3D_FIELDS[0]));
+	}
+	if (now.gaelco3d_wide_edges != was.gaelco3d_wide_edges) {
+		m_display.set_wide_edges(now.gaelco3d_wide_edges);
+		keep("gaelco3d_edges", now.gaelco3d_wide_edges ? std::optional<std::string>(GAELCO3D_EDGES[1]) : std::nullopt);
+	}
 	if (now.fullscreen != was.fullscreen) {
 		m_display.set_fullscreen(now.fullscreen);
 		keep("fullscreen", kept_on_off(now.fullscreen, false));
@@ -637,10 +659,10 @@ MenuSession::apply_sound(const MenuState &was)
 			keep(section, game.woofer ? "woofer_level" : "option_level",
 			     game.level == game.standard ? std::nullopt : std::optional<std::string>(db));
 		}
-		if (game.cutoff != before.cutoff && game.woofer) {
+		if (game.cutoff != before.cutoff && (game.woofer || game.seat_woofer)) {
 			const char *const cutoff = WOOFER_CUTOFFS[game.cutoff];
 
-			if (runs)
+			if (runs && game.woofer)
 				m_audio->set_woofer(*woofer_hz_named(cutoff));
 			keep(section, "woofer_cutoff",
 			     game.cutoff == game.cutoff_standard ? std::nullopt : std::optional<std::string>(cutoff));
@@ -673,9 +695,16 @@ MenuSession::apply_game(const MenuState &was)
 	/* How far a wheel turns for its steering, at once too */
 	if (now.wheel_rotation != was.wheel_rotation && now.steers)
 		keep_wheel_rotation(game_shown(), now.wheel_rotation, !m_other && m_game);
+	/* Keeping its learned ranges: from the end of the game that runs */
+	if (now.keep_calibration != was.keep_calibration && now.learns_range)
+		keep_calibration(game_shown(), now.keep_calibration);
 	/* Its cabinet: the game that runs takes it when it is reset */
-	if (now.cabinet != was.cabinet && now.cabinet >= 0 && static_cast<size_t>(now.cabinet) < now.cabinet_ids.size())
+	if (now.cabinet != was.cabinet && now.cabinet >= 0 && static_cast<size_t>(now.cabinet) < now.cabinet_ids.size()) {
 		keep_cabinet(game_shown(), now.cabinet_ids[static_cast<size_t>(now.cabinet)]);
+		/* A game shown that does not run: its outputs as on that cabinet */
+		if (m_other)
+			show_game(now.shown);
+	}
 	/* The dead zone and the trigger threshold of the gamepad shown */
 	if (const std::string guid = pad_shown(now); !guid.empty())
 		keep_tuning(guid, now.tuning, was.tuning);
@@ -791,11 +820,27 @@ MenuSession::keep_vibration(const std::string &game, bool on, bool runs)
 	keep("players." + game, "vibration", on ? std::nullopt : std::optional<std::string>("off"));
 }
 
-/* [players.<game>] cabinet: a line only for another than Standard */
+/* [players.<game>] keep_calibration: a line only when on */
+void
+MenuSession::keep_calibration(const std::string &game, bool on)
+{
+	keep("players." + game, "keep_calibration", on ? std::optional<std::string>("on") : std::nullopt);
+}
+
+/* [players.<game>] cabinet: a line only for a cabinet other than the one it
+ * starts on */
 void
 MenuSession::keep_cabinet(const std::string &game, const std::string &id)
 {
-	keep("players." + game, "cabinet", id == "standard" ? std::nullopt : std::optional<std::string>(id));
+	keep("players." + game, "cabinet", id == first_cabinet_shown() ? std::nullopt : std::optional<std::string>(id));
+}
+
+const std::string &
+MenuSession::first_cabinet_shown() const
+{
+	static const std::string standard = "standard";
+
+	return m_other ? m_other_first_cabinet : m_game ? m_game->first_cabinet : standard;
 }
 
 /* [players.<game>] hide_cursor: a line only when not as by default

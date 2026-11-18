@@ -247,7 +247,6 @@ private:
 	/* The game whose controls the page Input shows: its name and panel */
 	std::string game_shown() const;
 	const ControlPanel &panel_shown() const { return m_other ? *m_other : m_controls.panel(); }
-	ControlPanel &panel_shown() { return m_other ? *m_other : m_controls.panel(); }
 	/* The joystick of a player in the game shown (0: none), and what the
 	 * host holds for it: of a game that does not run, the gamepad and the
 	 * joystick its settings seat (fill_devices), which the game that runs
@@ -281,7 +280,10 @@ private:
 	void keep_sinden_border(const std::string &game, const SindenBorder &border, bool runs);
 	void keep_wheel_force(const std::string &game, int percent, bool runs);
 	void keep_wheel_rotation(const std::string &game, int degrees, bool runs);
+	void keep_calibration(const std::string &game, bool on);
 	void keep_cabinet(const std::string &game, const std::string &id);
+	/* The cabinet the game shown starts on when none is chosen */
+	const std::string &first_cabinet_shown() const;
 	void keep_tuning(const std::string &guid, const PadTuning &now, const PadTuning &was);
 	void fill_bar_inputs(BarState &bar) const;
 	void light_guns(const std::string &game, const std::vector<GameControl> &controls, std::vector<LightGun> &guns,
@@ -321,11 +323,14 @@ private:
 	std::vector<GameOutput> m_other_outputs;
 	bool m_other_shakes = false;
 	bool m_other_forces = false;
+	bool m_other_learns = false;
 	std::vector<Game::Cabinet> m_other_cabinets;
 	std::array<std::string, 2> m_other_shakers;
 	std::array<bool, 2> m_other_experimental{};
 	Game::Link m_other_link;
+	std::string m_other_machine;
 	std::string m_other_title;
+	std::string m_other_first_cabinet = "standard";
 	std::optional<ControlPanel> m_other;
 	/* The game shown does not run: its devices, as its settings seat them,
 	 * at the next fill_devices */

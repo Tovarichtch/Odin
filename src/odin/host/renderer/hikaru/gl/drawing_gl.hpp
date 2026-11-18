@@ -56,6 +56,13 @@ public:
 	void set_scale(unsigned scale) override;
 	bool draws_native() const override { return gl::geometry_shaders(); }
 	bool sorts_per_pixel() const override { return gl::fragment_lists() && gl::primitive_ids(); }
+	unsigned largest_texture() const override
+	{
+		GLint most = 0;
+
+		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &most);
+		return static_cast<unsigned>(most);
+	}
 
 	void begin_scene(const odin_display_list_t &list, const SceneDebug &debug) override;
 	void clear_depth() override;
@@ -100,6 +107,7 @@ public:
 	void compose(const Compose &compose, unsigned shown, const bool layers[2]) override;
 	void present(PictureRect rect, unsigned window_w, unsigned window_h) override;
 	void draw_pmx(const PmxScene &scene, unsigned anisotropy) override;
+	void draw_gaelco3d(const Gaelco3dScene &scene) override;
 	void prepare_pmx(const std::vector<uint64_t> &keys,
 	                 const std::function<void(unsigned, unsigned)> &progress) override;
 	/* All its programs are made before the first scene: none to list */
@@ -126,6 +134,9 @@ private:
 	struct Pmx;
 	std::shared_ptr<Pmx> m_pmx;
 	void make_pmx(const std::function<void(unsigned, unsigned)> &progress);
+	/* The programs and pictures of the Gaelco 3D boards (gaelco3d_gl.cpp) */
+	struct Gaelco3d;
+	std::shared_ptr<Gaelco3d> m_gaelco3d;
 	/* Layers peeled at a time, each with a query of whether it drew, read
 	 * once the batch is done */
 	static constexpr unsigned PEEL_BATCH = 8;

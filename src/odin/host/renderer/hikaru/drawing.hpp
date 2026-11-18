@@ -38,6 +38,7 @@
 
 #include "odin/common/repeats.hpp"
 #include "odin/machine/chips/antarctic/antarctic_list.hpp"
+#include "odin/machine/boards/gaelco3d/gaelco3d_scene.hpp"
 #include "odin/machine/chips/pmx1/pmx1_scene.hpp"
 #include "odin/machine/boards/hikaru/hikaru_draw.hpp"
 #include "odin/host/gfx/host_graphics.hpp"
@@ -199,6 +200,9 @@ public:
 	/* Whether it sorts the translucent fragments of a scene of the Neon
 	 * 250 pixel by pixel (PmxDraw::per_pixel) */
 	virtual bool sorts_per_pixel() const = 0;
+	/* The longest side of a texture it can hold, in texels (the Gaelco 3D's
+	 * texture ROMs, draw_gaelco3d) */
+	virtual unsigned largest_texture() const = 0;
 
 	/* A display list drawn into the scene: its vertices sent and the
 	 * scene emptied; each of its views from an empty depth; a pass for
@@ -287,6 +291,9 @@ public:
 	/* Draws a Neon 250 scene (pmx_gl.cpp) as the frame's picture, at the
 	 * picture scale, with that texture anisotropy */
 	virtual void draw_pmx(const PmxScene &scene, unsigned anisotropy) = 0;
+	/* Draws a field of a Gaelco 3D board above the board's resolution
+	 * (gaelco3d_gl.cpp) as the frame's picture, at the picture scale */
+	virtual void draw_gaelco3d(const Gaelco3dScene &scene) = 0;
 	/* Makes the programs draw_pmx draws with before its first scene, and
 	 * those of the keys of a list of the Neon 250 (read_pmx_list) the card
 	 * runs; `progress` is told how many of how many are made: none, then

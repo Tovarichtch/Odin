@@ -51,9 +51,11 @@ struct JvsSwitch {
 	uint16_t mask;
 };
 
-/* A switch of a Gaelco board (machine atvtrack or smashdrv): its group, 0
- * to 3, of the four the FPGA puts on port A of the master, and its bit in
- * the group, 0 to 7 ("1.4": group 1, bit 4) */
+/* A switch of a Gaelco board: its group, 0 to 3, and its bit in the group
+ * ("1.4": group 1, bit 4). On the boards of ATV Track and Smashing Drive,
+ * the four groups the FPGA puts on port A of the master, bits 0 to 7; on a
+ * Gaelco 3D board, the words its 68000 or 68EC020 reads at 0x51000C,
+ * 0x51001C, 0x51002C and 0x51003C */
 struct PortSwitch {
 	uint8_t group;
 	uint8_t bit;
@@ -166,15 +168,17 @@ steers_of(const std::vector<GameControl> &controls)
  * or its wiring gives it: "output", 1 to 32 as JVS counts them (output 1
  * is bit 7 of the first byte; on a Gaelco board, output n is bit n - 1 of
  * the group 7800 of port A for 1 to 11 (AtvTrack::system_pins; bits 11-15
- * pick the group), channel n - 17 of the motor DAC running for 17 to 20),
+ * pick the group), channel n - 17 of the motor DAC running for 17 to 20;
+ * on a Gaelco 3D board, bit n - 1 of its output latch, Gaelco3d::outputs),
  * and "role", what the host does with it: "rumble", the gamepad of the
  * player shakes while it is on; "mute", the vibration device the optional sound board feeds is still
- * while it is on; "lamp", "lock" (a solenoid that holds a control) and
- * "counter" (a coin counter), nothing but what every output does: go to
+ * while it is on; "lamp", "lock" (a solenoid that holds a control),
+ * "coin_lock" (the coin lock of a coin door: coins go in while it is on)
+ * and "counter" (a coin counter), nothing but what every output does: go to
  * other programs when the user asks (outputs_network.hpp). "player" : 2
  * for one of player 2. "id" as for a control. */
 struct GameOutput {
-	enum class Role { LAMP, LOCK, RUMBLE, MUTE, COUNTER };
+	enum class Role { LAMP, LOCK, COIN_LOCK, RUMBLE, MUTE, COUNTER };
 
 	std::string name;
 	std::string id;
@@ -203,12 +207,13 @@ any_on(const std::vector<GameOutput> &list, GameOutput::Role role, std::span<con
  * (speaker, woofer, shaker, or unwired, a channel of the board with no
  * part on the cabinet), "at" (its place in the drawing, none when
  * unwired), what feeds it ("board": main or option, or "channel": 0 to 3
- * of a Gaelco board's DAC), "cabinet" (only on that model of the list's
- * "cabinets", or on the "standard" one). */
+ * of a Gaelco board, as it reaches Odin's sound: 3 and 2 the left and right
+ * of its first pair, 1 and 0 of its second), "cabinet" (only on that model
+ * of the list's "cabinets", or on the "standard" one). */
 struct SoundPart {
 	enum class Kind : uint8_t { SPEAKER, WOOFER, SHAKER, UNWIRED };
 	enum class Place : uint8_t {
-		NONE, FRONT_LEFT, FRONT_RIGHT, BASE, PANEL, SEAT_LEFT, SEAT_RIGHT, SEAT, FRONT, REAR_LEFT, REAR_RIGHT
+		NONE, FRONT_LEFT, FRONT_RIGHT, BASE, PANEL, SEAT_LEFT, SEAT_RIGHT, SEAT, DASH_LEFT, DASH_RIGHT
 	};
 
 	Kind kind = Kind::SPEAKER;
@@ -245,6 +250,11 @@ struct Game {
 	 * entry says (its name, title and files at least), and takes its
 	 * parent's pictures when it has none. */
 	std::string parent;
+	/* The set whose archive holds its files in MAME's merged sets (MAME's
+	 * cloneof): "cloneof" in the list, when MAME's parent is not Odin's
+	 * (Football Power, whose parent in Odin is the released 1.4); the parent
+	 * when the list does not say */
+	std::string cloneof;
 	/* The game whose settings it shares ([controls.<game>]...): its
 	 * parent, or itself */
 	const std::string &family() const { return parent.empty() ? name : parent; }
@@ -265,13 +275,16 @@ struct Game {
 	/* The other cabinets the game was sold in, which its program tells
 	 * apart (NASCAR: Deluxe): "cabinets" in the list, [{"id": ..., "name":
 	 * ..., "grounded": [...], "controls": {<id>: {fields in place of those
-	 * of that control}}, "seated": false when it is played standing}]. The
-	 * cabinet of the list is "standard". */
+	 * of that control}}, "seated": false when it is played standing,
+	 * "woofer": false when it has none}]. The cabinet of the list is
+	 * "standard". */
 	struct Cabinet {
 		std::string id, name;
 		std::vector<GameControl> controls;
 		std::vector<JvsSwitch> grounded;
-		std::optional<bool> motion_platform, seated;
+		std::optional<bool> motion_platform, seated, woofer;
+		/* "woofer": "optional" (Surf Planet's Atari kit, SP-ATK p. 4-5) */
+		bool woofer_optional = false;
 		std::optional<std::vector<GameOutput>> outputs;
 		std::vector<unsigned> grounded_analog;
 		/* A byte of the settings the game keeps in its NAND that this
@@ -296,8 +309,13 @@ struct Game {
 	 * false when the game has no such cabinet */
 	std::string cabinet = "standard";
 	bool use_cabinet(const std::string &id);
-	/* Its optional sound board is wired on the cabinet played: false when
-	 * "sound_parts" leave it unwired there (Star Wars Racer's Mini Deluxe) */
+	/* The cabinet it starts on when the player chose none ("cabinet" in
+	 * the list): Standard, or the one that version was sold in */
+	std::string first_cabinet = "standard";
+	/* Its optional sound board, or its woofer's pair, is wired on the cabinet
+	 * played: false when "sound_parts" leave it unwired there (Star Wars
+	 * Racer's Mini Deluxe), or when the cabinet has no woofer (Radikal
+	 * Bikers' Atari) */
 	bool option_wired() const;
 	/* The 93C46 of the MIE of a new cabinet, the settings of the SYSTEM
 	 * MENU as SEGA left them: "mie_eeprom" in the list, 128 bytes in
@@ -324,10 +342,19 @@ struct Game {
 	 * (the Gaelco boards, AudioOut::woofer_pairs): "woofer" in the list,
 	 * false when it does not say. */
 	bool woofer = false;
+	/* The cabinet played has that woofer; false if its "woofer" is false */
+	bool woofer_wired = true;
+	/* Speed Up's woofer sits in the seat: Odin filters it into the seat
+	 * speakers ([sound.<game>] woofer_cutoff, Gaelco3dGame) */
+	bool seat_woofer() const { return machine == "speedup"; }
 	/* The wheel of player 1 has a motor the board drives (Board::drive_torque,
 	 * the Gaelco boards): "wheel_motor" in the list, false when it does not
 	 * say */
 	bool wheel_motor = false;
+	/* The program relearns the ranges of its analog channels at each
+	 * power-on (learned_ranges.hpp): "learns_range" in the list, false when
+	 * the list does not say */
+	bool learns_range = false;
 	/* The cabinet stands on a motion platform of two motors, whose
 	 * positions the board reads on its ADC channels 2 and 3 (ATV Track):
 	 * "motion_platform" in the list, false when it does not say */
@@ -359,13 +386,18 @@ struct Game {
 	struct Link {
 		/* FLASH: the settings Smashing Drive keeps in its program flash
 		 * (AtvTrack::set_flash_setting); NAND: those ATV Track keeps in
-		 * its NAND (set_nand_setting) */
+		 * its NAND (set_nand_setting); EEPROM: those of the Gaelco 3D
+		 * games in their 93C66 (Gaelco3d::set_eeprom_setting) */
 		enum class In { NONE, MIE, BACKUP, FLASH, NAND, EEPROM };
 
 		unsigned cabinets = 0;
 		In seat_in = In::NONE;
 		unsigned seat_byte = 0, seat_shift = 0, seat_bits = 8, seat_first = 0;
 		bool seat_letter = false;	/* the menu shows it as A, B... */
+		/* What the game calls each cabinet ("names") and what Odin sets
+		 * when the link is off ("off"); none: master, slaves and seats */
+		std::vector<std::string> names;
+		std::string off;
 	} link;
 	/* Its ROM board: "rom_board" in the list; none when it does not say,
 	 * as for the BOOTROM alone. */
@@ -377,10 +409,11 @@ struct Game {
 	/* The bytes of a section; empty when the game has no such section. */
 	std::span<const uint8_t> section(const std::string &name) const;
 	/* A pad shakes as its cabinet does: a rumble output, the vibration
-	 * device of the optional board, the shocks of the drive board */
+	 * device of the optional board, the shocks of the drive board or of
+	 * the wheel's motor */
 	bool shakes() const
 	{
-		return option_vibration || drive_first_output ||
+		return option_vibration || drive_first_output || wheel_motor ||
 		       std::any_of(outputs.begin(), outputs.end(),
 		                   [](const GameOutput &output) { return output.role == GameOutput::Role::RUMBLE; });
 	}
@@ -400,6 +433,14 @@ title_before(const std::string &a, const std::string &b)
 	return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end(), [](char x, char y) {
 		return std::tolower(static_cast<unsigned char>(x)) < std::tolower(static_cast<unsigned char>(y));
 	});
+}
+
+/* Whether a machine is a Gaelco 3D board: Speed Up, Surf Planet, Radikal
+ * Bikers, Football Power */
+inline bool
+gaelco3d_machine(const std::string &machine)
+{
+	return machine == "gaelco3d" || machine == "footbpow" || machine == "speedup" || machine == "surfplnt";
 }
 
 /* The list of the games, a JSON file (odin-games.json). A game has sections

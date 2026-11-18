@@ -55,6 +55,8 @@ public:
 	void wait();
 	/* Waits for it at most that long: whether it is done. */
 	bool wait_for(std::chrono::milliseconds time);
+	/* Whether the job given last is done, without waiting. */
+	bool idle() const { return !m_busy; }
 
 private:
 	void loop();

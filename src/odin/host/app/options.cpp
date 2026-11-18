@@ -155,6 +155,10 @@ read_display(const Settings &settings, Options &options)
 			options.display.gpu = value;
 		} else if (key == "upscale_mode" && index_named(UPSCALE_MODES, value)) {
 			options.display.upscale_mode = static_cast<DisplayUpscaleMode>(*index_named(UPSCALE_MODES, value));
+		} else if (key == "gaelco3d_fields" && index_named(GAELCO3D_FIELDS, value)) {
+			options.display.board_fields = *index_named(GAELCO3D_FIELDS, value) == 1;
+		} else if (key == "gaelco3d_edges" && index_named(GAELCO3D_EDGES, value)) {
+			options.display.wide_edges = *index_named(GAELCO3D_EDGES, value) == 1;
 		} else if (key == "bezel" && index_named(SIDES_NAMES, value)) {
 			options.sides = static_cast<DisplaySides>(*index_named(SIDES_NAMES, value));
 		} else {
@@ -176,8 +180,6 @@ read_paths(const Settings &settings, Options &options)
 		if (key == "roms" && !value.empty()) {
 			if (!options.given.roms)
 				options.rom_path = value;
-		} else if (key == "gaelco" && !value.empty()) {
-			options.gaelco_path = value;
 		} else if (key == "bios" && !value.empty()) {
 			if (!options.given.bios)
 				options.bios_path = value;
@@ -441,7 +443,8 @@ game_sound(Options &options, const Game &game, const Settings &settings)
 {
 	const std::string section = "sound." + game.name;
 	const char *const level_key = game.woofer ? "woofer_level" : "option_level";
-	GameSound sound = { game.option_level, game.woofer ? *woofer_hz_named(WOOFER_CUTOFFS[1]) : 0.0 };
+	const bool cut = game.woofer || game.seat_woofer();
+	GameSound sound = { game.option_level, cut ? *woofer_hz_named(WOOFER_CUTOFFS[1]) : 0.0 };
 
 	/* Not Star Wars Racer: its optional board drives only the panel
 	 * shaker, felt and not heard on the cabinet (the pad feels it in
@@ -454,7 +457,7 @@ game_sound(Options &options, const Game &game, const Settings &settings)
 				options.sound = mode_named(value);
 		} else if (key == level_key && level_named(value)) {
 			sound.level = *level_named(value);
-		} else if (key == "woofer_cutoff" && game.woofer && woofer_hz_named(value)) {
+		} else if (key == "woofer_cutoff" && cut && woofer_hz_named(value)) {
 			sound.woofer_hz = *woofer_hz_named(value);
 		} else if (key != "start_volume" || game.machine != "smashdrv") {
 			refuse_setting(section, key, value);
@@ -591,6 +594,12 @@ wheel_rotation_of(const Settings &settings, const std::string &game)
 	return player_number(settings, game, "wheel_rotation", WHEEL_ROTATION, wheel_rotation_named);
 }
 
+bool
+keeps_calibration_of(const Settings &settings, const std::string &game)
+{
+	return player_on(settings, game, "keep_calibration", false);
+}
+
 std::optional<InputDevice>
 device_named(const std::string &value)
 {
@@ -611,9 +620,9 @@ device_chosen(const Settings &settings, const std::string &game, unsigned player
 }
 
 std::string
-cabinet_of(const Settings &settings, const std::string &game)
+cabinet_of(const Settings &settings, const std::string &game, const std::string &first)
 {
-	std::string id = "standard";
+	std::string id = first;
 
 	for (const auto &[key, value] : settings.section("players." + game))
 		if (key == "cabinet")
@@ -686,6 +695,7 @@ known_settings(const GameList &games, int button)
 		{ "display", "bezel", SIDES_NAMES[static_cast<unsigned>(SIDES)] },
 		{ "display", "unthrottled", "off" }, { "display", "show_speed", "on" }, { "display", "filter", "none" },
 		{ "display", "api", APIS[static_cast<unsigned>(API)] }, { "display", "gpu", "" },
+		{ "display", "gaelco3d_fields", GAELCO3D_FIELDS[1] }, { "display", "gaelco3d_edges", GAELCO3D_EDGES[0] },
 		{ "sound", "device", "" }, { "sound", "volume", "100" }, { "sound", "background", "on" },
 	};
 
@@ -698,7 +708,7 @@ known_settings(const GameList &games, int button)
 	out.insert(out.end(), { { "outputs", "network", "off" }, { "network", "board", "none" },
 	                        { "network", "port", std::to_string(NetCable::PORT) }, { "network", "next", "" },
 	                        { "network", "cabinet", "1" },
-	                        { "paths", "roms", "" }, { "paths", "gaelco", "" }, { "paths", "bios", "" },
+	                        { "paths", "roms", "" }, { "paths", "bios", "" },
 	                        { "paths", "saves", SaveFolder::root() }, { "paths", "states", default_states() },
 	                        { "paths", "artwork", artwork_folder() }, { "paths", "log", odin_data_dir() },
 	                        { "log", "verbose", "off" }, { "library", "owned_only", "off" },
@@ -728,6 +738,8 @@ known_settings(const GameList &games, int button)
 		if (game->woofer)
 			out.insert(out.end(), { { "sound." + name, "mode", "mix" }, { "sound." + name, "woofer_level", "0" },
 			                        { "sound." + name, "woofer_cutoff", WOOFER_CUTOFFS[1] } });
+		if (game->seat_woofer())
+			out.push_back({ "sound." + name, "woofer_cutoff", WOOFER_CUTOFFS[1] });
 		if (game->machine == "smashdrv")
 			out.push_back({ "sound." + name, "start_volume", START_VOLUMES[START_VOLUME_STANDARD] });
 		for (const auto &[key, value] : ControlPanel(game->controls, Settings(), name).bindings().standard_lines())
@@ -752,11 +764,13 @@ known_settings(const GameList &games, int button)
 			out.push_back({ "players." + name, "wheel_force", std::to_string(WHEEL_FORCE) });
 		if (steers_of(game->controls))
 			out.push_back({ "players." + name, "wheel_rotation", std::to_string(WHEEL_ROTATION) });
+		if (game->learns_range)
+			out.push_back({ "players." + name, "keep_calibration", "off" });
 		if (std::any_of(game->controls.begin(), game->controls.end(),
 		                [](const GameControl &control) { return control.invertible; }))
 			out.push_back({ "players." + name, "invert", "" });
 		if (!game->cabinets.empty())
-			out.push_back({ "players." + name, "cabinet", "standard" });
+			out.push_back({ "players." + name, "cabinet", game->first_cabinet });
 		if (!game->card_reader.empty())
 			out.push_back({ "players." + name, "card", "" });
 		std::vector<std::string> rumbles;

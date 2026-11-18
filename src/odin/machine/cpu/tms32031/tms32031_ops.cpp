@@ -1,3 +1,5 @@
+// license:BSD-3-Clause
+// copyright-holders:Aaron Giles
 /*
  *  ██████╗ ██████╗ ██╗███╗   ██╗
  * ██╔═══██╗██╔══██╗██║████╗  ██║
@@ -58,6 +60,29 @@ saturated(uint32_t a)
 {
 	return static_cast<int32_t>(a) < 0 ? 0x80000000 : 0x7FFFFFFF;
 }
+
+template <typename T>
+struct MulAdd {
+	T mul_a, mul_b, add_a, add_b;
+};
+
+/* The sources the multiply and the add or subtract of a parallel multiply
+ * take, as its two P bits pick them */
+template <typename T>
+MulAdd<T>
+mul_add(unsigned how, T s1, T s2, T s3, T s4)
+{
+	switch (how) {
+	case 0:
+		return { s3, s4, s1, s2 };
+	case 1:
+		return { s3, s1, s4, s2 };
+	case 2:
+		return { s1, s2, s3, s4 };
+	default:
+		return { s3, s1, s2, s4 };
+	}
+}
 }
 
 Tms32031::Reg
@@ -103,20 +128,16 @@ Tms32031::load_int(unsigned dreg, uint32_t value)
 }
 
 void
-Tms32031::logic(unsigned dreg, uint32_t result)
-{
-	load_int(dreg, result);
-}
-
-void
 Tms32031::absi(unsigned dreg, uint32_t src)
 {
 	const uint32_t res = static_cast<int32_t>(src) < 0 ? 0u - src : src;
 
 	ireg(dreg) = !ovm() || res != 0x80000000 ? res : 0x7FFFFFFF;
 	if (dreg < 8) {
+		/* PROVEN (TMS320C3x User's Guide SPRU031F p. 13-45, 13-48): N is 0,
+		 * even for 80000000h */
 		clr(N | Z | V | UF);
-		or_nz(res);
+		st() |= res == 0 ? Z : 0;
 		if (res == 0x80000000)
 			st() |= V | LV;
 	} else if (dreg >= BK) {
@@ -125,9 +146,9 @@ Tms32031::absi(unsigned dreg, uint32_t src)
 }
 
 void
-Tms32031::addc(unsigned dreg, uint32_t a, uint32_t b)
+Tms32031::addi(unsigned dreg, uint32_t a, uint32_t b, uint32_t carry)
 {
-	const uint32_t carry = st() & C, res = a + b + carry;
+	const uint32_t res = a + b + carry;
 
 	ireg(dreg) = !ovm() || !overflow_add(a, b, res) ? res : saturated(a);
 	if (dreg < 8) {
@@ -141,30 +162,14 @@ Tms32031::addc(unsigned dreg, uint32_t a, uint32_t b)
 }
 
 void
-Tms32031::addi(unsigned dreg, uint32_t a, uint32_t b)
+Tms32031::subi(unsigned dreg, uint32_t a, uint32_t b, uint32_t borrow)
 {
-	const uint32_t res = a + b;
-
-	ireg(dreg) = !ovm() || !overflow_add(a, b, res) ? res : saturated(a);
-	if (dreg < 8) {
-		clr(N | Z | C | V | UF);
-		st() |= a > res ? C : 0;
-		or_v_add(a, b, res);
-		or_nz(res);
-	} else if (dreg >= BK) {
-		update_special(dreg);
-	}
-}
-
-void
-Tms32031::subb(unsigned dreg, uint32_t a, uint32_t b)
-{
-	const uint32_t carry = st() & C, res = a - b - carry;
+	const uint32_t res = a - b - borrow;
 
 	ireg(dreg) = !ovm() || !overflow_sub(a, b, res) ? res : saturated(a);
 	if (dreg < 8) {
 		clr(N | Z | C | V | UF);
-		st() |= static_cast<int64_t>(a) - b - carry < 0 ? C : 0;
+		st() |= static_cast<int64_t>(a) - b - borrow < 0 ? C : 0;
 		or_v_sub(a, b, res);
 		or_nz(res);
 	} else if (dreg >= BK) {
@@ -172,52 +177,12 @@ Tms32031::subb(unsigned dreg, uint32_t a, uint32_t b)
 	}
 }
 
+/* 0 - src only overflows upward. PROVEN (TMS320C3x User's Guide SPRU031F
+ * p. 3-6): with OVM, such a result is set to 7FFFFFFFh, as subi() does */
 void
-Tms32031::subi(unsigned dreg, uint32_t a, uint32_t b)
+Tms32031::negi(unsigned dreg, uint32_t src, uint32_t borrow)
 {
-	const uint32_t res = a - b;
-
-	ireg(dreg) = !ovm() || !overflow_sub(a, b, res) ? res : saturated(a);
-	if (dreg < 8) {
-		clr(N | Z | C | V | UF);
-		st() |= b > a ? C : 0;
-		or_v_sub(a, b, res);
-		or_nz(res);
-	} else if (dreg >= BK) {
-		update_special(dreg);
-	}
-}
-
-void
-Tms32031::negb(unsigned dreg, uint32_t src)
-{
-	const uint32_t carry = st() & C, res = 0u - src - carry;
-
-	ireg(dreg) = !ovm() || !overflow_sub(0, src, res) ? res : saturated(src);
-	if (dreg < 8) {
-		clr(N | Z | C | V | UF);
-		st() |= static_cast<int64_t>(0) - src - carry < 0 ? C : 0;
-		or_v_sub(0, src, res);
-		or_nz(res);
-	} else if (dreg >= BK) {
-		update_special(dreg);
-	}
-}
-
-void
-Tms32031::negi(unsigned dreg, uint32_t src)
-{
-	const uint32_t res = 0u - src;
-
-	ireg(dreg) = !ovm() || !overflow_sub(0, src, res) ? res : saturated(src);
-	if (dreg < 8) {
-		clr(N | Z | C | V | UF);
-		st() |= src > 0 ? C : 0;
-		or_v_sub(0, src, res);
-		or_nz(res);
-	} else if (dreg >= BK) {
-		update_special(dreg);
-	}
+	subi(dreg, 0, src, borrow);
 }
 
 void
@@ -292,6 +257,8 @@ Tms32031::op_two(uint32_t op)
 	const unsigned mode = (op >> 21) & 3, d = (op >> 16) & 31, f = (op >> 16) & 7;
 	const bool memory = mode == 1 || mode == 2;
 
+	/* The source is read before the destination: its indirect address may
+	 * update an AR that is also the destination */
 	switch (op >> 23) {
 	case 0x00:
 		absf(f, float_operand(op, mode));
@@ -302,7 +269,7 @@ Tms32031::op_two(uint32_t op)
 	case 0x02: {
 		const uint32_t src = int_operand(op, mode, true);
 
-		addc(d, ireg(d), src);
+		addi(d, ireg(d), src, st() & C);
 		break;
 	}
 	case 0x03:
@@ -317,13 +284,13 @@ Tms32031::op_two(uint32_t op)
 	case 0x05: {
 		const uint32_t src = int_operand(op, mode, false);
 
-		logic(d, ireg(d) & src);
+		load_int(d, ireg(d) & src);
 		break;
 	}
 	case 0x06: {
 		const uint32_t src = int_operand(op, mode, false);
 
-		logic(d, ireg(d) & ~src);
+		load_int(d, ireg(d) & ~src);
 		break;
 	}
 	case 0x07: {
@@ -404,9 +371,12 @@ Tms32031::op_two(uint32_t op)
 		mpyi(d, ireg(d), src);
 		break;
 	}
-	case 0x16:
-		negb(d, int_operand(op, mode, true));
+	case 0x16: {
+		const uint32_t src = int_operand(op, mode, true);
+
+		negi(d, src, st() & C);
 		break;
+	}
 	case 0x17:
 		negf(m_r[f], float_operand(op, mode));
 		break;
@@ -421,7 +391,7 @@ Tms32031::op_two(uint32_t op)
 		norm(m_r[f], float_operand(op, mode));
 		break;
 	case 0x1B:
-		logic(d, ~int_operand(op, mode, false));
+		load_int(d, ~int_operand(op, mode, false));
 		break;
 	case 0x1C:
 		if (mode == 1)
@@ -445,7 +415,7 @@ Tms32031::op_two(uint32_t op)
 	case 0x20: {
 		const uint32_t src = int_operand(op, mode, false);
 
-		logic(d, ireg(d) | src);
+		load_int(d, ireg(d) | src);
 		break;
 	}
 	case 0x21:
@@ -505,7 +475,7 @@ Tms32031::op_two(uint32_t op)
 	case 0x2D: {
 		const uint32_t src = int_operand(op, mode, true);
 
-		subb(d, ireg(d), src);
+		subi(d, ireg(d), src, st() & C);
 		break;
 	}
 	case 0x2E: {
@@ -528,7 +498,7 @@ Tms32031::op_two(uint32_t op)
 	case 0x31: {
 		const uint32_t src = int_operand(op, mode, true);
 
-		subb(d, src, ireg(d));
+		subi(d, src, ireg(d), st() & C);
 		break;
 	}
 	case 0x32: {
@@ -553,7 +523,7 @@ Tms32031::op_two(uint32_t op)
 	case 0x35: {
 		const uint32_t src = int_operand(op, mode, false);
 
-		logic(d, ireg(d) ^ src);
+		load_int(d, ireg(d) ^ src);
 		break;
 	}
 	case 0x36:
@@ -626,16 +596,16 @@ Tms32031::op_three(uint32_t op)
 	}
 	switch (which) {
 	case 0x00:
-		addc(d, a, b);
+		addi(d, a, b, st() & C);
 		break;
 	case 0x02:
 		addi(d, a, b);
 		break;
 	case 0x03:
-		logic(d, a & b);
+		load_int(d, a & b);
 		break;
 	case 0x04:
-		logic(d, a & ~b);
+		load_int(d, a & ~b);
 		break;
 	case 0x05:
 		ash(d, a, b);
@@ -650,10 +620,10 @@ Tms32031::op_three(uint32_t op)
 		mpyi(d, a, b);
 		break;
 	case 0x0B:
-		logic(d, a | b);
+		load_int(d, a | b);
 		break;
 	case 0x0C:
-		subb(d, a, b);
+		subi(d, a, b, st() & C);
 		break;
 	case 0x0E:
 		subi(d, a, b);
@@ -663,7 +633,7 @@ Tms32031::op_three(uint32_t op)
 		or_nz(a & b);
 		break;
 	default:
-		logic(d, a ^ b);
+		load_int(d, a ^ b);
 		break;
 	}
 }
@@ -701,6 +671,14 @@ Tms32031::op_flow(uint32_t op)
 	const uint32_t top11 = op >> 21;
 	const int32_t disp = static_cast<int16_t>(op);
 	const bool imm = op & 0x02000000, delayed = op & 0x00200000;
+	const auto branch = [&](bool take) {
+		if (delayed) {
+			execute_delayed(imm ? m_pc + 2 + static_cast<uint32_t>(disp) : ireg(op & 31), take);
+		} else if (take) {
+			m_pc = (imm ? m_pc + static_cast<uint32_t>(disp) : ireg(op & 31)) & 0xFFFFFF;
+			burn(3);
+		}
+	};
 
 	switch (op >> 24) {
 	case 0x60:
@@ -725,28 +703,13 @@ Tms32031::op_flow(uint32_t op)
 		break;
 	}
 	if (top11 == 0x340 || top11 == 0x341 || top11 == 0x350 || top11 == 0x351) {
-		const bool take = condition(op >> 16);
-
-		if (delayed) {
-			execute_delayed(imm ? m_pc + 2 + static_cast<uint32_t>(disp) : ireg(op & 31), take);
-		} else if (take) {
-			m_pc = (imm ? m_pc + static_cast<uint32_t>(disp) : ireg(op & 31)) & 0xFFFFFF;
-			burn(3);
-		}
+		branch(condition(op >> 16));
 	} else if (op >> 26 == 0x1B) {
 		const unsigned reg = AR0 + ((op >> 22) & 7);
 		const uint32_t res = (ireg(reg) - 1) & 0xFFFFFF;
 
 		ireg(reg) = res | (ireg(reg) & 0xFF000000);
-
-		const bool take = condition(op >> 16) && !(res & 0x800000);
-
-		if (delayed) {
-			execute_delayed(imm ? m_pc + 2 + static_cast<uint32_t>(disp) : ireg(op & 31), take);
-		} else if (take) {
-			m_pc = (imm ? m_pc + static_cast<uint32_t>(disp) : ireg(op & 31)) & 0xFFFFFF;
-			burn(3);
-		}
+		branch(condition(op >> 16) && !(res & 0x800000));
 	} else if (top11 == 0x380 || top11 == 0x390) {
 		if (condition(op >> 16)) {
 			write(++ireg(SP), m_pc);
@@ -779,22 +742,8 @@ Tms32031::op_parallel_multiply(uint32_t op)
 	if (kind < 2) {
 		const uint32_t m3 = read(indirect_1(op >> 8, &deferred)), m4 = read(indirect_1(op));
 		const Reg s3 = long_to_fp(m3), s4 = long_to_fp(m4), s1 = m_r[r19], s2 = m_r[r16];
-		Reg mul_a, mul_b, add_a, add_b;
+		const auto [mul_a, mul_b, add_a, add_b] = mul_add(how, s1, s2, s3, s4);
 
-		switch (how) {
-		case 0:
-			mul_a = s3, mul_b = s4, add_a = s1, add_b = s2;
-			break;
-		case 1:
-			mul_a = s3, mul_b = s1, add_a = s4, add_b = s2;
-			break;
-		case 2:
-			mul_a = s1, mul_b = s2, add_a = s3, add_b = s4;
-			break;
-		default:
-			mul_a = s3, mul_b = s1, add_a = s2, add_b = s4;
-			break;
-		}
 		mpyf(m_r[TEMP3], mul_a, mul_b);
 		if (kind == 0)
 			addf(m_r[sum], add_a, add_b);
@@ -807,30 +756,22 @@ Tms32031::op_parallel_multiply(uint32_t op)
 
 	const uint32_t s1 = ireg(r19), s2 = ireg(r16);
 	const uint32_t s3 = read(indirect_1(op >> 8, &deferred)), s4 = read(indirect_1(op));
-	uint32_t mul_a, mul_b, add_a, add_b;
-
-	switch (how) {
-	case 0:
-		mul_a = s3, mul_b = s4, add_a = s1, add_b = s2;
-		break;
-	case 1:
-		mul_a = s3, mul_b = s1, add_a = s4, add_b = s2;
-		break;
-	case 2:
-		mul_a = s1, mul_b = s2, add_a = s3, add_b = s4;
-		break;
-	default:
-		mul_a = s3, mul_b = s1, add_a = s2, add_b = s4;
-		break;
-	}
-
+	const auto [mul_a, mul_b, add_a, add_b] = mul_add(how, s1, s2, s3, s4);
 	int64_t mres = sext24(mul_a) * sext24(mul_b);
 	uint32_t ares = kind == 2 ? add_a + add_b : add_a - add_b;
+	const bool mul_over = mres < -int64_t(0x80000000) || mres > int64_t(0x7FFFFFFF);
+	const bool add_over = kind == 2 ? overflow_add(add_a, add_b, ares) : overflow_sub(add_a, add_b, ares);
 
+	/* PROVEN (TMS320C3x User's Guide SPRU031F p. 13-167, 13-173): N, Z and UF
+	 * are 0, an integer overflow sets V and LV, the product's when it leaves
+	 * 32 bits. DEDUCED: the add's or subtract's overflow counts too (the pages
+	 * define only the product's) */
 	clr(N | Z | V | UF);
+	if (mul_over || add_over)
+		st() |= V | LV;
 	if (ovm()) {
 		mres = std::clamp(mres, -int64_t(0x80000000), int64_t(0x7FFFFFFF));
-		if (kind == 2 ? overflow_add(add_a, add_b, ares) : overflow_sub(add_a, add_b, ares))
+		if (add_over)
 			ares = saturated(add_a);
 	}
 	ireg(product) = static_cast<uint32_t>(mres);
@@ -893,7 +834,7 @@ Tms32031::op_parallel_store(uint32_t op)
 		addi(d22, ireg(r19), src);
 		break;
 	case 0x68:
-		logic(d22, ireg(r19) & src);
+		load_int(d22, ireg(r19) & src);
 		break;
 	case 0x69:
 		ash(d22, src, ireg(r19));
@@ -928,10 +869,10 @@ Tms32031::op_parallel_store(uint32_t op)
 		negi(d22, src);
 		break;
 	case 0x73:
-		logic(d22, ~src);
+		load_int(d22, ~src);
 		break;
 	case 0x74:
-		logic(d22, ireg(r19) | src);
+		load_int(d22, ireg(r19) | src);
 		break;
 	case 0x75:
 		subf(m_r[d22], long_to_fp(src), m_r[r19]);
@@ -940,7 +881,7 @@ Tms32031::op_parallel_store(uint32_t op)
 		subi(d22, src, ireg(r19));
 		break;
 	default:
-		logic(d22, ireg(r19) ^ src);
+		load_int(d22, ireg(r19) ^ src);
 		break;
 	}
 	write(indirect_1(op >> 8), stored);

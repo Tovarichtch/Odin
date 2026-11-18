@@ -321,9 +321,9 @@ Controls::reseat()
 		if (seats[player] == m_seats[player])
 			continue;
 		/* A pad that leaves a player stops shaking */
-		if (Pad *const was = seat(player); was && was->rumbling) {
+		if (Pad *const was = seat(player); was && (was->rumbling || was->rumbling_light)) {
 			SDL_RumbleGamepad(was->handle, 0, 0, 0);
-			was->rumbling = 0;
+			was->rumbling = was->rumbling_light = 0;
 		}
 		m_seats[player] = seats[player];
 		if (const Pad *const now = seat(player))
@@ -665,7 +665,7 @@ Controls::turn_wheel(int torque)
 
 void
 Controls::show(std::span<const uint8_t> outputs, std::span<const uint8_t> levels, std::span<const int16_t> option_sound,
-               std::optional<int> drive_torque)
+               std::optional<int> drive_torque, std::optional<Board::PadShake> pad_shake)
 {
 	const Uint64 now = SDL_GetTicks();
 
@@ -675,22 +675,42 @@ Controls::show(std::span<const uint8_t> outputs, std::span<const uint8_t> levels
 	m_felt_level = m_felt && !still ? AudioOut::smoothed(m_felt_level, AudioOut::shake_of(option_sound)) : 0;
 
 	/* A shock shakes at once and dies away as a shake does; what the moves
-	 * of the wheel give is no shock */
-	const int force = m_drive_output ? DriveBoard::force_of(DriveBoard::command(outputs, m_drive_output)) : 0;
+	 * of the wheel give is no shock. The shocks come from the command given
+	 * to the drive board, or from the wheel motor a board drives itself
+	 * (Speed Up, ATV Track, Smashing Drive) while the game's vibration is
+	 * on */
+	const int commanded = m_drive_output ? DriveBoard::force_of(DriveBoard::command(outputs, m_drive_output)) : 0;
+	const bool own_motor = !m_drive_output && m_wheel_motor && drive_torque;
+	const int force = own_motor ? *drive_torque : commanded;
 
-	turn_wheel(drive_torque.value_or(force));
+	turn_wheel(drive_torque.value_or(commanded));
 	const uint16_t wheel = m_wheel_channel < 0 ? 0 : m_panel.analog_channel(static_cast<size_t>(m_wheel_channel));
 
 	m_wheel_moves[m_wheel_move++ % m_wheel_moves.size()] = std::abs(wheel - m_wheel_was) / 65535.0;
 	m_wheel_was = wheel;
 
 	const double moved = *std::max_element(m_wheel_moves.begin(), m_wheel_moves.end());
-	const Uint16 jolt = DriveBoard::jolt_of(force - m_force_was, moved);
+	/* A motor the board drives: its force against that of two frames
+	 * before, so a buzz that swings back and forth each frame gives no
+	 * shock, and the pad no lasting shake; Speed Up adds one at every frame
+	 * its wheel is held (0x15E44-0x15E54: -5, 5, -5, 5... of 0x15ED4), its
+	 * skids and bumps stay */
+	const Uint16 jolt = own_motor ? DriveBoard::jolt_of(force - m_force_before, moved, 2) :
+	                                DriveBoard::jolt_of(force - m_force_was, moved);
 
+	m_force_before = m_force_was;
 	m_force_was = force;
-	m_drive_level = std::max(jolt, AudioOut::smoothed(m_drive_level, jolt));
+	/* A board that shakes the pad itself, while the game's vibration is on,
+	 * gives no shocks */
+	const std::optional<Board::PadShake> own_shake = m_wheel_motor ? pad_shake : std::nullopt;
+	const Uint16 drive = own_shake ? 0 : jolt;
+
+	m_drive_level = std::max(drive, AudioOut::smoothed(m_drive_level, drive));
 
 	const Uint16 felt = std::max(m_felt_level, m_drive_level) / FELT_STEP * FELT_STEP;
+	/* Its heavy and light motors; else both alike */
+	const Uint16 felt_heavy = own_shake ? std::max(felt, own_shake->heavy) / FELT_STEP * FELT_STEP : felt;
+	const Uint16 felt_light = own_shake ? std::max(felt, own_shake->light) / FELT_STEP * FELT_STEP : felt;
 
 	/* Each vibration of the cabinet to the light gun it goes to, as the
 	 * game drives it this frame (the page Outputs) */
@@ -715,8 +735,12 @@ Controls::show(std::span<const uint8_t> outputs, std::span<const uint8_t> levels
 				level = std::max(level, output.output <= levels.size() ? levels[output.output - 1] : 255u);
 
 		const Uint16 driven = static_cast<Uint16>(RUMBLE * level / 255 / FELT_STEP * FELT_STEP);
-		const int shake = device(player) == InputDevice::PAD ? std::max<Uint16>(driven, player ? 0 : felt) : 0;
-		const Uint16 strength = static_cast<Uint16>(std::min(shake * m_vibration_force / 100, 0xFFFF));
+		const auto strength = [&](Uint16 felt_one) {
+			const int shake = device(player) == InputDevice::PAD ? std::max<Uint16>(driven, player ? 0 : felt_one) : 0;
+
+			return static_cast<Uint16>(std::min(shake * m_vibration_force / 100, 0xFFFF));
+		};
+		const Uint16 heavy = strength(felt_heavy), light = strength(felt_light);
 
 		shake_gun(player, gun_run[player], gun_kick[player]);
 		if (!seated)
@@ -724,13 +748,17 @@ Controls::show(std::span<const uint8_t> outputs, std::span<const uint8_t> levels
 
 		Pad &pad = *seated;
 
-		if (strength == pad.rumbling && (!strength || now - pad.rumbled < RUMBLE_AGAIN_MS))
+		const bool same = heavy == pad.rumbling && light == pad.rumbling_light;
+		const bool shakes = heavy || light, shook = pad.rumbling || pad.rumbling_light;
+
+		if (same && (!shakes || now - pad.rumbled < RUMBLE_AGAIN_MS))
 			continue;
 		/* A shake changes its strength a few times a second at most */
-		if (strength && pad.rumbling && strength != pad.rumbling && now - pad.rumbled < FELT_MS)
+		if (shakes && shook && !same && now - pad.rumbled < FELT_MS)
 			continue;
-		SDL_RumbleGamepad(pad.handle, strength, strength, strength ? RUMBLE_MS : 0);
-		pad.rumbling = strength;
+		SDL_RumbleGamepad(pad.handle, heavy, light, shakes ? RUMBLE_MS : 0);
+		pad.rumbling = heavy;
+		pad.rumbling_light = light;
 		pad.rumbled = now;
 	}
 }
@@ -781,9 +809,9 @@ Controls::quiet()
 	if (m_force)
 		m_force->release();
 	for (Pad &pad : m_pads)
-		if (pad.rumbling) {
+		if (pad.rumbling || pad.rumbling_light) {
 			SDL_RumbleGamepad(pad.handle, 0, 0, 0);
-			pad.rumbling = 0;
+			pad.rumbling = pad.rumbling_light = 0;
 		}
 	if (m_pointers)
 		m_pointers->hold({});

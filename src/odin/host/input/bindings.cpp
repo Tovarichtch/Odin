@@ -95,7 +95,8 @@ const Default DEFAULTS[] = {
 
 /* The keys that move an analog control: left or up, right or down, for
  * player 1 then player 2; those of the directions of the player, the
- * second stick of player 1 on those of player 2. The gas on Up and the
+ * second stick of player 1 on those of player 2, that of player 2 (the
+ * ball of the football games) on I, K, J and L. The gas on Up and the
  * brake on Down, as xemu's Chihiro has them. */
 struct KeysToward {
 	Role role;
@@ -108,8 +109,8 @@ const KeysToward KEYS_TOWARD[] = {
 	{ Role::BRAKE, { { nullptr, "Down" }, { nullptr, "F" } } },
 	{ Role::STICK_X, { { "Left", "Right" }, { "D", "G" } } },
 	{ Role::STICK_Y, { { "Up", "Down" }, { "R", "F" } } },
-	{ Role::STICK2_X, { { "D", "G" }, { nullptr, nullptr } } },
-	{ Role::STICK2_Y, { { "R", "F" }, { nullptr, nullptr } } },
+	{ Role::STICK2_X, { { "D", "G" }, { "J", "L" } } },
+	{ Role::STICK2_Y, { { "R", "F" }, { "I", "K" } } },
 	{ Role::GUN_X, { { "Left", "Right" }, { "D", "G" } } },
 	{ Role::GUN_Y, { { "Up", "Down" }, { "R", "F" } } },
 };

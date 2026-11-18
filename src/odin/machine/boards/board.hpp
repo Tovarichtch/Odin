@@ -54,6 +54,13 @@ public:
 	virtual std::span<const uint8_t> output_levels() const { return {}; }
 	virtual const std::vector<int16_t> &sound(bool optional) const = 0;
 	virtual std::optional<int> drive_torque() const = 0;
+	/* A gamepad's two motors, 0 to 0xFFFF, the heavy low one and the light
+	 * high one, as the game's own wheel effects make them; none: they
+	 * follow the wheel's force (Controls::show) */
+	struct PadShake {
+		uint16_t heavy = 0, light = 0;
+	};
+	virtual std::optional<PadShake> pad_shake() const { return std::nullopt; }
 	/* How it links to other Odins (the page Link): whether it has a link
 	 * (a network board, a cable), linked to them or looped back, the port
 	 * it could not open, each end plugged in; none: it never links */

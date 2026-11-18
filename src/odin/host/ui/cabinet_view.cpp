@@ -418,6 +418,7 @@ public:
 		return c && c->on;
 	}
 	Light light(const char *id) const { return { on(id), !m_now.chosen.empty() && m_now.chosen == id }; }
+	std::string_view cabinet() const { return m_now.cabinet; }
 	float value(const char *id) const
 	{
 		const ControlNow *const c = find(id);
@@ -436,6 +437,13 @@ public:
 		const ControlNow *const c = find(id);
 
 		return c ? c->position : 0;
+	}
+	/* A lever's way its inputs hold now (up, or down) */
+	bool held(const char *id, bool up) const
+	{
+		const ControlNow *const c = find(id);
+
+		return c && (up ? c->up : c->down);
 	}
 
 private:
@@ -477,6 +485,30 @@ push_button(Pen &pen, const Controls &c, const char *id, float x, float y, float
 		pen.text(x, y + r + 20.0f, label, Align::CENTRE);
 	else
 		pen.text(x, y - r - 12.0f, label, Align::CENTRE);
+	pen.light();
+}
+
+/* A small rectangular lit button (Speed Up's START and VIEW, SU p. 16), its
+ * label beside it as for push_button */
+void
+lit_key(Pen &pen, const Controls &c, const char *id, float x, float y, const char *label, char side)
+{
+	if (!c.has(id))
+		return;
+
+	const bool on = c.on(id);
+	const float w = 32.0f, h = 20.0f;
+
+	pen.light(c.light(id));
+	pen.rect(x - w / 2.0f - 5.0f, y - h / 2.0f - 5.0f, w + 10.0f, h + 10.0f, 6.0f, Ink::DETAIL);
+	pen.push();
+	pen.sink(on, x, y);
+	pen.rect(x - w / 2.0f, y - h / 2.0f, w, h, 4.0f, on ? Ink::LIT : Ink::PART);
+	pen.pop();
+	if (side == 'b')
+		pen.text(x, y + h / 2.0f + 22.0f, label, Align::CENTRE);
+	else
+		pen.text(x, y - h / 2.0f - 13.0f, label, Align::CENTRE);
 	pen.light();
 }
 
@@ -1056,66 +1088,85 @@ smashing_drive(Pen &pen, const Controls &c)
 	pen.light();
 }
 
-/* Speed Up: the wheel, a two-position shifter with LOW up and HIGH down,
- * and the pedals */
+/* Speed Up, face on (SU p. 16, 18, 22): the oval dashboard with, from the
+ * left, the two lit buttons stacked (START on top: INFERRED, the drawing does
+ * not say), a speaker grille, the wheel, a second grille and the shift lever
+ * at the right end, its two positions named 1 and 2 as on the test screen;
+ * under it, the wide brake pedal on the left and the gas pedal */
 void
 speed_up(Pen &pen, const Controls &c)
 {
-	const float cx = 230, cy = 240, R = 144, r = 118;
+	const float cx = 300, cy = 236, R = 100, r = 82;
 
-	pen.curve({ 30, 86 }, { 210, 71.3f }, { 390, 71.3f }, { 570, 86 }, Ink::DETAIL, 0.0f);
-	push_button(pen, c, "start", 120, 44, 14, "START", 'r');
-	push_button(pen, c, "view", 300, 44, 14, "VIEW", 'r');
+	pen.rect(20, cy - 104, 560, 208, 104, Ink::BODY);
+	for (const float gx : { 158.0f, 442.0f }) {
+		pen.circle(gx, cy, 34, Ink::PART);
+		for (float d = -22.0f; d <= 22.0f; d += 11.0f) {
+			const float h = std::sqrt(26.0f * 26.0f - d * d);
+
+			pen.line(gx + d, cy - h, gx + d, cy + h, Ink::DETAIL);
+			pen.line(gx - h, cy + d, gx + h, cy + d, Ink::DETAIL);
+		}
+	}
+	lit_key(pen, c, "start", 76, cy - 36, "START", 't');
+	lit_key(pen, c, "view", 76, cy + 36, "VIEW", 'b');
 	pen.light(c.light("wheel"));
 	pen.push();
 	pen.turn(c.value("wheel") * 135.0f, cx, cy);
 	pen.ring(cx, cy, R, r);
 	pen.line(cx, cy - R + 3, cx, cy - r - 3, Ink::INK, 4.0f);
-	pen.shape({ { cx - r, cy - 12 }, { cx - 40, cy - 18 }, { cx - 40, cy + 16 }, { cx - r, cy + 12 } }, true, Ink::PART);
-	pen.shape({ { cx + r, cy - 12 }, { cx + 40, cy - 18 }, { cx + 40, cy + 16 }, { cx + r, cy + 12 } }, true, Ink::PART);
-	pen.shape({ { cx - 16, cy + 38 }, { cx + 16, cy + 38 }, { cx + 10, cy + r }, { cx - 10, cy + r } }, true, Ink::PART);
-	pen.circle(cx, cy, 44, Ink::PART);
+	pen.shape({ { cx - r, cy - 9 }, { cx - 28, cy - 13 }, { cx - 28, cy + 11 }, { cx - r, cy + 9 } }, true, Ink::PART);
+	pen.shape({ { cx + r, cy - 9 }, { cx + 28, cy - 13 }, { cx + 28, cy + 11 }, { cx + r, cy + 9 } }, true, Ink::PART);
+	pen.shape({ { cx - 11, cy + 27 }, { cx + 11, cy + 27 }, { cx + 7, cy + r }, { cx - 7, cy + r } }, true, Ink::PART);
+	pen.circle(cx, cy, 31, Ink::PART);
 	pen.pop();
 	pen.light();
 
-	const float sx = 486, sy = 250;
-	const float ky = c.position("gear") > 0 ? 44.0f : -44.0f;
+	/* The lever at its position; held one way, at the end of that way, as the
+	 * game puts it (the game, paused under the menu, moves no lever there) */
+	const size_t at = c.held("gear", true) ? 1 : c.held("gear", false) ? 0 : c.position("gear");
+	const float sx = 524, ky = at > 0 ? 34.0f : -34.0f;
 
 	pen.light(c.light("gear"));
-	pen.rect(sx - 44, sy - 82, 88, 164, 14, Ink::BODY);
-	pen.line(sx, sy - 44, sx, sy + 44, Ink::THICK, 7.0f);
-	pen.text(sx, sy - 62, "LOW", Align::CENTRE);
-	pen.text(sx, sy + 72, "HIGH", Align::CENTRE);
-	pen.circle(sx, sy + ky, 15, Ink::PART);
+	pen.rect(sx - 13, cy - 52, 26, 104, 13, Ink::DETAIL);
+	pen.text(sx + 26, cy - 30, "1", Align::LEFT);
+	pen.text(sx + 26, cy + 44, "2", Align::LEFT);
+	pen.circle(sx, cy + ky, 15, Ink::PART);
 	if (c.on("gear"))
-		pen.circle(sx, sy + ky, 14, Ink::LIT);
-	pen.text(sx, sy - 96, "SHIFTER", Align::CENTRE);
+		pen.circle(sx, cy + ky, 14, Ink::LIT);
+	pen.text(sx, cy - 64, "GEAR", Align::CENTRE);
 	pen.light(c.light("brake_pedal"));
-	pedal(pen, 150, 440, 64, 74, c.on("brake_pedal") ? 1.0f : 0.0f, "BRAKE");
+	pedal(pen, 226, 440, 70, 74, c.on("brake_pedal") ? 1.0f : 0.0f, "BRAKE");
 	pen.light(c.light("gas_pedal"));
-	pedal(pen, 252, 426, 48, 88, c.value("gas_pedal"), "GAS");
+	pedal(pen, 340, 426, 48, 88, c.value("gas_pedal"), "GAS");
 	pen.light();
 }
 
-/* Surf Planet: the board the player stands on, seen from behind, rocking
- * left and right, and START on the stand */
+/* Surf Planet's upright, face on (SP p. 6-7, 24; SP-REG p. 3, 9): the two
+ * speakers at the top, the screen, and on the panel under it the lit START
+ * on the left and, in the middle, the single-axis analog joystick, a lever
+ * with a grip that swings left and right; no surfboard */
 void
 surf_planet(Pen &pen, const Controls &c)
 {
-	const float cx = 300, cy = 330;
+	const float cx = 300, py = 318;
 
-	push_button(pen, c, "start", 300, 70, 14, "START", 'r');
-	pen.line(cx, cy + 40, cx, cy + 120, Ink::THICK, 8.0f);
-	pen.shape({ { cx - 70, cy + 120 }, { cx + 70, cy + 120 }, { cx + 50, cy + 136 }, { cx - 50, cy + 136 } }, true,
-	          Ink::BODY);
-	pen.light(c.light("board"));
+	for (const float sx : { 236.0f, 364.0f }) {
+		pen.circle(sx, 52, 30, Ink::PART);
+		pen.circle(sx, 52, 18, Ink::DETAIL);
+	}
+	pen.rect(186, 96, 228, 168, 12, Ink::BODY);
+	pen.rect(204, 110, 192, 140, 8, Ink::DETAIL);
+	pen.rect(150, py - 26, 300, 52, 10, Ink::BODY);
+	push_button(pen, c, "start", 194, py, 10, "START", 'r');
+	pen.light(c.light("joystick"));
+	pen.circle(cx, py, 13, Ink::DETAIL);
 	pen.push();
-	pen.turn(c.value("board") * 20.0f, cx, cy + 40);
-	pen.rect(cx - 200, cy + 14, 400, 26, 13, Ink::PART);
-	pen.rect(cx - 150, cy - 2, 70, 16, 4, Ink::DETAIL);
-	pen.rect(cx + 80, cy - 2, 70, 16, 4, Ink::DETAIL);
+	pen.turn(c.value("joystick") * 25.0f, cx, py);
+	pen.line(cx, py, cx, py - 64, Ink::THICK, 8.0f);
+	pen.rect(cx - 13, py - 112, 26, 54, 12, Ink::PART);
 	pen.pop();
-	pen.text(cx, cy - 60, "SURFBOARD", Align::CENTRE);
+	pen.text(cx, py + 56, "JOYSTICK", Align::CENTRE);
 	pen.light();
 }
 
@@ -1135,6 +1186,50 @@ ball_pattern(Pen &pen, float x, float y, float r)
 	pen.shape(std::move(pentagon), true, Ink::DETAIL);
 }
 
+/* The 8-way stick of a player ("1p_", "2p_") in its gate of four switches */
+void
+gate_stick(Pen &pen, const Controls &c, const std::string &player, float jx, float jy)
+{
+	const auto id = [&](const char *what) { return player + what; };
+	const auto on = [&](const char *what) { return c.on(id(what).c_str()) ? 1.0f : 0.0f; };
+	const auto light = [&](const char *what) { return c.light(id(what).c_str()); };
+	const float dx = (on("right") - on("left")) * 14.0f, dy = (on("down") - on("up")) * 14.0f;
+
+	pen.light(light("up") | light("down") | light("left") | light("right"));
+	pen.circle(jx, jy, 32, Ink::DETAIL);
+	for (const auto &[gx, gy] : { std::pair{ 0.0f, -1.0f }, std::pair{ 0.0f, 1.0f }, std::pair{ -1.0f, 0.0f },
+	                              std::pair{ 1.0f, 0.0f } })
+		pen.line(jx + gx * 8, jy + gy * 8, jx + gx * 26, jy + gy * 26, Ink::DETAIL);
+	pen.line(jx, jy, jx + dx, jy + dy, Ink::THICK, 3.0f);
+	pen.circle(jx + dx, jy + dy, 17, Ink::PART);
+	pen.circle(jx + dx, jy + dy, 8, Ink::DETAIL);
+	pen.light();
+}
+
+/* The ball of a player at (cx, by), held from `from` above it: forward is
+ * away from the player */
+void
+kicked_ball(Pen &pen, const Controls &c, const std::string &player, float cx, float by, float from)
+{
+	const std::string x = player + "kick_x", y = player + "kick_y";
+	const float side = c.value(x.c_str()), forward = std::fabs(c.value(y.c_str()));
+	const bool kicked = std::fabs(side) > 0.1f || forward > 0.1f;
+
+	pen.light(c.light(x.c_str()) | c.light(y.c_str()));
+	pen.line(cx, by - from, cx, by - 38, Ink::DETAIL);
+	pen.push();
+	pen.turn(-side * 18.0f, cx, by - 62);
+	pen.move(0.0f, -forward * 22.0f);
+	pen.line(cx, by - 62, cx, by - 36, Ink::THICK, 6.0f);
+	pen.circle(cx, by, 34, Ink::PART);
+	if (kicked)
+		pen.circle(cx, by, 33, Ink::LIT, 0.85f);
+	ball_pattern(pen, cx, by, 34);
+	pen.pop();
+	pen.text(cx + 48, by + 6, "BALL", Align::LEFT);
+	pen.light();
+}
+
 /* Gaelco Football from above (GF-EN p. 7, 14, 22, 32, 52-54): two
  * stations under the screen, 1P on the left; on each, the stick, then A,
  * B and C from left to right, A by the stick (the game's own "How to play"
@@ -1149,62 +1244,83 @@ football(Pen &pen, const Controls &c)
 	for (const auto &[p, cx] : { std::pair{ 1u, 162.0f }, std::pair{ 2u, 438.0f } }) {
 		const std::string player = std::to_string(p) + "p_";
 		const auto id = [&](const char *what) { return player + what; };
-		const auto on = [&](const char *what) { return c.on(id(what).c_str()) ? 1.0f : 0.0f; };
-		const auto light = [&](const char *what) { return c.light(id(what).c_str()); };
 		const float cy = 236;
 
 		pen.rect(cx - 100, cy - 88, 200, 176, 40, Ink::BODY);
 		pen.rect(cx - 88, cy - 76, 176, 152, 32, Ink::DETAIL);
 		pen.text(cx, cy - 104, p == 1 ? "1P" : "2P", Align::CENTRE, BIG);
-
-		/* The stick in its gate of four switches */
-		const float jx = cx - 44, jy = cy + 18;
-		const float dx = (on("right") - on("left")) * 14.0f, dy = (on("down") - on("up")) * 14.0f;
-
-		pen.light(light("up") | light("down") | light("left") | light("right"));
-		pen.circle(jx, jy, 32, Ink::DETAIL);
-		for (const auto &[gx, gy] : { std::pair{ 0.0f, -1.0f }, std::pair{ 0.0f, 1.0f }, std::pair{ -1.0f, 0.0f },
-		                              std::pair{ 1.0f, 0.0f } })
-			pen.line(jx + gx * 8, jy + gy * 8, jx + gx * 26, jy + gy * 26, Ink::DETAIL);
-		pen.line(jx, jy, jx + dx, jy + dy, Ink::THICK, 3.0f);
-		pen.circle(jx + dx, jy + dy, 17, Ink::PART);
-		pen.circle(jx + dx, jy + dy, 8, Ink::DETAIL);
-		pen.light();
+		gate_stick(pen, c, player, cx - 44, cy + 18);
 		push_button(pen, c, id("button1").c_str(), cx + 10, cy + 30, 10, "A", 't');
 		push_button(pen, c, id("button2").c_str(), cx + 42, cy + 8, 10, "B", 't');
 		push_button(pen, c, id("button3").c_str(), cx + 74, cy - 14, 10, "C", 't');
 		push_button(pen, c, id("start").c_str(), cx - 50, cy - 50, 10, "START", 'r');
-
-		/* The ball on its arm: forward is away from the player */
-		const float side = c.value(id("kick_x").c_str()), forward = std::fabs(c.value(id("kick_y").c_str()));
-		const bool kicked = std::fabs(side) > 0.1f || forward > 0.1f;
-		const float by = cy + 152;
-
-		pen.light(light("kick_x") | light("kick_y"));
-		pen.line(cx, by - 62, cx, by - 38, Ink::DETAIL);
-		pen.push();
-		pen.turn(-side * 18.0f, cx, by - 62);
-		pen.move(0.0f, -forward * 22.0f);
-		pen.line(cx, by - 62, cx, by - 36, Ink::THICK, 6.0f);
-		pen.circle(cx, by, 34, Ink::PART);
-		if (kicked)
-			pen.circle(cx, by, 33, Ink::LIT, 0.85f);
-		ball_pattern(pen, cx, by, 34);
-		pen.pop();
-		pen.text(cx + 48, by + 6, "BALL", Align::LEFT);
-		pen.light();
+		kicked_ball(pen, c, player, cx, cy + 152, 62);
 	}
 }
 
+/* An octagon of half-width `s`, its corners cut like a regular octagon's */
+std::vector<ImVec2>
+octagon(float cx, float cy, float s)
+{
+	const float k = s * 0.414f;
+
+	return { { cx - s + k, cy - s }, { cx + s - k, cy - s }, { cx + s, cy - s + k }, { cx + s, cy + s - k },
+		 { cx + s - k, cy + s }, { cx - s + k, cy + s }, { cx - s, cy + s - k }, { cx - s, cy - s + k } };
+}
+
+/* Football Power from above (FP p. 28, 42-43): the monitor cabinet and its
+ * round bezel, then on the platform two octagonal consoles on the hand rail,
+ * 1P (orange) on the left and 2P (yellow) on the right, the coin tower
+ * between them. On each console, START on the left, the 8-way stick in
+ * front, DRIBBLING (blue) and DEFENSE (red) side by side on the right (the
+ * exploded view of p. 43, read by eye: INFERRED); the ball on its spring in
+ * front, kicked by the foot */
+void
+football_power(Pen &pen, const Controls &c)
+{
+	pen.rect(176, 20, 248, 66, 30, Ink::BODY);
+	pen.rect(208, 31, 184, 44, 18, Ink::DETAIL);
+	pen.line(150, 102, 450, 102, Ink::THICK, 5.0f);
+	pen.rect(278, 144, 44, 104, 6, Ink::BODY);
+	pen.rect(289, 160, 22, 30, 3, Ink::DETAIL);
+	for (const auto &[p, cx] : { std::pair{ 1u, 150.0f }, std::pair{ 2u, 450.0f } }) {
+		const std::string player = std::to_string(p) + "p_";
+		const auto id = [&](const char *what) { return player + what; };
+		const float cy = 236;
+
+		pen.shape(octagon(cx, cy, 96), true, Ink::BODY);
+		pen.shape(octagon(cx, cy, 84), true, Ink::DETAIL);
+		pen.text(cx, cy - 110, p == 1 ? "1P" : "2P", Align::CENTRE, BIG);
+		push_button(pen, c, id("start").c_str(), cx - 54, cy - 28, 10, "START", 't');
+		gate_stick(pen, c, player, cx - 6, cy + 34);
+		push_button(pen, c, id("button1").c_str(), cx + 4, cy - 30, 10, "DRIBBLING", 't');
+		push_button(pen, c, id("button2").c_str(), cx + 50, cy - 30, 10, "DEFENSE", 'b');
+		kicked_ball(pen, c, player, cx, cy + 160, 64);
+	}
+}
+
+/* Radikal Bikers, Gaelco's upright (RB p. 13, 15, 28-32, 35, 52): the
+ * handlebar turning on its column, the hand brake lever in front of the left
+ * grip and the twist accelerator on the right (both switches); the bar
+ * tilted back closes HANDLE UP (its rear microswitch); START on the left
+ * plate and VIEW CHANGE on the right one, fixed beside the column. Atari's
+ * cabinet has VIEW on the left (RB-FSB p. 2, RB-ATA p. 21) */
 void
 radikal_bikers(Pen &pen, const Controls &c)
 {
 	const float cx = 290, base = 196;
-	const float cy = base + (c.on("handle_up") ? -14.0f : 0.0f);
+	const float cy = base + (c.on("handle_up") ? 14.0f : 0.0f);
+	const bool atari = c.cabinet() == "atari";
+	const float view = atari ? -102.0f : 102.0f;
 
+	/* The plates first: the handlebar turns over them */
+	pen.rect(cx - 150, base + 52, 96, 44, 8, Ink::BODY);
+	pen.rect(cx + 54, base + 52, 96, 44, 8, Ink::BODY);
+	push_button(pen, c, "start", cx - view, base + 74, 9.0f, "START", 't');
+	push_button(pen, c, "view", cx + view, base + 74, 9.0f, "VIEW CHANGE", 't');
 	pen.arc(cx, base, 118, -PI * 118.0f / 180.0f, -PI * 62.0f / 180.0f, Ink::DETAIL, 0.0f);
 	pen.light(c.light("handlebar"));
-	pen.text(cx, base - 142, "HANDLEBAR", Align::CENTRE);
+	pen.text(cx, base - 142, "HANDLE", Align::CENTRE);
 	pen.push();
 	pen.turn(c.value("handlebar") * 20.0f, cx, cy);
 	std::vector<ImVec2> bar = { { cx - 172, cy + 16 } };
@@ -1216,10 +1332,10 @@ radikal_bikers(Pen &pen, const Controls &c)
 	pen.line(cx, cy - 106, cx, cy - 128, Ink::INK, 4.0f);
 	pen.light();
 
-	pen.light(c.light("brake"));
 	grip(pen, cx - 232, cy + 1, 64, 30);
-	if (c.on("brake"))
-		pen.rect(cx - 231, cy + 2, 62, 28, 12, Ink::LIT, 0.9f);
+	pen.rect(cx - 168, cy + 2, 16, 28, 4, Ink::PART);
+	brake_lever(pen, c, "brake", cx - 160, cy, -102);
+	pen.light(c.light("brake"));
 	pen.text(cx - 232, cy - 38, "BRAKE", Align::LEFT);
 	pen.light(c.light("accelerator"));
 	grip(pen, cx + 200, cy + 1, 64, 30);
@@ -1227,13 +1343,12 @@ radikal_bikers(Pen &pen, const Controls &c)
 		pen.rect(cx + 201, cy + 2, 62, 28, 12, Ink::LIT, 0.9f);
 	pen.text(cx + 264, cy - 38, "ACCELERATOR", Align::RIGHT);
 	pen.light();
-	push_button(pen, c, "view", cx - 110, cy + 60, 9.0f, "VIEW", 'b');
-	push_button(pen, c, "start", cx + 110, cy + 60, 9.0f, "START", 'b');
 	pen.pop();
 	pen.light(c.light("handle_up"));
 	pen.text(cx, base + 186, "HANDLE UP", Align::CENTRE);
+	/* As each manual puts it: RB p. 35, RB-ATA p. 21 (1-18) */
 	if (c.on("handle_up"))
-		pen.text(cx, base + 210, "PULLED", Align::CENTRE);
+		pen.text(cx, base + 210, atari ? "PUSHED DOWN" : "TILTED BACK", Align::CENTRE);
 	pen.light();
 }
 
@@ -1248,7 +1363,8 @@ drawing_of(const std::string &game)
 		{ "atvtrack", atv_track }, { "atvtracka", atv_track }, { "smashdrv", smashing_drive },
 		{ "smashdrvb", smashing_drive }, { "smashdrvs", smashing_drive },
 		{ "gfootbal", football }, { "radikalb", radikal_bikers }, { "radikalba", radikal_bikers },
-		{ "footbpow", football }, { "footbpow14", football }, { "footbpow12", football }, { "footbpow11", football },
+		{ "footbpow", football_power }, { "footbpow14", football_power }, { "footbpow12", football_power },
+		{ "footbpow11", football_power },
 		{ "speedup", speed_up }, { "speedup21", speed_up }, { "speedup20", speed_up }, { "speedup20a", speed_up },
 		{ "speedup12", speed_up }, { "speedup10", speed_up },
 		{ "surfplnt", surf_planet }, { "surfplnt40", surf_planet }, { "surfplnt31", surf_planet },
@@ -1274,7 +1390,7 @@ draw_cabinet(const MenuKit &kit, const std::string &game, const CabinetNow &now,
 
 	/* Measured at rest, so that it does not move as its controls do: the
 	 * row of COIN, SERVICE and TEST centred under it */
-	const CabinetNow rest{ now.controls, {}, false, false, false };
+	const CabinetNow rest{ now.controls, {}, false, false, false, {}, now.cabinet };
 	const Controls at_rest(rest), worked(now);
 	Pen pen(kit);
 

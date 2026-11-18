@@ -39,6 +39,7 @@
 #include "odin/host/input/control_panel.hpp"
 #include "odin/host/input/gun_serial.hpp"
 #include "odin/host/app/games.hpp"
+#include "odin/machine/boards/board.hpp"
 #include "odin/machine/boards/hikaru/hikaru_host.hpp"
 #include "odin/host/input/keyboard.hpp"
 #include "odin/host/video/picture.hpp"
@@ -101,7 +102,6 @@ public:
 	/* The panel of the game and its inputs (control_panel.hpp), made
 	 * again when they change in the settings */
 	const ControlPanel &panel() const { return m_panel; }
-	ControlPanel &panel() { return m_panel; }
 	void rebind();
 	/* The dead zone and the trigger threshold of each gamepad read again
 	 * from the settings (control_panel.hpp: PadTuning) */
@@ -176,13 +176,17 @@ public:
 	 * feels them, as hard as the output drives (`levels`: none, all); the
 	 * pad of player 1 also as hard as the vibration device the sound of the
 	 * optional board feeds, when it feels it and no mute output is on, or as
-	 * the shocks the drive board is told, when it feels them. The wheel of
+	 * the shocks the drive board is told or the wheel motor of the board
+	 * gives, when it feels them (the game's vibration on). The wheel of
 	 * player 1, when the player plays with it and it has force feedback,
 	 * turns with the torque of the drive board (`drive_torque`, when the
 	 * board runs its program), else with the force of the command the game
-	 * gives it. */
+	 * gives it. A board that shakes the pad from its game's own effects
+	 * (`pad_shake`, Board::pad_shake: Speed Up) gives its heavy and light
+	 * motors instead of those shocks, while the game's vibration is on. */
 	void show(std::span<const uint8_t> outputs, std::span<const uint8_t> levels, std::span<const int16_t> option_sound,
-	          std::optional<int> drive_torque = std::nullopt);
+	          std::optional<int> drive_torque = std::nullopt,
+	          std::optional<Board::PadShake> pad_shake = std::nullopt);
 	/* No pad shakes and the wheel lets go (the emulation stops); the light
 	 * guns are the desktop's again */
 	void quiet();
@@ -252,7 +256,7 @@ private:
 		PadState state;
 		std::array<bool, SDL_GAMEPAD_BUTTON_COUNT> fresh{};
 		std::array<bool, SDL_GAMEPAD_BUTTON_COUNT> release{};
-		Uint16 rumbling = 0;	/* how hard it shakes */
+		Uint16 rumbling = 0, rumbling_light = 0;	/* how hard its heavy and light motors shake */
 		Uint64 rumbled = 0;	/* when it was last asked to */
 		bool guide_alone = false;	/* Guide held, no other button since */
 	};
@@ -334,6 +338,7 @@ private:
 	bool m_wheel_motor = false;	/* the board drives the wheel itself (Game::wheel_motor) */
 	Uint16 m_drive_level = 0;	/* how hard the felt shocks shake */
 	int m_force_was = 0;		/* the force of the last frame */
+	int m_force_before = 0;		/* and of the frame before it */
 	int m_wheel_force = 100;	/* the wheel turns at that % of it */
 	int m_vibration_force = 100;	/* the pads shake at that % of it */
 	int m_wheel_rotation = 0;	/* the degrees of a wheel for the steering, 0: its whole way */
