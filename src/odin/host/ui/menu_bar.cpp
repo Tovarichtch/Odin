@@ -530,10 +530,12 @@ Menu::bar_display(BarItems &b)
 		state.anisotropy = ANISOTROPY[filter];
 	/* A Gaelco 3D board's own, while one of its games runs */
 	if (state.own_picture) {
-		int fields = state.gaelco3d_board_fields ? 1 : 0;
+		int fields = state.gaelco3d_board_fields ? 1 : 0, edges = state.gaelco3d_wide_edges ? 1 : 0;
 
 		if (b.choose("Interlaced picture", FIELDS_SHOWN, fields))
 			state.gaelco3d_board_fields = fields == 1;
+		if (b.choose("Polygon edges", EDGES_SHOWN, edges))
+			state.gaelco3d_wide_edges = edges == 1;
 	}
 	if (b.choose("Vertical sync", SYNCS, sync, !state.vsync_locked))
 		state.vsync = static_cast<unsigned>(sync);

@@ -84,6 +84,9 @@ apart by commas (see INPUTS below).
 [display]
 
  scale         1 to 6          3D resolution, times 640 x 480. Default 1.
+                               Gaelco 3D: 1 is the board's own exact
+                               picture; above 1, the graphics card
+                               redraws its scenes, close to the board.
  upscale_mode  raw, snap,      How flat 2D pieces (HUD, text) are drawn
                native          above scale 1. raw: fine like the rest;
                                snap: corners on the board's pixels;
@@ -95,6 +98,12 @@ apart by commas (see INPUTS below).
                                nothing moved (experimental); board shows
                                both fields as the board keeps them, what
                                moves seen twice. Default one_picture.
+ gaelco3d_edges
+               fine, wide      Gaelco 3D above scale 1: fine draws each
+                               polygon on its own outline; wide makes it
+                               half a board pixel wider on every side,
+                               as the board does at 1x (fewer seams, but
+                               a thin rim may show). Default fine.
  window        1 to 6, or      Window size: times 640 x 480, or a size.
                <w>x<h>         Default 1.
  fullscreen    on, off         Default off.

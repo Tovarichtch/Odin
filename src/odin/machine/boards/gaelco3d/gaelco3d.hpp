@@ -137,6 +137,10 @@ public:
 	/* One picture per field, or both fields as the board keeps them
 	 * (Gaelco3dVideo::set_one_picture) */
 	void set_one_picture(bool on) { m_video.set_one_picture(on); }
+	/* Above the board's resolution: the host GPU draws each field
+	 * (Gaelco3dVideo::set_gpu, take_scene) */
+	void set_gpu(bool on, bool native, bool wide) { m_video.set_gpu(on, native, wide); }
+	Gaelco3dScene take_scene() { return m_video.take_scene(); }
 
 	const std::vector<int16_t> &sound() const { return m_sound; }
 	/* The second pair: Speed Up's seat speakers; on the other games, the

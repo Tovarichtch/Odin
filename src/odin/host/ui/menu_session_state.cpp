@@ -555,6 +555,10 @@ MenuSession::apply_display(const MenuState &was)
 		m_display.set_board_fields(now.gaelco3d_board_fields);
 		keep("gaelco3d_fields", now.gaelco3d_board_fields ? std::optional<std::string>(GAELCO3D_FIELDS[1]) : std::nullopt);
 	}
+	if (now.gaelco3d_wide_edges != was.gaelco3d_wide_edges) {
+		m_display.set_wide_edges(now.gaelco3d_wide_edges);
+		keep("gaelco3d_edges", now.gaelco3d_wide_edges ? std::optional<std::string>(GAELCO3D_EDGES[1]) : std::nullopt);
+	}
 	if (now.fullscreen != was.fullscreen) {
 		m_display.set_fullscreen(now.fullscreen);
 		keep("fullscreen", kept_on_off(now.fullscreen, false));

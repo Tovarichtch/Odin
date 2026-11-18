@@ -137,6 +137,10 @@ private:
 	 * ([sound.speedup] woofer_cutoff) */
 	LowPass m_woofer_low{ std::strtod(WOOFER_CUTOFFS[1], nullptr), static_cast<int>(Gaelco3d::SOUND_RATE) };
 	std::vector<int16_t> m_seat;
+	/* The texture ROMs in rows of 4096 texels, as the GPU takes them
+	 * (Gaelco3dRoms); the card was found too small for them */
+	unsigned m_texture_rows;
+	bool m_too_large = false;
 	/* Speed Up's gamepad (shake_pad): its two motors; how long the program
 	 * has let go of the wheel's spring, and the hit it played then */
 	std::optional<PadShake> m_pad;
@@ -182,6 +186,17 @@ picture_scene(const std::vector<uint32_t> &picture)
 	return scene;
 }
 
+/* The texture ROMs' slots of 4 MB: 8 when the game fills one of the upper
+ * four, else 4 */
+unsigned
+texture_slots(const Game &game)
+{
+	for (unsigned slot = 4; slot < 8; slot++)
+		if (!game.section("texture" + std::to_string(slot)).empty())
+			return 8;
+	return 4;
+}
+
 Gaelco3d::Roms
 roms_of(const Game &game)
 {
@@ -193,7 +208,7 @@ roms_of(const Game &game)
 	};
 
 	const unsigned lanes = game.section("program2").empty() ? 2 : 4;
-	unsigned slots = 4;
+	const unsigned slots = texture_slots(game);
 
 	roms.program.assign(0x200000, 0);
 	for (unsigned lane = 0; lane < lanes; lane++) {
@@ -204,9 +219,6 @@ roms_of(const Game &game)
 	}
 	roms.tms = take("tms");
 	roms.adsp = take("adsp");
-	for (unsigned slot = 4; slot < 8; slot++)
-		if (!game.section("texture" + std::to_string(slot)).empty())
-			slots = 8;
 	roms.texture.assign(slots * 0x400000, 0);
 	for (unsigned slot = 0; slot < slots; slot++) {
 		const std::span<const uint8_t> bytes = game.section("texture" + std::to_string(slot));
@@ -228,7 +240,8 @@ Gaelco3dGame::Gaelco3dGame(const Game &game, Controls &controls, Display &displa
                            bool verbose)
 	: m_name(game.name), m_kept(kept), m_board(std::make_unique<Gaelco3d>(roms_of(game))), m_controls(controls),
 	  m_display(display), m_wiring(game.controls), m_grounded(game.grounded_pins),
-	  m_speedup(game.machine == "speedup"), m_wheel_motor(game.wheel_motor), m_balls(ball_sticks(game.controls))
+	  m_speedup(game.machine == "speedup"), m_wheel_motor(game.wheel_motor), m_balls(ball_sticks(game.controls)),
+	  m_texture_rows(texture_slots(game) * (0x400000 / 4096))
 {
 	m_board->set_name(m_name);
 	m_board->set_verbose(verbose);
@@ -338,7 +351,20 @@ void
 Gaelco3dGame::run_frame()
 {
 	read_controls();
+	/* Above the board's resolution, the GPU draws each field (note 124);
+	 * on a card whose textures cannot hold the texture ROMs, the board
+	 * draws its own picture, as at 1x, and the user is told once */
+	const bool fits = m_texture_rows <= m_display.largest_texture();
+	const bool fine = m_display.scale() > 1 && fits;
+
+	if (m_display.scale() > 1 && !fits && !m_too_large) {
+		std::fprintf(stderr, "renderer: the graphics card's textures are too small for the Gaelco 3D's "
+		                     "(%u rows): its own picture is shown, as at 1x\n", m_texture_rows);
+		m_too_large = true;
+	}
+
 	m_board->set_one_picture(!m_display.board_fields());
+	m_board->set_gpu(fine, m_display.upscale_mode() == DisplayUpscaleMode::NATIVE, m_display.wide_edges());
 	m_board->run_frame();
 	shake_pad();
 	if (m_speedup) {
@@ -359,7 +385,10 @@ Gaelco3dGame::run_frame()
 			m_outputs[0] = static_cast<uint8_t>(m_outputs[0] | 0x80u >> bit);
 			m_levels[bit] = 255;
 		}
-	m_display.set_scene(picture_scene(m_board->picture()));
+	if (fine)
+		m_display.set_scene(m_board->take_scene());
+	else
+		m_display.set_scene(picture_scene(m_board->picture()));
 }
 
 } /* namespace */

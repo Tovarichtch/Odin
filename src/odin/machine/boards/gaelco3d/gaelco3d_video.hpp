@@ -31,6 +31,8 @@
 #include <memory>
 #include <vector>
 
+#include "odin/machine/boards/gaelco3d/gaelco3d_scene.hpp"
+
 namespace odin {
 class StateFile;
 class Worker;
@@ -73,9 +75,19 @@ public:
 	void next_field()
 	{
 		settle();
+		m_scene.field = m_field;
 		m_field ^= 1;
 		m_drawn = true;
 	}
+	/* Above the board's resolution (note 124): the polygons go to the host
+	 * GPU as a scene, and the CPU draws none; with `native`, the flat ones
+	 * are drawn on the board's pixels; with `wide`, each polygon is half a
+	 * board pixel wider on every side, as the board's line ends make it on
+	 * average. When the CPU draws again, the frame is the one from the last
+	 * field it drew */
+	void set_gpu(bool on, bool native, bool wide);
+	/* The scene of the field drawn last (next_field) */
+	Gaelco3dScene take_scene();
 	/* What a flat screen shows: true, one picture per field (the older
 	 * field only where it stood still); false, both fields as the board
 	 * keeps them. The board itself does not depend on it */
@@ -87,17 +99,28 @@ public:
 private:
 	struct Plane;
 	struct Texel;
+	struct Edge {
+		int64_t x, step;
+		int high, low;
+	};
 
 	void polygon();
+	void outline(const Plane &plane, const Edge *edges, unsigned count, int top, int bottom);
+	static bool span(const Edge *edges, unsigned count, int y, int bottom, int &start, int &stop);
 	void line(const Plane &plane, unsigned row, int y, int from, int to);
 	Texel texel(const Plane &plane, float k23, float k89, float k56, int x) const;
 	bool masked(uint32_t address) const;
-	uint8_t texture(uint32_t address) const { return m_texture[address & m_texture_end]; }
+	uint8_t texture(uint32_t address) const { return m_roms->texture[address & m_texture_end]; }
 
-	std::vector<uint8_t> m_texture, m_texmask;
+	/* Shared with the host GPU's scenes, which take the mask once one is
+	 * drawn */
+	std::shared_ptr<Gaelco3dRoms> m_roms;
+	std::vector<uint8_t> m_texmask;
 	uint32_t m_texture_end, m_mask_off;
-	/* The palette, each entry's red, green and blue 16 bits apart */
+	/* The palette, with each entry's red, green and blue 16 bits apart,
+	 * and the words as written */
 	std::vector<uint64_t> m_palette;
+	std::vector<uint16_t> m_words_of_palette;
 
 	/* 40 bits per pixel: texel address (0-24), palette bank (25-31), u and
 	 * v fractions (32-35, 36-39) */
@@ -118,6 +141,9 @@ private:
 	/* A field has been drawn since the last scan-out */
 	bool m_drawn = false;
 	bool m_one_picture = true;
+
+	bool m_gpu = false, m_native = false, m_wide = false, m_gpu_palette_changed = true;
+	Gaelco3dScene m_scene;
 
 	void forget_motion();
 	void colour(unsigned shown, bool drawn, size_t from, size_t to);

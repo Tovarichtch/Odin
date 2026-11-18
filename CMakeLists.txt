@@ -209,10 +209,12 @@ set(ODIN_SOURCES
 	host/gfx/vk_common.cpp host/renderer/hikaru/vk/drawing_vk.cpp
 	host/renderer/hikaru/vk/pictures_vk.cpp
 	host/renderer/hikaru/vk/pmx_vk.cpp
+	host/renderer/hikaru/vk/gaelco3d_vk.cpp
 	host/renderer/hikaru/vk/scene_vk.cpp
 	host/renderer/hikaru/vk/translucent_vk.cpp
 	host/renderer/hikaru/gl/drawing_gl.cpp
 	host/renderer/hikaru/gl/pmx_gl.cpp
+	host/renderer/hikaru/gl/gaelco3d_gl.cpp
 	host/renderer/hikaru/gl/pictures_gl.cpp
 	host/renderer/hikaru/gl/programs_gl.cpp
 	host/renderer/hikaru/gl/scene_gl.cpp
@@ -323,6 +325,7 @@ file(MAKE_DIRECTORY ${SPIRV_DIR}/glsl)
 set(SPIRV)
 foreach(shader whole_picture.vert blend.frag compose.vert compose.frag present.frag
 		mesh.vert mesh.geom mesh.frag sort.frag image.vert image.frag pmx.vert pmx.geom pmx.frag pmx_sort.frag
+		gaelco3d_draw.vert gaelco3d_draw.frag gaelco3d_show.frag
 		whole_window.vert
 		blur.frag show.frag average.frag sides.frag)
 	string(REGEX REPLACE ".*\\." "" stage ${shader})

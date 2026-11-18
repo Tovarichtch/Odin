@@ -170,8 +170,11 @@ struct BarSettings {
 	bool unthrottled = false, show_speed = true;
 	/* Gaelco 3D: both fields as the board keeps them ([display] gaelco3d_fields) */
 	bool gaelco3d_board_fields = false;
-	/* The game that runs draws its own picture (Gaelco 3D): the 3D quality
-	 * settings do not change it */
+	/* Gaelco 3D above the board's resolution: polygons half a board pixel
+	 * wider ([display] gaelco3d_edges) */
+	bool gaelco3d_wide_edges = false;
+	/* The game that runs is on a Gaelco 3D board: its own picture at 1×,
+	 * its scenes redrawn by the graphics card above 1× */
 	bool own_picture = false;
 	/* Audio: the device chosen (empty: the system's), the volume of Odin
 	 * from 0 to 100, its sound kept while its window is in the background */
@@ -625,10 +628,12 @@ public:
 	 * screen; its sizes shorter where the row is narrow; Custom among them:
 	 * the size the user gives the window by hand), how frames wait for the
 	 * display, the screens of the cabinets, or none (PRESETS: the filters
-	 * they name), the speed limit; on a Gaelco 3D board, its two fields */
+	 * they name), the speed limit; on a Gaelco 3D board, its two fields and
+	 * the edges of its polygons above 1× */
 	static constexpr const char *SCALES[] = { "1×", "2×", "3×", "4×", "5×", "6×" };
 	static constexpr const char *UPSCALE_MODES_SHOWN[] = { "Raw", "Snap 2D", "Native 2D" };
 	static constexpr const char *FIELDS_SHOWN[] = { "One picture", "Both fields" };
+	static constexpr const char *EDGES_SHOWN[] = { "Fine", "Wide" };
 	static constexpr const char *FILTERS[] = { "Off", "2×", "4×", "8×", "16×" };
 	static constexpr unsigned ANISOTROPY[] = { 1, 2, 4, 8, 16 };
 	/* The place of an anisotropy among them; -1 for another */
@@ -734,14 +739,15 @@ private:
 	 * of Odin, the same place at each scale and at each filter, a frame
 	 * whole and torn, the timer of VON4 at 1× and in each upscaling mode
 	 * at 4×, a close-up of each CRT screen (in the order of PRESETS), a
-	 * Gaelco 3D player running with both fields and in one picture */
+	 * Gaelco 3D player running with both fields and as one picture, and a
+	 * Gaelco 3D seam at 1× and with each edge rule at 4× */
 	enum Picture { UPSCALE = 0, FILTER = UPSCALE + 6, SCREEN = FILTER + 5, WHOLE, TORN, MODE, CRT = MODE + 4,
-	               FIELDS = CRT + 5, PICTURES = FIELDS + 2 };
+	               FIELDS = CRT + 5, EDGES = FIELDS + 2, PICTURES = EDGES + 3 };
 	/* What the left of the page Display shows: what the row pointed at
 	 * or in the frame does */
 	enum Preview {
 		PREVIEW_CARD, PREVIEW_UPSCALE, PREVIEW_MODE, PREVIEW_FILTER, PREVIEW_SCREEN, PREVIEW_VSYNC, PREVIEW_CRT,
-		PREVIEW_FIELDS
+		PREVIEW_FIELDS, PREVIEW_EDGES
 	};
 
 	void follow_scale();

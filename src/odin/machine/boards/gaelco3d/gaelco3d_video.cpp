@@ -127,8 +127,9 @@ struct Gaelco3dVideo::Texel {
 };
 
 Gaelco3dVideo::Gaelco3dVideo(const std::vector<uint8_t> &rom, std::vector<uint8_t> texmask)
-	: m_texture(rom.size()), m_texmask(std::move(texmask)), m_texture_end(static_cast<uint32_t>(rom.size() - 1)),
-	  m_palette(32768), m_frame(size_t{ WIDTH } * HEIGHT), m_depth(size_t{ PAIRS } * HEIGHT),
+	: m_roms(std::make_shared<Gaelco3dRoms>()), m_texmask(std::move(texmask)),
+	  m_texture_end(static_cast<uint32_t>(rom.size() - 1)), m_palette(32768), m_words_of_palette(32768),
+	  m_frame(size_t{ WIDTH } * HEIGHT), m_depth(size_t{ PAIRS } * HEIGHT),
 	  m_colours(size_t{ WIDTH } * HEIGHT, 0xFF000000u), m_picture(size_t{ WIDTH } * HEIGHT, 0xFF000000u),
 	  m_seen(size_t{ WIDTH } * HEIGHT), m_moved(size_t{ WIDTH } * HEIGHT, 1), m_raster(std::make_unique<Worker>())
 {
@@ -138,21 +139,25 @@ Gaelco3dVideo::Gaelco3dVideo(const std::vector<uint8_t> &rom, std::vector<uint8_
 	/* Each ROM holds one parity of u and v (sheet 7, IC11-14), in MAME's
 	 * order: odd u even v, odd u odd v, even u even v, even u odd v */
 	const size_t quarter = rom.size() / 4;
+	std::vector<uint8_t> &texels = m_roms->texture;
 
+	texels.resize(rom.size());
 	for (size_t row = 0; row < rom.size() / 4096; row += 2)
 		for (size_t u = 0; u < 4096; u += 2) {
 			const size_t from = row / 2 * 2048 + u / 2, at = row * 4096 + u;
 
-			m_texture[at + 1] = rom[from];
-			m_texture[at + 4097] = rom[quarter + from];
-			m_texture[at] = rom[2 * quarter + from];
-			m_texture[at + 4096] = rom[3 * quarter + from];
+			texels[at + 1] = rom[from];
+			texels[at + 4097] = rom[quarter + from];
+			texels[at] = rom[2 * quarter + from];
+			texels[at + 4096] = rom[3 * quarter + from];
 		}
 	m_texmask.resize(std::max<size_t>(m_texmask.size(), 4 << 17), 0);
 	/* HEURISTIC: with one bank of texture ROMs, address bit 24 reads the same
 	 * bank again (MAME); on Speed Up's board no ROM answers there, an address
 	 * its data never uses */
 	m_mask_off = rom.size() > (size_t{ 1 } << 24) ? 0x1C00000 : 0xC00000;
+	m_roms->texture_end = m_texture_end;
+	m_roms->mask_off = m_mask_off;
 }
 
 Gaelco3dVideo::~Gaelco3dVideo() = default;
@@ -165,6 +170,7 @@ Gaelco3dVideo::reset()
 	/* HEURISTIC: the even lines first */
 	m_field = 0;
 	forget_motion();
+	m_scene = {};
 }
 
 void
@@ -182,7 +188,9 @@ Gaelco3dVideo::set_palette(uint32_t index, uint16_t value)
 	const uint64_t lanes = uint64_t{ value >> 10 & 31u } | uint64_t{ value >> 5 & 31u } << 16 | uint64_t{ value & 31u } << 32;
 
 	m_palette_changed = m_palette_changed || m_palette[index] != lanes;
+	m_gpu_palette_changed = m_gpu_palette_changed || m_words_of_palette[index] != value;
 	m_palette[index] = lanes;
+	m_words_of_palette[index] = value;
 }
 
 void
@@ -241,10 +249,6 @@ Gaelco3dVideo::polygon()
 
 	/* Each edge starts at its upper corner; its slope is added at each line
 	 * down */
-	struct Edge {
-		int64_t x, step;
-		int high, low;
-	};
 	std::array<Edge, MOST_CORNERS> edges;
 	unsigned count = 0;
 	int top = INT_MIN, bottom = INT_MAX;
@@ -266,36 +270,267 @@ Gaelco3dVideo::polygon()
 	}
 	if (count < 2)
 		return;
+	if (m_gpu) {
+		outline(plane, edges.data(), count, top, bottom);
+		return;
+	}
 
 	const int first = std::max(TOP - top, 0), end = std::min(TOP - bottom + 1, static_cast<int>(HEIGHT));
 
 	/* The lines of this field, two apart */
 	for (int row = first + ((first ^ static_cast<int>(m_field)) & 1); row < end; row += 2) {
 		const int y = TOP - row;
-		int64_t left = 0, right = 0;
-		bool crossed = false;
+		int start, stop;
 
-		/* An edge from its top line down to the line above its bottom
-		 * corner, the next edge taking over there; the polygon's bottom
-		 * line from the edges that end on it */
-		for (unsigned i = 0; i < count; i++) {
-			const Edge &e = edges[i];
-
-			if (y <= e.high && (y > e.low || (y == e.low && y == bottom))) {
-				const int64_t x = e.x + (e.high - y) * e.step;
-
-				left = crossed ? std::min(left, x) : x;
-				right = crossed ? std::max(right, x) : x;
-				crossed = true;
-			}
-		}
-
-		const int start = std::clamp(pixel(left), 0, static_cast<int>(WIDTH));
-		const int stop = std::clamp(pixel(right) + 1, 0, static_cast<int>(WIDTH));
-
-		if (crossed && start < stop)
+		if (span(edges.data(), count, y, bottom, start, stop))
 			line(plane, static_cast<unsigned>(row), y, start, stop);
 	}
+}
+
+/* The pixels the raster fills on line y: an edge counts from its top line
+ * down to the line above its bottom corner, where the next edge takes over;
+ * the polygon's bottom line comes from the edges that end on it */
+bool
+Gaelco3dVideo::span(const Edge *edges, unsigned count, int y, int bottom, int &start, int &stop)
+{
+	int64_t left = 0, right = 0;
+	bool crossed = false;
+
+	for (unsigned i = 0; i < count; i++) {
+		const Edge &e = edges[i];
+
+		if (y <= e.high && (y > e.low || (y == e.low && y == bottom))) {
+			const int64_t x = e.x + (e.high - y) * e.step;
+
+			left = crossed ? std::min(left, x) : x;
+			right = crossed ? std::max(right, x) : x;
+			crossed = true;
+		}
+	}
+	start = std::clamp(pixel(left), 0, static_cast<int>(WIDTH));
+	stop = std::clamp(pixel(right) + 1, 0, static_cast<int>(WIDTH));
+	return crossed && start < stop;
+}
+
+/* Above the board's resolution: the outline the raster fills, each line from
+ * the leftmost of its edges to the rightmost, with the edges stepped from their
+ * upper corners by their slopes, as the raster steps them; cut into pieces
+ * between two straight edges, so the GPU's own rule decides which of its pixels
+ * a triangle covers. A flat polygon on the board's pixels (Native 2D): the
+ * board's own spans, with lines of equal span joined */
+void
+Gaelco3dVideo::outline(const Plane &p, const Edge *edges, unsigned count, int top, int bottom)
+{
+	const bool native = m_native && p.k4 == 0.0f && p.k5 == 0.0f;
+	Gaelco3dVertex corner{};
+	const size_t first = m_scene.vertices.size();
+
+	corner.k[0] = p.k0;
+	corner.k[1] = p.k1;
+	corner.k[2] = p.k2;
+	corner.k[3] = p.k3;
+	corner.k[4] = p.k4;
+	corner.k[5] = p.k5;
+	corner.k[6] = p.k6;
+	corner.k[7] = p.k7;
+	corner.k[8] = p.k8;
+	corner.k[9] = p.k9;
+	corner.texture = p.texture;
+	corner.bank = p.bank | (native ? Gaelco3dVertex::NATIVE : 0);
+
+	/* A piece from its upper line to its lower one, in the board's pixels */
+	const auto piece = [&](double up, double up_left, double up_right, double down, double down_left,
+	                       double down_right) {
+		const auto put = [&](double x, double y) {
+			corner.x = static_cast<float>(x);
+			corner.y = static_cast<float>(y);
+			m_scene.vertices.push_back(corner);
+		};
+
+		put(up_left, up);
+		put(up_right, up);
+		put(down_right, down);
+		put(up_left, up);
+		put(down_right, down);
+		put(down_left, down);
+	};
+
+	if (native) {
+		const int from = std::max(TOP - top, 0), end = std::min(TOP - bottom + 1, static_cast<int>(HEIGHT));
+		int kept = -1, kept_start = 0, kept_stop = 0;
+		const auto flush = [&](int row) {
+			if (kept >= 0)
+				piece(kept, kept_start, kept_stop, row, kept_start, kept_stop);
+			kept = -1;
+		};
+
+		for (int row = from; row < end; row++) {
+			int start, stop;
+
+			if (!span(edges, count, TOP - row, bottom, start, stop)) {
+				flush(row);
+				continue;
+			}
+			if (kept >= 0 && start == kept_start && stop == kept_stop)
+				continue;
+			flush(row);
+			kept = row;
+			kept_start = start;
+			kept_stop = stop;
+		}
+		flush(end);
+	} else {
+		/* Where the GPU samples the board's terms (gaelco3d_draw.frag): a
+		 * board pixel takes them at its whole x and y, so x is half a
+		 * pixel left of its middle */
+		const auto across = [](double x) { return x - LEFT + 0.5; };
+		const auto down = [](double y) { return TOP - y + 0.5; };
+		const double grow = m_wide ? 0.5 : 0.0;
+		const auto x_of = [](const Edge &e, double y) {
+			return (static_cast<double>(e.x) + (e.high - y) * static_cast<double>(e.step)) / (1 << EDGE_FRACTION);
+		};
+		/* The leftmost and rightmost edges over the lines ya to yb */
+		const auto ends = [&](double y, double ya, double yb, double &left, double &right) {
+			bool crossed = false;
+
+			for (unsigned i = 0; i < count; i++)
+				if (edges[i].low <= ya && edges[i].high >= yb) {
+					const double x = x_of(edges[i], y);
+
+					left = crossed ? std::min(left, x) : x;
+					right = crossed ? std::max(right, x) : x;
+					crossed = true;
+				}
+			return crossed;
+		};
+		std::array<int, 2 * MOST_CORNERS> lines;
+		unsigned n = 0;
+
+		for (unsigned i = 0; i < count; i++) {
+			lines[n++] = edges[i].high;
+			lines[n++] = edges[i].low;
+		}
+		std::sort(lines.begin(), lines.begin() + n);
+		n = static_cast<unsigned>(std::unique(lines.begin(), lines.begin() + n) - lines.begin());
+
+		const double lowest = TOP - static_cast<int>(HEIGHT), highest = TOP + 1;
+
+		for (unsigned k = 0; k + 1 < n; k++) {
+			const int ya = lines[k], yb = lines[k + 1];
+			const double a = std::max<double>(ya, lowest), b = std::min<double>(yb, highest);
+
+			if (a >= b)
+				continue;
+
+			/* Where two of the edges cross, the leftmost or rightmost
+			 * may change */
+			std::array<double, MOST_CORNERS * MOST_CORNERS / 2 + 2> cuts;
+			unsigned m = 0;
+
+			cuts[m++] = a;
+			for (unsigned i = 0; i < count; i++)
+				for (unsigned j = i + 1; j < count; j++) {
+					const Edge &e = edges[i], &f = edges[j];
+
+					if (e.low > ya || e.high < yb || f.low > ya || f.high < yb)
+						continue;
+
+					const double ea = x_of(e, a), eb = x_of(e, b), fa = x_of(f, a), fb = x_of(f, b);
+
+					if ((ea - fa) * (eb - fb) < 0.0)
+						cuts[m++] = a + (b - a) * (ea - fa) / ((ea - fa) - (eb - fb));
+				}
+			cuts[m++] = b;
+			std::sort(cuts.begin(), cuts.begin() + m);
+			for (unsigned c = 0; c + 1 < m; c++) {
+				const double y0 = cuts[c], y1 = cuts[c + 1];
+				double l0, r0, l1, r1;
+
+				if (y1 <= y0 || !ends(y0, ya, yb, l0, r0) || !ends(y1, ya, yb, l1, r1))
+					continue;
+				piece(down(y1), across(l1) - grow, across(r1) + grow, down(y0), across(l0) - grow,
+				      across(r0) + grow);
+			}
+		}
+		/* Wide: half a board line more above the top line and below the
+		 * bottom one, as the board fills both */
+		if (m_wide)
+			for (const int y : { top, bottom }) {
+				double left, right;
+
+				if (y < lowest || y > highest || !ends(y, y, y, left, right))
+					continue;
+				if (y == top)
+					piece(down(y) - grow, across(left) - grow, across(right) + grow, down(y), across(left) - grow,
+					      across(right) + grow);
+				else
+					piece(down(y), across(left) - grow, across(right) + grow, down(y) + grow, across(left) - grow,
+					      across(right) + grow);
+			}
+	}
+
+	const uint32_t added = static_cast<uint32_t>(m_scene.vertices.size() - first);
+
+	if (!added)
+		return;
+
+	const bool see_through = p.bank == SEE_THROUGH, always = p.k0 < 0.0f;
+
+	if (!m_scene.runs.empty()) {
+		Gaelco3dRun &last = m_scene.runs.back();
+
+		if (last.see_through == see_through && last.always == always && last.first + last.count == first) {
+			last.count += added;
+			return;
+		}
+	}
+	m_scene.runs.push_back({ static_cast<uint32_t>(first), added, see_through, always });
+}
+
+void
+Gaelco3dVideo::set_gpu(bool on, bool native, bool wide)
+{
+	if (on == m_gpu && native == m_native && wide == m_wide)
+		return;
+	settle();
+	if (on && m_roms->mask.empty()) {
+		/* The mask of each texel of the first page; the others have none
+		 * (masked()) */
+		std::vector<uint8_t> mask(size_t{ 4096 } * 1024);
+
+		for (uint32_t a = 0; a < mask.size(); a++)
+			mask[a] = masked(a) ? 1 : 0;
+		m_roms->mask = std::move(mask);
+	}
+	if (m_gpu && !on) {
+		m_line_changed.fill(true);
+		m_palette_changed = true;
+		forget_motion();
+	}
+	m_gpu = on;
+	m_native = native;
+	m_wide = wide;
+	m_scene = {};
+	m_gpu_palette_changed = true;
+}
+
+Gaelco3dScene
+Gaelco3dVideo::take_scene()
+{
+	settle();
+
+	Gaelco3dScene scene = std::move(m_scene);
+
+	m_scene = {};
+	m_scene.vertices.reserve(scene.vertices.size());
+	m_scene.runs.reserve(scene.runs.size());
+	scene.roms = m_roms;
+	scene.both_fields = !m_one_picture;
+	if (m_gpu_palette_changed) {
+		scene.palette = m_words_of_palette;
+		m_gpu_palette_changed = false;
+	}
+	return scene;
 }
 
 Gaelco3dVideo::Texel
@@ -384,6 +619,8 @@ void
 Gaelco3dVideo::scan_out()
 {
 	settle();
+	if (m_gpu)
+		return;
 
 	const unsigned shown = m_field ^ 1;
 
@@ -515,6 +752,8 @@ Gaelco3dVideo::load(StateFile &state)
 	m_field = counts[1];
 	m_line_changed.fill(true);
 	forget_motion();
+	m_scene = {};
+	m_gpu_palette_changed = true;
 	return true;
 }
 }

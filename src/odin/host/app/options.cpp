@@ -157,6 +157,8 @@ read_display(const Settings &settings, Options &options)
 			options.display.upscale_mode = static_cast<DisplayUpscaleMode>(*index_named(UPSCALE_MODES, value));
 		} else if (key == "gaelco3d_fields" && index_named(GAELCO3D_FIELDS, value)) {
 			options.display.board_fields = *index_named(GAELCO3D_FIELDS, value) == 1;
+		} else if (key == "gaelco3d_edges" && index_named(GAELCO3D_EDGES, value)) {
+			options.display.wide_edges = *index_named(GAELCO3D_EDGES, value) == 1;
 		} else if (key == "bezel" && index_named(SIDES_NAMES, value)) {
 			options.sides = static_cast<DisplaySides>(*index_named(SIDES_NAMES, value));
 		} else {
@@ -687,7 +689,7 @@ known_settings(const GameList &games, int button)
 		{ "display", "bezel", SIDES_NAMES[static_cast<unsigned>(SIDES)] },
 		{ "display", "unthrottled", "off" }, { "display", "show_speed", "on" }, { "display", "filter", "none" },
 		{ "display", "api", APIS[static_cast<unsigned>(API)] }, { "display", "gpu", "" },
-		{ "display", "gaelco3d_fields", GAELCO3D_FIELDS[0] },
+		{ "display", "gaelco3d_fields", GAELCO3D_FIELDS[0] }, { "display", "gaelco3d_edges", GAELCO3D_EDGES[0] },
 		{ "sound", "device", "" }, { "sound", "volume", "100" }, { "sound", "background", "on" },
 	};
 

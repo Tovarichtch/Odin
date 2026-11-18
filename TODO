@@ -554,10 +554,13 @@ Gaelco 3D boards
 - From MAME alone: the depth rounded toward zero, a negative one always
   passing; nothing drawn where the plane is behind the eye; CUS-COL
   weighting four texels by their fractions and keeping 8 of the 13 bits
-  of each channel (gaelco3d_video.cpp).
+  of each channel (gaelco3d_video.cpp; above 1x, gaelco3d_draw.frag and
+  gaelco3d_show.frag).
 - One picture of both fields on a flat screen (Interlaced picture: One
   picture): the new field, with the older one where nothing moved
-  (gaelco3d_video.cpp). The board's picture is enlarged to 640 x 480
+  (gaelco3d_video.cpp); above 1x, the colours the board writes into one
+  pixel of each pair a field mixed half and half with those under them
+  (gaelco3d_show.frag). The board's picture is enlarged to 640 x 480
   smoothly (gaelco3d_play.cpp).
 - The 68EC020 takes 2 clocks an instruction and 3 a data access: what
   each instruction costs, only a real chip can give. On Radikal Bikers'

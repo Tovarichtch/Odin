@@ -135,6 +135,7 @@ MenuSession::MenuSession(const Options &options, Display &display, Keyboard &key
 	state.anisotropy = options.display.anisotropy;
 	state.upscale_mode = static_cast<unsigned>(options.display.upscale_mode);
 	state.gaelco3d_board_fields = options.display.board_fields;
+	state.gaelco3d_wide_edges = options.display.wide_edges;
 	state.filter = options.display.filter;
 	state.window = options.display.window ? options.display.window : 1;
 	state.custom_w = options.display.window_w;

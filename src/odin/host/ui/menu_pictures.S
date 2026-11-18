@@ -59,5 +59,8 @@ PICTURE(crt_gaelco_monitor_28, "pictures/crt-gaelco-monitor-28.png")
 PICTURE(crt_gaelco_monitor_34, "pictures/crt-gaelco-monitor-34.png")
 PICTURE(fields_board, "pictures/fields-board.png")
 PICTURE(fields_one, "pictures/fields-one.png")
+PICTURE(edges_board, "pictures/edges-board.png")
+PICTURE(edges_fine, "pictures/edges-fine.png")
+PICTURE(edges_wide, "pictures/edges-wide.png")
 
 	STACK_NOTE

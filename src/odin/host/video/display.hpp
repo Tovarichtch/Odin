@@ -43,6 +43,7 @@
 #include "odin/host/gfx/host_graphics.hpp"
 #include "odin/host/video/picture.hpp"
 
+#include "odin/machine/boards/gaelco3d/gaelco3d_scene.hpp"
 #include "odin/machine/chips/pmx1/pmx1_scene.hpp"
 
 namespace odin {
@@ -126,6 +127,8 @@ public:
 	 * end_frame of a frame that has one */
 	void attach_scenes(const std::string &game, const std::string &title);
 	void set_scene(PmxScene scene);
+	/* A field of a Gaelco 3D board above the board's resolution, instead */
+	void set_scene(Gaelco3dScene scene);
 	/* The DAC of that board puts out black: the picture is black, its
 	 * scenes drawn all the same (its frame buffer keeps them) */
 	void set_blank(bool blank);
@@ -133,11 +136,16 @@ public:
 	DisplayUpscaleMode upscale_mode() const { return m_upscale_mode; }
 	bool draws_native() const { return m_own_native; }
 	bool sorts_per_pixel() const { return m_own_sorts; }
+	unsigned largest_texture() const { return m_own_largest; }
 	unsigned anisotropy() const { return m_anisotropy; }
 	/* Gaelco 3D: both fields as the board keeps them, not one picture per
 	 * field */
 	bool board_fields() const { return m_board_fields; }
 	void set_board_fields(bool on) { m_board_fields = on; }
+	/* Gaelco 3D above the board's resolution: polygons half a board pixel
+	 * wider on every side, not their own outline */
+	bool wide_edges() const { return m_wide_edges; }
+	void set_wide_edges(bool on) { m_wide_edges = on; }
 	void detach();
 
 	/* A frame of the board: begin_frame before the board runs it,
@@ -323,7 +331,7 @@ private:
 	unsigned m_frame;
 	unsigned m_scale, m_anisotropy;
 	DisplayUpscaleMode m_upscale_mode;
-	bool m_board_fields;
+	bool m_board_fields, m_wide_edges;
 	std::string m_filter;	/* the path of its preset */
 	bool m_logged;
 	HostPicture m_picture;
@@ -332,10 +340,13 @@ private:
 	 * next scene */
 	std::unique_ptr<Drawing> m_own;
 	PmxScene m_own_scene;
+	Gaelco3dScene m_own_gaelco3d;
+	bool m_own_is_gaelco3d = false;
 	unsigned m_own_built = 1;
 	bool m_own_fresh = false;
 	bool m_own_blank = false;
 	bool m_own_native = false, m_own_sorts = false;
+	unsigned m_own_largest = 0;
 	std::atomic<Sides> m_sides{ Sides::OFF };
 	PictureHole m_hole;
 	SindenBorder m_sinden_border;

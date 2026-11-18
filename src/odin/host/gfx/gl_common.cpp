@@ -388,8 +388,12 @@ storage(GLsizei levels, GLenum format, GLsizei w, GLsizei h)
 		return;
 	}
 	const bool depth = format == GL_DEPTH_COMPONENT24 || format == GL_DEPTH_COMPONENT32F;
-	const GLenum layout = depth ? GL_DEPTH_COMPONENT : (format == GL_R32UI) ? GL_RED_INTEGER : GL_RGBA;
-	const GLenum type = depth ? GL_FLOAT : (format == GL_R32UI) ? GL_UNSIGNED_INT : GL_UNSIGNED_BYTE;
+	const bool red = format == GL_R32UI || format == GL_R16UI || format == GL_R8UI;
+	const GLenum layout = depth ? GL_DEPTH_COMPONENT : red ? GL_RED_INTEGER : format == GL_RG32UI ? GL_RG_INTEGER : GL_RGBA;
+	const GLenum type = depth                                     ? GL_FLOAT :
+	                    format == GL_R32UI || format == GL_RG32UI ? GL_UNSIGNED_INT :
+	                    format == GL_R16UI                        ? GL_UNSIGNED_SHORT :
+	                                                                GL_UNSIGNED_BYTE;
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, levels - 1);
 	for (GLint level = 0; level < levels; level++) {
