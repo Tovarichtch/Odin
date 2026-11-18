@@ -35,6 +35,7 @@
 
 #include "odin/host/app/ball_kick.hpp"
 #include "odin/host/app/gaelco_play.hpp"
+#include "odin/host/app/kept_ranges.hpp"
 #include "odin/host/app/options.hpp"
 #include "odin/host/app/user_files.hpp"
 #include "odin/host/audio/audio_out.hpp"
@@ -108,6 +109,8 @@ public:
 		return (static_cast<int>(motors[0]) - static_cast<int>(motors[1])) * DriveBoard::MOST / 255;
 	}
 
+	KeptRanges &ranges() { return m_ranges; }
+
 private:
 	void read_controls();
 
@@ -131,6 +134,7 @@ private:
 	/* How hard each one drives: a pin on, all; a channel, its level */
 	std::array<uint8_t, 24> m_levels{};
 	bool m_wheel_motor;
+	KeptRanges m_ranges;
 };
 
 std::unique_ptr<AtvTrack>
@@ -241,6 +245,7 @@ AtvGame::run_frame()
 	                                                                   : mode),
 	                  m_display.sorts_per_pixel());
 	m_board->run_frame();
+	m_ranges.follow(*m_board);
 	m_outputs.fill(0);
 	m_levels.fill(0);
 	for (unsigned bit = 0; bit < 11; bit++)
@@ -289,7 +294,7 @@ play_atvtrack(const Options &options, const Game &game, const GameList &games, S
 	AtvGame running(game, play.controls, display, SaveFolder::of_game(game.name, options.saves).path("kept.bin"),
 	                volume_frames, options.verbose);
 
-	play.attach();
+	play.attach(running.ranges());
 
 	/* The link cable of the games that have one (Game::Link) */
 	const NetLinkSettings link = link_settings(settings);
@@ -332,7 +337,7 @@ play_atvtrack(const Options &options, const Game &game, const GameList &games, S
 			std::fprintf(stderr, "cabinet: %s keeps no settings yet: set its %s cabinet once in its test menu\n",
 			             game.name.c_str(), model.name.c_str());
 	}
-	return play.run(running);
+	return play.run(running, running.ranges());
 }
 
 } /* namespace odin */

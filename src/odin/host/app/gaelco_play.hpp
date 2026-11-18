@@ -32,6 +32,7 @@
 #include <string>
 
 #include "odin/host/app/games.hpp"
+#include "odin/host/app/kept_ranges.hpp"
 #include "odin/host/app/options.hpp"
 #include "odin/host/app/session.hpp"
 #include "odin/host/audio/audio_out.hpp"
@@ -64,11 +65,12 @@ public:
 	           const std::string &settings_file, Display &display, Keyboard &keys, Pointers *pointers, Opened &opened,
 	           int rate);
 
-	/* The window's scenes for the game */
-	void attach();
+	/* The ranges the game learned at its last start, restored
+	 * (experimental), then the window's scenes for it */
+	void attach(KeptRanges &ranges);
 	/* The game from its state (-s) or its start, until it ends; then the
-	 * window let go */
-	Ended run(Board &running);
+	 * ranges it learned kept and the window let go */
+	Ended run(Board &running, const KeptRanges &ranges);
 
 private:
 	const Options &m_options;
@@ -79,6 +81,7 @@ private:
 	Display &m_display;
 	Keyboard &m_keys;
 	Opened &m_opened;
+	const std::string m_kept_ranges;
 
 public:
 	/* Made in this order */

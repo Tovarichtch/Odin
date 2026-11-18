@@ -235,6 +235,9 @@ inline constexpr int WHEEL_ROTATIONS[] = { 0, 270, 360, 540, 900, 1080 };
 inline constexpr int WHEEL_ROTATION = 0;
 std::optional<int> wheel_rotation_named(const std::string &value);
 int wheel_rotation_of(const Settings &settings, const std::string &game);
+/* [players.<game>] keep_calibration: the ranges the game learned, restored
+ * at its next start (experimental; off by default) */
+bool keeps_calibration_of(const Settings &settings, const std::string &game);
 /* [players.<game>] device1, device2: the kind of device a player chose
  * (DEVICE_NAMES, seats.hpp; nothing: Odin picks); the last line says */
 std::optional<InputDevice> device_named(const std::string &value);

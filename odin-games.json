@@ -862,6 +862,7 @@
 			],
 			"woofer" : true,
 			"wheel_motor" : true,
+			"learns_range" : true,
 			"link" : { "cabinets" : 2, "seat" : { "in" : "nand", "byte" : "0017", "first" : 1 } },
 			"motion_platform" : true,
 			"cabinets" : [
@@ -1058,6 +1059,7 @@
 			],
 			"woofer" : true,
 			"wheel_motor" : true,
+			"learns_range" : true,
 			"link" : { "cabinets" : 2, "seat" : { "in" : "flash", "byte" : "01E1", "first" : 1 } },
 			"controls" : [
 				{ "name" : "STEERING WHEEL", "id" : "wheel", "analog" : 0, "low" : "left", "span" : [ 2, 254 ], "role" : "steer" },
@@ -1921,6 +1923,7 @@
 			"mach" : "speedup",
 			"seated" : true,
 			"wheel_motor" : true,
+			"learns_range" : true,
 			"option_speakers" : true,
 			"sound_parts" : [
 				{ "part" : "speaker", "at" : "dash_left", "board" : "main" },

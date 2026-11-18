@@ -468,6 +468,8 @@ Menu::bar_input(BarItems &b)
 	}
 	if (state.can_shake)
 		toggle("Vibration", {}, state.shake, state.game);
+	if (state.learns_range)
+		toggle("Keep calibration (experimental)", {}, state.keep_calibration, state.game);
 	toggle("Hide cursor", b.key(Action::LIGHT_GUN), state.hide_cursor, state.game);
 	ImGui::Separator();
 	if (ImGui::BeginMenu("Hotkeys")) {

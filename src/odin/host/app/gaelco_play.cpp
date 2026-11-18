@@ -28,6 +28,7 @@
 #include <cmath>
 #include <cstdio>
 
+#include "odin/host/app/user_files.hpp"
 #include "odin/machine/boards/atvtrack/atvtrack.hpp"
 
 namespace odin {
@@ -56,6 +57,7 @@ GaelcoPlay::GaelcoPlay(const Options &options, const Game &game, const GameList 
                        Opened &opened, int rate)
 	: m_options(options), m_game(game), m_games(games), m_settings(settings), m_settings_file(settings_file),
 	  m_display(display), m_keys(keys), m_opened(opened),
+	  m_kept_ranges(SaveFolder::of_game(game.name, options.saves).path(KEPT_RANGES)),
 	  controls(keys, game.controls, game.outputs, settings, game.name), sound_options(options)
 {
 	controls.set_pointers(pointers);
@@ -82,13 +84,15 @@ GaelcoPlay::GaelcoPlay(const Options &options, const Game &game, const GameList 
 }
 
 void
-GaelcoPlay::attach()
+GaelcoPlay::attach(KeptRanges &ranges)
 {
+	if (m_game.learns_range && keeps_calibration_of(m_settings, m_game.name))
+		ranges.restore(m_kept_ranges);
 	m_display.attach_scenes(m_game.name, m_game.title);
 }
 
 Ended
-GaelcoPlay::run(Board &running)
+GaelcoPlay::run(Board &running, const KeptRanges &ranges)
 {
 	bool started = true;
 
@@ -108,6 +112,8 @@ GaelcoPlay::run(Board &running)
 		ended = session.run();
 		m_opened = session.opened();
 	}
+	if (m_game.learns_range && keeps_calibration_of(m_settings, m_game.name))
+		ranges.save(m_kept_ranges);
 	std::printf("Finalizing\n");
 	m_display.detach();
 	return ended;

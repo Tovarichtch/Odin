@@ -38,6 +38,7 @@
 
 #include "odin/host/app/ball_kick.hpp"
 #include "odin/host/app/gaelco_play.hpp"
+#include "odin/host/app/kept_ranges.hpp"
 #include "odin/host/app/options.hpp"
 #include "odin/host/app/user_files.hpp"
 #include "odin/host/audio/audio_out.hpp"
@@ -109,6 +110,8 @@ public:
 	std::optional<PadShake> pad_shake() const override { return m_pad; }
 	bool set_link(const NetLinkSettings &link) { return m_board->set_link(link); }
 	void set_seat_woofer(double hz) { m_woofer_low = LowPass(hz, static_cast<int>(Gaelco3d::SOUND_RATE)); }
+	KeptRanges &ranges() { return m_ranges; }
+
 	bool set_eeprom_setting(uint32_t byte, unsigned shift, unsigned bits, uint8_t value)
 	{
 		return m_board->set_eeprom_setting(byte, shift, bits, value);
@@ -137,6 +140,7 @@ private:
 	 * ([sound.speedup] woofer_cutoff) */
 	LowPass m_woofer_low{ std::strtod(WOOFER_CUTOFFS[1], nullptr), static_cast<int>(Gaelco3d::SOUND_RATE) };
 	std::vector<int16_t> m_seat;
+	KeptRanges m_ranges;
 	/* The texture ROMs in rows of 4096 texels, as the GPU takes them
 	 * (Gaelco3dRoms); the card was found too small for them */
 	unsigned m_texture_rows;
@@ -366,6 +370,7 @@ Gaelco3dGame::run_frame()
 	m_board->set_one_picture(!m_display.board_fields());
 	m_board->set_gpu(fine, m_display.upscale_mode() == DisplayUpscaleMode::NATIVE, m_display.wide_edges());
 	m_board->run_frame();
+	m_ranges.follow(*m_board);
 	shake_pad();
 	if (m_speedup) {
 		const std::vector<int16_t> &seat = m_board->option_sound(), &woofer = m_board->woofer_sound();
@@ -404,7 +409,7 @@ play_gaelco3d(const Options &options, const Game &game, const GameList &games, S
 
 	if (game.seat_woofer())
 		running.set_seat_woofer(play.sound.woofer_hz);
-	play.attach();
+	play.attach(running.ranges());
 
 	const NetLinkSettings link = link_settings(settings);
 
@@ -424,7 +429,7 @@ play_gaelco3d(const Options &options, const Game &game, const GameList &games, S
 			std::fprintf(stderr, "link: %s keeps no settings yet: it gets its cabinet number at its next start\n",
 			             game.name.c_str());
 	}
-	return play.run(running);
+	return play.run(running, running.ranges());
 }
 
 } /* namespace odin */

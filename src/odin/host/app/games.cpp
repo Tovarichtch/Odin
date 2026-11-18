@@ -869,6 +869,7 @@ read_options(const json_t *rom, Game &game)
 	    !read_true_false(rom, "option_vibration", name, game.option_vibration) ||
 	    !read_true_false(rom, "woofer", name, game.woofer) ||
 	    !read_true_false(rom, "wheel_motor", name, game.wheel_motor) ||
+	    !read_true_false(rom, "learns_range", name, game.learns_range) ||
 	    !read_true_false(rom, "motion_platform", name, game.motion_platform))
 		return false;
 	if (game.woofer && (game.option_speakers || game.option_vibration)) {

@@ -594,6 +594,12 @@ wheel_rotation_of(const Settings &settings, const std::string &game)
 	return player_number(settings, game, "wheel_rotation", WHEEL_ROTATION, wheel_rotation_named);
 }
 
+bool
+keeps_calibration_of(const Settings &settings, const std::string &game)
+{
+	return player_on(settings, game, "keep_calibration", false);
+}
+
 std::optional<InputDevice>
 device_named(const std::string &value)
 {
@@ -758,6 +764,8 @@ known_settings(const GameList &games, int button)
 			out.push_back({ "players." + name, "wheel_force", std::to_string(WHEEL_FORCE) });
 		if (steers_of(game->controls))
 			out.push_back({ "players." + name, "wheel_rotation", std::to_string(WHEEL_ROTATION) });
+		if (game->learns_range)
+			out.push_back({ "players." + name, "keep_calibration", "off" });
 		if (std::any_of(game->controls.begin(), game->controls.end(),
 		                [](const GameControl &control) { return control.invertible; }))
 			out.push_back({ "players." + name, "invert", "" });

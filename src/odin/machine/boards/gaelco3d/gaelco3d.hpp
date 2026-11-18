@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "odin/machine/boards/gaelco3d/gaelco3d_video.hpp"
+#include "odin/machine/core/learned_ranges.hpp"
 #include "odin/machine/cpu/adsp2115/adsp2115.hpp"
 #include "odin/machine/cpu/m68000/m68000.hpp"
 #include "odin/machine/cpu/m68020/m68020.hpp"
@@ -141,6 +142,12 @@ public:
 	 * (Gaelco3dVideo::set_gpu, take_scene) */
 	void set_gpu(bool on, bool native, bool wide) { m_video.set_gpu(on, native, wide); }
 	Gaelco3dScene take_scene() { return m_video.take_scene(); }
+	/* The ranges the program has learned for its analog channels since
+	 * power-on (Speed Up; none for the other games, or before it has
+	 * cleared them), and widening them to cover `kept`
+	 * (learned_ranges.hpp) */
+	std::optional<LearnedRanges> learned_ranges() const;
+	void widen_ranges(const LearnedRanges &kept);
 
 	const std::vector<int16_t> &sound() const { return m_sound; }
 	/* The second pair: Speed Up's seat speakers; on the other games, the
@@ -245,6 +252,13 @@ private:
 		return static_cast<uint8_t>(m_ram[(addr & 0xFFFF) >> 2] >> (8 * (3 - (addr & 3))));
 	}
 	uint16_t ram16(uint32_t addr) const { return static_cast<uint16_t>(ram8(addr) << 8 | ram8(addr + 1)); }
+	void set_ram8(uint32_t addr, uint8_t value)
+	{
+		uint32_t &word = m_ram[(addr & 0xFFFF) >> 2];
+		const unsigned shift = 8 * (3 - (addr & 3));
+
+		word = (word & ~(uint32_t{ 0xFF } << shift)) | uint32_t{ value } << shift;
+	}
 
 	Main m_main_bus;
 	Main16 m_main16_bus;
@@ -266,6 +280,9 @@ private:
 	Eeprom93c66 m_eeprom;
 	uint8_t m_mainlatch = 0, m_outlatch = 0;
 	int16_t m_motor = 0;
+	/* Speed Up's learned ranges: the addresses of their records and of the
+	 * word its boot code sets once it has cleared them (0: none) */
+	uint32_t m_ranges_records = 0, m_ranges_marker = 0;
 	/* Where Speed Up's program keeps the wheel's position, its gain, whether
 	 * the spring is on and the hit played (0: not found), and the parts of
 	 * the last command */

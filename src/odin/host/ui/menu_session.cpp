@@ -863,6 +863,7 @@ MenuSession::fill_bar_inputs(BarState &bar) const
 	bar.dead_zone = { -1, -1 };
 	bar.trigger_threshold = { -1, -1 };
 	bar.can_shake = m_game && m_game->shakes();
+	bar.learns_range = m_game && m_game->learns_range;
 	bar.undo = m_undo_until && SDL_GetTicks() < m_undo_until;
 	bar.players = 1;
 	if (!m_game)
@@ -899,6 +900,7 @@ MenuSession::fill_bar_inputs(BarState &bar) const
 		}
 	light_guns(m_game->name, controls, bar.guns, bar.gun, bar.sights);
 	bar.shake = vibration_on(m_settings, m_game->name);
+	bar.keep_calibration = keeps_calibration_of(m_settings, m_game->name);
 	bar.hide_cursor = m_controls.hides_cursor();
 }
 
@@ -943,6 +945,9 @@ MenuSession::do_bar(BarState &bar)
 	if (m_game) {
 		if (bar.can_shake && bar.shake != vibration_on(m_settings, m_game->name))
 			keep_vibration(m_game->name, bar.shake, true);
+		/* From the end of the game that runs */
+		if (bar.learns_range && bar.keep_calibration != keeps_calibration_of(m_settings, m_game->name))
+			keep_calibration(m_game->name, bar.keep_calibration);
 		if (bar.hide_cursor != m_controls.hides_cursor()) {
 			keep_hide_cursor(m_game->name, bar.hide_cursor, true, m_controls.panel().takes_mouse());
 			m_controls.follow_cursor();

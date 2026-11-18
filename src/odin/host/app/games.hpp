@@ -351,6 +351,10 @@ struct Game {
 	 * the Gaelco boards): "wheel_motor" in the list, false when it does not
 	 * say */
 	bool wheel_motor = false;
+	/* The program relearns the ranges of its analog channels at each
+	 * power-on (learned_ranges.hpp): "learns_range" in the list, false when
+	 * the list does not say */
+	bool learns_range = false;
 	/* The cabinet stands on a motion platform of two motors, whose
 	 * positions the board reads on its ADC channels 2 and 3 (ATV Track):
 	 * "motion_platform" in the list, false when it does not say */

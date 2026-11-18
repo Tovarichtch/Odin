@@ -280,6 +280,7 @@ private:
 	void keep_sinden_border(const std::string &game, const SindenBorder &border, bool runs);
 	void keep_wheel_force(const std::string &game, int percent, bool runs);
 	void keep_wheel_rotation(const std::string &game, int degrees, bool runs);
+	void keep_calibration(const std::string &game, bool on);
 	void keep_cabinet(const std::string &game, const std::string &id);
 	/* The cabinet the game shown starts on when none is chosen */
 	const std::string &first_cabinet_shown() const;
@@ -322,6 +323,7 @@ private:
 	std::vector<GameOutput> m_other_outputs;
 	bool m_other_shakes = false;
 	bool m_other_forces = false;
+	bool m_other_learns = false;
 	std::vector<Game::Cabinet> m_other_cabinets;
 	std::array<std::string, 2> m_other_shakers;
 	std::array<bool, 2> m_other_experimental{};

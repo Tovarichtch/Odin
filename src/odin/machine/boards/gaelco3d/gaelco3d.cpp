@@ -155,6 +155,28 @@ holds_wait(std::span<const uint8_t> program, const Main16Wait &wait)
 	return holds(program, wait.routine + 10 + static_cast<int8_t>(word_at(program, wait.routine + 8)), { 0x4E75 });
 }
 
+/* Where Speed Up keeps the ranges it learns for its analog channels
+ * (preuves/calibrage-volant-20261116): at power-on, jsr (routine).l /
+ * move.l #$FEA000,(marker).l; the routine does clr.b $510167.l / lea
+ * (records).l,a0, then clears four records {reading, low, high, middle} */
+struct LearnedAt {
+	uint32_t call, routine, records, marker;
+};
+constexpr uint32_t BOOTED = 0x00FEA000;
+constexpr LearnedAt SPEEDUP_RANGES[] = {
+	{ 0x550, 0x8358, 0xFE322A, 0xFE32C4 },	/* Speed Up 2.0, 2.0a, 2.1, 2.2 */
+	{ 0x54E, 0x82DE, 0xFE3222, 0xFE32C0 },	/* Speed Up 1.2 */
+	{ 0x54E, 0x81C2, 0xFE3220, 0xFE32BE },	/* Speed Up 1.0 */
+};
+
+bool
+holds_ranges(std::span<const uint8_t> program, const LearnedAt &at)
+{
+	return holds(program, at.call, { 0x4EB9, at.routine >> 16, at.routine & 0xFFFF, 0x23FC, BOOTED >> 16,
+	                                 BOOTED & 0xFFFF, at.marker >> 16, at.marker & 0xFFFF }) &&
+	       holds(program, at.routine, { 0x4239, 0x0051, 0x0167, 0x41F9, at.records >> 16, at.records & 0xFFFF });
+}
+
 /* Speed Up's motor command, as its program makes it each frame (2.2:
  * 0x0C1C-0x0C4C): move.w (spring).l,d0 / muls.w (gain).l,d0 / asr.l #4,d0 /
  * add.w (effects).l,d0 / cmpi.w #-128,d0, then bounded to -128..127 and
@@ -442,6 +464,7 @@ Gaelco3d::reset()
 		}
 	m_wait_counter = 0;
 	m_wait16 = {};
+	m_ranges_records = m_ranges_marker = 0;
 	m_spring_at = m_gain_at = m_spring_on_at = m_hit_at = 0;
 	if (m_main16) {
 		m_main16->set_wait_pc(0xFFFFFFFFu);
@@ -449,6 +472,11 @@ Gaelco3d::reset()
 			if (holds_wait(m_roms.program, wait)) {
 				m_main16->set_wait_pc(wait.pc);
 				m_wait16 = { wait.routine != 0, wait.flag, wait.cell };
+			}
+		for (const LearnedAt &at : SPEEDUP_RANGES)
+			if (holds_ranges(m_roms.program, at)) {
+				m_ranges_records = at.records;
+				m_ranges_marker = at.marker;
 			}
 		if (const std::optional<MotorAt> at = motor_at(m_roms.program)) {
 			m_spring_at = at->spring;
@@ -1568,5 +1596,41 @@ Gaelco3d::load_state(const std::string &path)
 	}
 	m_video.scan_out();
 	return true;
+}
+
+std::optional<LearnedRanges>
+Gaelco3d::learned_ranges() const
+{
+	if (!m_ranges_records || (uint32_t{ ram16(m_ranges_marker) } << 16 | ram16(m_ranges_marker + 2)) != BOOTED)
+		return std::nullopt;
+
+	LearnedRanges ranges;
+
+	for (unsigned i = 0; i < ranges.size(); i++)
+		ranges[i] = { ram8(m_ranges_records + 4 * i + 1), ram8(m_ranges_records + 4 * i + 2) };
+	return ranges;
+}
+
+/* Sets the middle too, from the two ends, as the program does */
+void
+Gaelco3d::widen_ranges(const LearnedRanges &kept)
+{
+	const std::optional<LearnedRanges> now = learned_ranges();
+
+	if (!now)
+		return;
+
+	const LearnedRanges wide = widened(*now, kept);
+
+	for (unsigned i = 0; i < wide.size(); i++) {
+		if (wide[i].low == (*now)[i].low && wide[i].high == (*now)[i].high)
+			continue;
+
+		const uint32_t record = m_ranges_records + 4 * i;
+
+		set_ram8(record + 1, static_cast<uint8_t>(wide[i].low));
+		set_ram8(record + 2, static_cast<uint8_t>(wide[i].high));
+		set_ram8(record + 3, static_cast<uint8_t>((wide[i].low + wide[i].high) / 2));
+	}
 }
 }

@@ -314,6 +314,12 @@ versions.
                                   Default 100.
  wheel_rotation   0, 270, 360,    How far the wheel turns from one end to
                   540, 900, 1080  the other (0: all the way). Default 0.
+ keep_calibration on, off         Experimental (Speed Up, ATV Track,
+                                  Smashing Drive): the game starts with the
+                                  wheel and pedal ranges it learned last
+                                  time (calibration.bin in its saves). The
+                                  cabinet relearns them at each power-on.
+                                  Default off.
  invert           <id>, ...       Controls turned the other way, on every
                                   device: pharrier stick_v (push up to
                                   climb; the cabinet's stick climbs pulled

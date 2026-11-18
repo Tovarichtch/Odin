@@ -107,6 +107,7 @@ MenuSession::show_game(size_t game)
 	m_other_outputs = other->outputs;
 	m_other_shakes = other->shakes();
 	m_other_forces = other->drive_first_output != 0 || other->wheel_motor;
+	m_other_learns = other->learns_range;
 	m_other_cabinets = other->cabinets;
 	m_other_first_cabinet = other->first_cabinet;
 	m_other_shakers = { other->shaker(0), other->shaker(1) };
@@ -253,6 +254,9 @@ MenuSession::fill_game_shown(MenuState &state)
 	state.steers = steers_of(panel_shown().controls());
 	state.wheel_force = wheel_force_of(m_settings, game_shown());
 	state.wheel_rotation = wheel_rotation_of(m_settings, game_shown());
+	/* The ranges it learns at each power-on, kept for its next start */
+	state.learns_range = m_other ? m_other_learns : m_game && m_game->learns_range;
+	state.keep_calibration = keeps_calibration_of(m_settings, game_shown());
 	/* Its cabinets, and the one chosen; the game that runs plays the one it
 	 * started with */
 	static const std::vector<Game::Cabinet> NONE;
@@ -691,6 +695,9 @@ MenuSession::apply_game(const MenuState &was)
 	/* How far a wheel turns for its steering, at once too */
 	if (now.wheel_rotation != was.wheel_rotation && now.steers)
 		keep_wheel_rotation(game_shown(), now.wheel_rotation, !m_other && m_game);
+	/* Keeping its learned ranges: from the end of the game that runs */
+	if (now.keep_calibration != was.keep_calibration && now.learns_range)
+		keep_calibration(game_shown(), now.keep_calibration);
 	/* Its cabinet: the game that runs takes it when it is reset */
 	if (now.cabinet != was.cabinet && now.cabinet >= 0 && static_cast<size_t>(now.cabinet) < now.cabinet_ids.size()) {
 		keep_cabinet(game_shown(), now.cabinet_ids[static_cast<size_t>(now.cabinet)]);
@@ -811,6 +818,13 @@ MenuSession::keep_vibration(const std::string &game, bool on, bool runs)
 	if (runs)
 		m_controls.feel_game(*m_game, on);
 	keep("players." + game, "vibration", on ? std::nullopt : std::optional<std::string>("off"));
+}
+
+/* [players.<game>] keep_calibration: a line only when on */
+void
+MenuSession::keep_calibration(const std::string &game, bool on)
+{
+	keep("players." + game, "keep_calibration", on ? std::optional<std::string>("on") : std::nullopt);
 }
 
 /* [players.<game>] cabinet: a line only for a cabinet other than the one it

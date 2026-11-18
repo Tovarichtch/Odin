@@ -1877,6 +1877,8 @@ advanced_box(const MenuKit &kit, MenuState &state, ImVec2 a, ImVec2 b)
 		game_rows.push_back("wheel force");
 	if (turns)
 		game_rows.push_back("wheel rotation");
+	if (state.learns_range)
+		game_rows.push_back("keep calibration");
 	for (std::string name : state.invert_names) {
 		name[0] = static_cast<char>(std::tolower(static_cast<unsigned char>(name[0])));
 		game_rows.push_back(name);
@@ -1980,6 +1982,28 @@ advanced_box(const MenuKit &kit, MenuState &state, ImVec2 a, ImVec2 b)
 			turn = (turn + (kit.side() < 0 ? n - 1 : 1)) % n;
 		kit.segments({ hi.x - cells.x, y + (h - cells.y) / 2.0f }, TURNS, turn);
 		state.wheel_rotation = WHEEL_ROTATIONS[turn];
+		y += h + apart;
+	}
+	/* Keeping the ranges the game learns for its next start, on every
+	 * device (the gamepad: left, right or A switches it) */
+	if (state.learns_range) {
+		static constexpr char UNDER[] = "Experimental. On: the game starts with the wheel and pedal ranges it "
+		                                "learned last time. The cabinet relearns them at each power-on.";
+		const ImVec2 cells = kit.segments_size(Menu::OFF_ON);
+		const float wrap = hi.x - lo.x - cells.x - kit.px(12.0f);
+		const float h = std::max(line + kit.px(2.0f) + MenuKit::wrapped_h(UNDER, note, wrap), cells.y);
+
+		ImGui::PushID("Keep calibration");
+		list->AddText({ lo.x, y }, palette.ink, "Keep calibration");
+		list->AddText(ImGui::GetFont(), note, { lo.x, y + line + kit.px(2.0f) }, palette.dim, UNDER, nullptr, wrap);
+		if (kit.focus({ lo.x, y }, { hi.x, y + h }, kit.px(4.0f)) && (kit.side() || kit.pressed()))
+			state.keep_calibration = kit.side() ? kit.side() > 0 : !state.keep_calibration;
+
+		int on = state.keep_calibration ? 1 : 0;
+
+		kit.segments({ hi.x - cells.x, y + (h - cells.y) / 2.0f }, Menu::OFF_ON, on);
+		state.keep_calibration = on == 1;
+		ImGui::PopID();
 		y += h + apart;
 	}
 	/* A control the player turns over, on every device (the gamepad:

@@ -246,7 +246,9 @@ struct BarState : BarSettings {
 	 * shown (two of a make numbered); the dead zone and the trigger threshold
 	 * of the gamepad of each player, in % (-1: no gamepad); the light guns
 	 * seen, that of each player (its identity; empty: none), the players
-	 * with a sight; its pads shake, and do; Undo of Clear mapping offered */
+	 * with a sight; its pads shake, and do; Undo of Clear mapping offered;
+	 * the ranges it learns at each power-on, kept for its next start
+	 * ([players.<game>] keep_calibration, experimental) */
 	struct Pad {
 		std::string name, label, guid;
 		bool joystick;
@@ -262,6 +264,7 @@ struct BarState : BarSettings {
 	std::array<std::string, 2> gun;
 	std::array<bool, 2> sights{};
 	bool can_shake = false, shake = true, undo = false, hide_cursor = false;
+	bool learns_range = false, keep_calibration = false;
 	/* The next cabinet of the link (typed in Settings); the link set by
 	 * ODIN_NETBD; the game that runs is on a Gaelco board and does not link
 	 * cabinets (Gaelco Football) */
@@ -508,6 +511,11 @@ struct MenuState : BarSettings {
 	bool steers = false;
 	int wheel_force = 100;
 	int wheel_rotation = WHEEL_ROTATION;
+	/* The game shown learns the ranges of its wheel and pedals at each
+	 * power-on, and Odin keeps them for its next start ([players.<game>]
+	 * keep_calibration, experimental) */
+	bool learns_range = false;
+	bool keep_calibration = false;
 	/* The cabinets the game shown was sold in, Standard first
 	 * (Game::cabinets): their ids and names, the one chosen
 	 * ([players.<game>] cabinet), and whether the game that runs plays
