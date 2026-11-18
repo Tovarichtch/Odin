@@ -460,7 +460,7 @@ Menu::build_library(LibraryState &state, BarState &bar_state)
 
 		/* Under a game that lacks files, the folders to choose, one
 		 * above the other, unless the command line gives them */
-		const char games[] = "Games folder...";
+		const char *const games = game.gaelco ? "Gaelco ROMs folder..." : "Hikaru ROMs folder...";
 		const char bios[] = "BIOS folder...";
 		const bool lacks = !game.missing.empty();
 		const bool choose_games = lacks && !state.roms_given && !state.choosing;
@@ -486,11 +486,12 @@ Menu::build_library(LibraryState &state, BarState &bar_state)
 		if (state.failed == game.name)
 			at += wrapped(text, { x, at }, width, size, palette.danger,
 			              "It failed to start: see odin.log for why.") + line;
-		const std::string &roms = state.roms;
+		const std::string &roms = game.gaelco && !state.gaelco.empty() ? state.gaelco : state.roms;
 
 		if (roms.empty()) {
 			at += wrapped(text, { x, at }, width, size, palette.ink,
-			              "Choose your games folder: one folder, zip or 7z per game, named as in MAME.") + line;
+			              std::string("Choose your ") + (game.gaelco ? "Gaelco" : "Hikaru") +
+			                      " ROMs folder: one folder, zip or 7z per game, named as in MAME.") + line;
 		} else if (lacks) {
 			at += wrapped(text, { x, at }, width, size, palette.ink, "Missing files:") + kit.px(4.0f);
 			for (const std::string &file : game.missing)
@@ -509,7 +510,7 @@ Menu::build_library(LibraryState &state, BarState &bar_state)
 
 		if (choose_games) {
 			if (kit.button(games, { x, button_y }, false))
-				state.choose = LibraryState::Folder::ROMS;
+				state.choose = game.gaelco ? LibraryState::Folder::GAELCO : LibraryState::Folder::ROMS;
 			button_y += kit.button_size(games).y + apart;
 		}
 		if (choose_bios && kit.button(bios, { x, button_y }, false))

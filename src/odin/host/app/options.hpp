@@ -61,9 +61,10 @@ inline constexpr const char *UPSCALE_MODES[] = { "raw", "snap", "native" };
 /* What Odin runs with: the command line, and odin.ini where it says
  * nothing (with_settings) */
 struct Options {
-	/* The folders of the games and of the sets of files they share (the
-	 * BIOS...), rom_files.hpp */
-	std::string rom_path, bios_path;
+	/* The folders of the games, of the Gaelco games (empty: that of the
+	 * games) and of the sets of files they share (the BIOS...),
+	 * rom_files.hpp */
+	std::string rom_path, gaelco_path, bios_path;
 	/* The folder of the saves of the games and that of the save states
 	 * odin.ini gives (empty: by default) */
 	std::string saves, states;
@@ -104,6 +105,12 @@ struct Options {
 		bool scale = false, anisotropy = false, window = false, fullscreen = false, unthrottled = false;
 		bool roms = false, bios = false, verbose = false;
 	} given;
+
+	/* The folder of the games of this machine; that of -R for all */
+	const std::string &roms_of(const std::string &machine) const
+	{
+		return machine == "hikaru" || given.roms || gaelco_path.empty() ? rom_path : gaelco_path;
+	}
 };
 
 /* RUN: go on; HELP_ASKED or WRONG: the help is to be shown (exit 0 or 1),

@@ -207,6 +207,9 @@ public:
 	/* A control as the host holds it now, the lever where the last update
 	 * left it; nothing changes */
 	ControlNow now(const HostState &host, size_t control) const;
+	/* The levers moved by what the host holds now, as an update moves
+	 * them: the menu shows them while the game waits */
+	void move_levers(const HostState &host);
 	/* An axis of a joystick that steers the game goes that many degrees
 	 * of a wheel from one end to the other (0: the whole way of the
 	 * wheel), never further than the wheel does */

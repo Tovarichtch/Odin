@@ -194,9 +194,13 @@ endif()
 
 set(ODIN_SOURCES
 	host/app/main.cpp host/app/cpu_check.cpp host/app/options.cpp host/app/atvtrack_play.cpp
+	host/app/gaelco3d_play.cpp host/app/ball_kick.cpp
 	machine/boards/atvtrack/atvtrack.cpp machine/boards/atvtrack/atvtrack_state.cpp machine/boards/atvtrack/atvtrack_fpga.cpp
 	machine/chips/pmx1/pmx1.cpp machine/chips/pmx1/pmx1_core.cpp machine/chips/pmx1/pmx1_scene.cpp
 	machine/chips/pmx1/pmx1_host.cpp machine/chips/pmx1/pmx1_ta.cpp
+	machine/boards/gaelco3d/gaelco3d.cpp machine/boards/gaelco3d/gaelco3d_render.cpp machine/boards/gaelco3d/gaelco3d_scene.cpp
+	machine/cpu/m68020/m68020.cpp machine/cpu/tms32031/tms32031.cpp machine/cpu/tms32031/tms32031_ops.cpp
+	machine/cpu/adsp2115/adsp2115.cpp
 	host/ui/menu_session.cpp host/ui/menu_session_input.cpp
 	host/ui/menu_session_state.cpp host/app/session.cpp
 	host/app/library.cpp host/video/display.cpp

@@ -72,12 +72,16 @@ FIRST START
    pharrier, sgnascar, sgnascaro, swracer, von4. Two shared sets are
    needed too, in the same folder (or in a BIOS folder): hikaru and mie.
    The Gaelco games (atvtrack, atvtracka, gfootbal, smashdrv, smashdrvb,
-   smashdrvs) go in the same folder. They need no shared set, and keep
-   their operator settings and scores in kept.bin in their saves folder.
+   smashdrvs; radikalb, footbpow, speedup, surfplnt and their versions)
+   go in the same folder or in one of their own (page Paths, Gaelco ROMs),
+   and keep their operator settings and scores in kept.bin in their saves
+   folder. Radikal Bikers, Football Power, Speed Up and Surf Planet need
+   the shared set of the TMS320C31's boot loader, tms320c31 (or tms32031),
+   with the games or in the BIOS folder; the others need none.
 
-2. Start Odin. Its library shows the games. Click "Games folder..." and
-   choose your folder. A game with missing files says which files, and in
-   which MAME set they are.
+2. Start Odin. Its library shows the games. Click "Hikaru ROMs folder..."
+   or "Gaelco ROMs folder..." under a game and choose your folder. A game
+   with missing files says which files, and in which MAME set they are.
 
 3. Choose a game with the arrows, a gamepad or the mouse, then press Enter
    (or click it again).
@@ -198,8 +202,9 @@ the artwork and its log (odin.log) in its folder:
  Windows  %APPDATA%\odin
  macOS    ~/Library/Application Support/odin
 
-Each folder can be changed on the page Paths of the menu (games, BIOS,
-artwork, saves, states, log). Another settings file: odin -c <file>.
+Each folder can be changed on the page Paths of the menu (Hikaru ROMs,
+Gaelco ROMs, BIOS, artwork, saves, states, log). Another settings file:
+odin -c <file>.
 
 Portable copy: put an empty file portable.txt beside the program; Odin
 then keeps everything in that folder.

@@ -60,6 +60,13 @@ struct PmxDraw {
 	 * sorting their fragments pixel by pixel from far to near, those of
 	 * equal depth in their order (PG, the chip's programming guide, p. 82) */
 	bool per_pixel;
+	/* The texel's alpha under a quarter drops the pixel, colour and depth
+	 * (the 1-bit mask of a Gaelco 3D texture) */
+	bool alpha_test = false;
+	/* The image holds palette indices (red) and the mask (green), the
+	 * colours those of PmxScene::palette's bank */
+	bool indexed = false;
+	uint8_t bank = 0;
 };
 
 /* A texture: RGBA, levels from the largest down */
@@ -82,6 +89,9 @@ struct PmxScene {
 	/* What the GPU should load and forget first */
 	std::vector<std::shared_ptr<const PmxImage>> new_images;
 	std::vector<uint32_t> gone_images;
+	/* When they change: 128 banks of 256 colours, RGB 5-5-5, bit 15 halving
+	 * the alpha */
+	std::vector<uint16_t> palette;
 };
 
 } /* namespace odin */

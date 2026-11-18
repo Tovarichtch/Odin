@@ -1179,6 +1179,1820 @@
 					]
 				}
 			]
+		},
+		{
+			"name" : "radikalb",
+			"title" : "Radikal Bikers",
+			"mach" : "gaelco3d",
+			"seated" : true,
+			"link" : { "cabinets" : 2, "seat" : { "in" : "eeprom", "byte" : "01F8", "first" : 1 } },
+			"controls" : [
+				{ "name" : "HANDLEBAR", "id" : "handlebar", "analog" : 0, "low" : "left", "span" : [ 16, 240 ], "role" : "steer" },
+				{ "name" : "ACCELERATOR", "id" : "accelerator", "switch" : "1P PUSH1", "port" : "0.6", "role" : "button1", "keys" : [ "Up" ], "pad" : [ "righttrigger" ] },
+				{ "name" : "BRAKE", "id" : "brake", "switch" : "1P PUSH2", "port" : "0.5", "role" : "button2", "keys" : [ "Down" ], "pad" : [ "lefttrigger" ] },
+				{ "name" : "VIEW", "id" : "view", "switch" : "1P PUSH3", "port" : "0.4", "role" : "button3" },
+				{ "name" : "HANDLE UP", "id" : "handle_up", "switch" : "1P UP", "port" : "0.3", "role" : "up" },
+				{ "name" : "START", "id" : "start", "switch" : "1P START", "port" : "0.7", "role" : "start" },
+				{ "name" : "VOLUME UP", "id" : "volume_up", "switch" : "1P PUSH5", "port" : "0.0", "role" : "button5", "keys" : [ "=" ], "pad" : [ "dpup" ] },
+				{ "name" : "VOLUME DOWN", "id" : "volume_down", "switch" : "1P PUSH6", "port" : "0.1", "role" : "button6", "keys" : [ "-" ], "pad" : [ "dpdown" ] }
+			],
+			"outputs" : [
+				{ "name" : "START LAMP", "id" : "start_lamp", "output" : 3, "role" : "lamp" },
+				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" }
+			],
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_6.ic6", "size" : 524288, "crc" : "ccac98c5" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_12.ic12", "size" : 524288, "crc" : "26199506" }
+					]
+				},
+				{
+					"name" : "program2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_14.ic14", "size" : 524288, "crc" : "4a0ac8cb" }
+					]
+				},
+				{
+					"name" : "program3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_19.ic19", "size" : 524288, "crc" : "c2d4fcb2" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "rab_ic48.ic48", "size" : 4194304, "crc" : "9c56a06a" },
+						{ "name" : "rab_ic45.ic45", "size" : 4194304, "crc" : "7e698584" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic23.ic23", "size" : 4194304, "crc" : "dcf52520" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic8.ic8", "size" : 4194304, "crc" : "4fbd4737" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic9.ic9", "size" : 4194304, "crc" : "9e3e038d" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic10.ic10", "size" : 4194304, "crc" : "870b0ce4" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic11.ic11", "size" : 4194304, "crc" : "75672271" }
+					]
+				},
+				{
+					"name" : "texture4",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic15.ic15", "size" : 4194304, "crc" : "edb9d409" }
+					]
+				},
+				{
+					"name" : "texture5",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic16.ic16", "size" : 4194304, "crc" : "9d595e46" }
+					]
+				},
+				{
+					"name" : "texture6",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic17.ic17", "size" : 4194304, "crc" : "e120236b" }
+					]
+				},
+				{
+					"name" : "texture7",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic18.ic18", "size" : 4194304, "crc" : "3084bc49" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "rab_24.ic24", "size" : 131072, "crc" : "2984bc1d" },
+						{ "name" : "rab_25.ic25", "size" : 131072, "crc" : "777758e3" },
+						{ "name" : "rab_26.ic26", "size" : 131072, "crc" : "bd9c1b54" },
+						{ "name" : "rab_27.ic27", "size" : 131072, "crc" : "bbcf6977" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "radikalba",
+			"title" : "Radikal Bikers (Atari license)",
+			"parent" : "radikalb",
+			"mach" : "gaelco3d",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_6.ic6", "size" : 524288, "crc" : "ccac98c5", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_12.ic12", "size" : 524288, "crc" : "26199506", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "program2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_14.ic14", "size" : 524288, "crc" : "4a0ac8cb", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "program3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_19.ic19", "size" : 524288, "crc" : "2631bd61" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "rab_ic48.ic48", "size" : 4194304, "crc" : "9c56a06a", "set" : "radikalb" },
+						{ "name" : "rab_ic45.ic45", "size" : 4194304, "crc" : "7e698584", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic23.ic23", "size" : 4194304, "crc" : "dcf52520", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic8.ic8", "size" : 4194304, "crc" : "4fbd4737", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic9.ic9", "size" : 4194304, "crc" : "9e3e038d", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic10.ic10", "size" : 4194304, "crc" : "870b0ce4", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic11.ic11", "size" : 4194304, "crc" : "75672271", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "texture4",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic15.ic15", "size" : 4194304, "crc" : "edb9d409", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "texture5",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic16.ic16", "size" : 4194304, "crc" : "9d595e46", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "texture6",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic17.ic17", "size" : 4194304, "crc" : "e120236b", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "texture7",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "rab_ic18.ic18", "size" : 4194304, "crc" : "3084bc49", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "rab_24.ic24", "size" : 131072, "crc" : "2984bc1d", "set" : "radikalb" },
+						{ "name" : "rab_25.ic25", "size" : 131072, "crc" : "777758e3", "set" : "radikalb" },
+						{ "name" : "rab_26.ic26", "size" : 131072, "crc" : "bd9c1b54", "set" : "radikalb" },
+						{ "name" : "rab_27.ic27", "size" : 131072, "crc" : "bbcf6977", "set" : "radikalb" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "footbpow",
+			"title" : "Football Power (version 4.6)",
+			"mach" : "footbpow",
+			"controls" : [
+				{ "name" : "1P UP", "id" : "1p_up", "switch" : "1P UP", "port" : "0.0", "role" : "up", "pad" : [ "dpup", "-lefty" ] },
+				{ "name" : "1P DOWN", "id" : "1p_down", "switch" : "1P DOWN", "port" : "0.1", "role" : "down", "pad" : [ "dpdown", "+lefty" ] },
+				{ "name" : "1P RIGHT", "id" : "1p_right", "switch" : "1P RIGHT", "port" : "0.2", "role" : "right", "pad" : [ "dpright", "+leftx" ] },
+				{ "name" : "1P LEFT", "id" : "1p_left", "switch" : "1P LEFT", "port" : "0.3", "role" : "left", "pad" : [ "dpleft", "-leftx" ] },
+				{ "name" : "1P DRIBBLING", "id" : "1p_button1", "switch" : "1P PUSH1", "port" : "0.4", "role" : "button1" },
+				{ "name" : "1P DEFENSE", "id" : "1p_button2", "switch" : "1P PUSH2", "port" : "0.5", "role" : "button2" },
+				{ "name" : "1P START", "id" : "1p_start", "switch" : "1P START", "port" : "0.7", "role" : "start" },
+				{ "name" : "1P KICK SIDE", "id" : "1p_kick_x", "analog" : 1, "low" : "left", "ball" : "side", "role" : "stick2_x" },
+				{ "name" : "1P KICK FORWARD", "id" : "1p_kick_y", "analog" : 0, "low" : "up", "ball" : "forward", "role" : "stick2_y" },
+				{ "name" : "VOLUME DOWN", "id" : "volume_down", "switch" : "1P PUSH6", "port" : "0.6", "role" : "button6", "keys" : [ "-" ] },
+				{ "name" : "2P UP", "id" : "2p_up", "switch" : "2P UP", "port" : "1.0", "role" : "up", "player" : 2, "pad" : [ "dpup", "-lefty" ] },
+				{ "name" : "2P DOWN", "id" : "2p_down", "switch" : "2P DOWN", "port" : "1.1", "role" : "down", "player" : 2, "pad" : [ "dpdown", "+lefty" ] },
+				{ "name" : "2P RIGHT", "id" : "2p_right", "switch" : "2P RIGHT", "port" : "1.2", "role" : "right", "player" : 2, "pad" : [ "dpright", "+leftx" ] },
+				{ "name" : "2P LEFT", "id" : "2p_left", "switch" : "2P LEFT", "port" : "1.3", "role" : "left", "player" : 2, "pad" : [ "dpleft", "-leftx" ] },
+				{ "name" : "2P DRIBBLING", "id" : "2p_button1", "switch" : "2P PUSH1", "port" : "1.4", "role" : "button1", "player" : 2 },
+				{ "name" : "2P DEFENSE", "id" : "2p_button2", "switch" : "2P PUSH2", "port" : "1.5", "role" : "button2", "player" : 2 },
+				{ "name" : "2P START", "id" : "2p_start", "switch" : "2P START", "port" : "1.7", "role" : "start", "player" : 2 },
+				{ "name" : "2P KICK SIDE", "id" : "2p_kick_x", "analog" : 3, "low" : "left", "ball" : "side", "role" : "stick2_x", "player" : 2 },
+				{ "name" : "2P KICK FORWARD", "id" : "2p_kick_y", "analog" : 2, "low" : "up", "ball" : "forward", "role" : "stick2_y", "player" : 2 },
+				{ "name" : "VOLUME UP", "id" : "volume_up", "switch" : "1P PUSH5", "port" : "1.6", "role" : "button5", "keys" : [ "=" ] }
+			],
+			"outputs" : [
+				{ "name" : "START LAMP", "id" : "start_lamp", "output" : 3, "role" : "lamp" },
+				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" }
+			],
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "p_ic7_2431_3c9c_28-2_27c040.ic7", "size" : 524288, "crc" : "0f4baf2e" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "p_ic12_1623_f0fb_28-2_27c040.ic12", "size" : 524288, "crc" : "a256a726" }
+					]
+				},
+				{
+					"name" : "program2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "p_ic13_0815_4ab5_28-2_27c040.ic13", "size" : 524288, "crc" : "d5865820" }
+					]
+				},
+				{
+					"name" : "program3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "p_ic19_0007_54c5_28-2_wait_27c040.ic19", "size" : 524288, "crc" : "48de8155" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "fop_ic48.ic48", "size" : 8388608, "crc" : "efddf5c1" },
+						{ "name" : "fop_ic42.ic42", "size" : 8388608, "crc" : "8772e536" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic23.ic23", "size" : 4194304, "crc" : "3c02f7c6" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic8.ic8", "size" : 4194304, "crc" : "eaff30ec" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic10.ic10", "size" : 4194304, "crc" : "536c822b" }
+					]
+				},
+				{
+					"name" : "texture4",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic15.ic15", "size" : 4194304, "crc" : "c8903051" }
+					]
+				},
+				{
+					"name" : "texture6",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic17.ic17", "size" : 4194304, "crc" : "559a38ae" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "fop_24.ic24", "size" : 131072, "crc" : "3214ae1b" },
+						{ "name" : "fop_25.ic25", "size" : 131072, "crc" : "69a8734c" },
+						{ "name" : "fop_26.ic26", "size" : 131072, "crc" : "b5877b68" },
+						{ "name" : "fop_27.ic27", "size" : 131072, "crc" : "58309912" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "footbpow14",
+			"title" : "Football Power (version 1.4)",
+			"parent" : "footbpow",
+			"mach" : "footbpow",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fut_ic7_1117_12-6-01_27c040.ic7", "size" : 524288, "crc" : "d6f473eb" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fut_ic12_4ad2_12-6-01_27c040.ic12", "size" : 524288, "crc" : "24b6c9a0" }
+					]
+				},
+				{
+					"name" : "program2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fut_ic13_e30f_12-6-01_27c040.ic13", "size" : 524288, "crc" : "948c7e41" }
+					]
+				},
+				{
+					"name" : "program3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fut_ic19_75ab_12-6-01_27c040.ic19", "size" : 524288, "crc" : "985551a1" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "fop_ic48.ic48", "size" : 8388608, "crc" : "efddf5c1", "set" : "footbpow" },
+						{ "name" : "fop_ic42.ic42", "size" : 8388608, "crc" : "8772e536", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic23.ic23", "size" : 4194304, "crc" : "3c02f7c6", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic8.ic8", "size" : 4194304, "crc" : "eaff30ec", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic10.ic10", "size" : 4194304, "crc" : "536c822b", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture4",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic15.ic15", "size" : 4194304, "crc" : "c8903051", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture6",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic17.ic17", "size" : 4194304, "crc" : "559a38ae", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "fop_24.ic24", "size" : 131072, "crc" : "3214ae1b", "set" : "footbpow" },
+						{ "name" : "fop_25.ic25", "size" : 131072, "crc" : "69a8734c", "set" : "footbpow" },
+						{ "name" : "fop_26.ic26", "size" : 131072, "crc" : "b5877b68", "set" : "footbpow" },
+						{ "name" : "fop_27.ic27", "size" : 131072, "crc" : "58309912", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "footbpow12",
+			"title" : "Football Power (version 1.2)",
+			"parent" : "footbpow",
+			"mach" : "footbpow",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_7.ic7", "size" : 524288, "crc" : "a2d7ec69" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_12.ic12", "size" : 524288, "crc" : "443caf77" }
+					]
+				},
+				{
+					"name" : "program2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_13.ic13", "size" : 524288, "crc" : "57723eda" }
+					]
+				},
+				{
+					"name" : "program3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_19.ic19", "size" : 524288, "crc" : "aa59cd2d" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "fop_ic48.ic48", "size" : 8388608, "crc" : "efddf5c1", "set" : "footbpow" },
+						{ "name" : "fop_ic42.ic42", "size" : 8388608, "crc" : "8772e536", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic23.ic23", "size" : 4194304, "crc" : "3c02f7c6", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic8.ic8", "size" : 4194304, "crc" : "eaff30ec", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic10.ic10", "size" : 4194304, "crc" : "536c822b", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture4",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic15.ic15", "size" : 4194304, "crc" : "c8903051", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture6",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic17.ic17", "size" : 4194304, "crc" : "559a38ae", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "fop_24.ic24", "size" : 131072, "crc" : "3214ae1b", "set" : "footbpow" },
+						{ "name" : "fop_25.ic25", "size" : 131072, "crc" : "69a8734c", "set" : "footbpow" },
+						{ "name" : "fop_26.ic26", "size" : 131072, "crc" : "b5877b68", "set" : "footbpow" },
+						{ "name" : "fop_27.ic27", "size" : 131072, "crc" : "58309912", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "footbpow11",
+			"title" : "Football Power (version 1.1)",
+			"parent" : "footbpow",
+			"mach" : "footbpow",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_7_..ic7", "size" : 524288, "crc" : "1314e1d6" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_12..ic12", "size" : 524288, "crc" : "d0dea4db" }
+					]
+				},
+				{
+					"name" : "program2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_13..ic13", "size" : 524288, "crc" : "c58afb45" }
+					]
+				},
+				{
+					"name" : "program3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_19..ic19", "size" : 524288, "crc" : "c6380cf1" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "fop_ic48.ic48", "size" : 8388608, "crc" : "efddf5c1", "set" : "footbpow" },
+						{ "name" : "fop_ic42.ic42", "size" : 8388608, "crc" : "8772e536", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic23.ic23", "size" : 4194304, "crc" : "3c02f7c6", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic8.ic8", "size" : 4194304, "crc" : "eaff30ec", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic10.ic10", "size" : 4194304, "crc" : "536c822b", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture4",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic15.ic15", "size" : 4194304, "crc" : "c8903051", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texture6",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_ic17.ic17", "size" : 4194304, "crc" : "559a38ae", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "fop_24.ic24", "size" : 131072, "crc" : "3214ae1b", "set" : "footbpow" },
+						{ "name" : "fop_25.ic25", "size" : 131072, "crc" : "69a8734c", "set" : "footbpow" },
+						{ "name" : "fop_26.ic26", "size" : 131072, "crc" : "b5877b68", "set" : "footbpow" },
+						{ "name" : "fop_27.ic27", "size" : 131072, "crc" : "58309912", "set" : "footbpow" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "speedup",
+			"title" : "Speed Up (version 2.20)",
+			"mach" : "speedup",
+			"seated" : true,
+			"wheel_motor" : true,
+			"option_speakers" : true,
+			"sound_parts" : [
+				{ "part" : "speaker", "at" : "front", "board" : "main" },
+				{ "part" : "speaker", "at" : "seat", "board" : "main" },
+				{ "part" : "speaker", "at" : "rear_left", "board" : "option" },
+				{ "part" : "speaker", "at" : "rear_right", "board" : "option" }
+			],
+			"link" : { "cabinets" : 4, "seat" : { "in" : "eeprom", "byte" : "009F", "shift" : 6, "bits" : 2, "first" : 0 } },
+			"controls" : [
+				{ "name" : "STEERING WHEEL", "id" : "wheel", "analog" : 0, "low" : "left", "span" : [ 48, 208 ], "role" : "steer" },
+				{ "name" : "ACCELERATOR", "id" : "gas_pedal", "analog" : 1, "low" : "released", "span" : [ 0, 255 ], "role" : "accel" },
+				{ "name" : "BRAKE", "id" : "brake_pedal", "switch" : "1P PUSH1", "port" : "0.5", "role" : "button1", "keys" : [ "Down" ], "pad" : [ "lefttrigger" ], "wheel" : "brake" },
+				{ "name" : "GEAR", "id" : "gear", "positions" : [
+					{ "name" : "LOW", "switches" : [] },
+					{ "name" : "HIGH", "switches" : [ "1P PUSH2" ] } ],
+					"port" : "0.6", "role" : "gear" },
+				{ "name" : "VIEW", "id" : "view", "switch" : "1P PUSH3", "port" : "0.4", "role" : "button3" },
+				{ "name" : "START", "id" : "start", "switch" : "1P START", "port" : "0.7", "role" : "start" },
+				{ "name" : "VOLUME UP", "id" : "volume_up", "switch" : "1P PUSH5", "port" : "0.0", "role" : "button5", "keys" : [ "=" ], "pad" : [ "dpup" ] },
+				{ "name" : "VOLUME DOWN", "id" : "volume_down", "switch" : "1P PUSH6", "port" : "0.1", "role" : "button6", "keys" : [ "-" ], "pad" : [ "dpdown" ] }
+			],
+			"outputs" : [
+				{ "name" : "START LAMP", "id" : "start_lamp", "output" : 3, "role" : "lamp" },
+				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" }
+			],
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_2.2_10.ic10", "size" : 524288, "crc" : "ee781e64" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_2.2_15.ic15", "size" : 524288, "crc" : "1b8ff9d2" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "sup_ic32.ic32", "size" : 2097152, "crc" : "aed151de" },
+						{ "name" : "sup_ic33.ic33", "size" : 2097152, "crc" : "9be6ab7d" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic25.ic25", "size" : 4194304, "crc" : "284c7cd1" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic12.ic12", "size" : 4194304, "crc" : "311f3247" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic14.ic14", "size" : 4194304, "crc" : "3ad3c089" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic11.ic11", "size" : 4194304, "crc" : "b993e65a" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic13.ic13", "size" : 4194304, "crc" : "ad00023c" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "ic35.bin", "size" : 131072, "crc" : "34737d1d" },
+						{ "name" : "ic34.bin", "size" : 131072, "crc" : "e89e829b" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "speedup21",
+			"title" : "Speed Up (version 2.10)",
+			"parent" : "speedup",
+			"mach" : "speedup",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_e_v2.10_5-3_ic10_2345_27c040.bin", "size" : 524288, "crc" : "d6fabf94" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_o_v2.10_5-3_ic15_5e35_27c040.bin", "size" : 524288, "crc" : "ee2c215e" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "sup_ic32.ic32", "size" : 2097152, "crc" : "aed151de", "set" : "speedup" },
+						{ "name" : "sup_ic33.ic33", "size" : 2097152, "crc" : "9be6ab7d", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic25.ic25", "size" : 4194304, "crc" : "284c7cd1", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic12.ic12", "size" : 4194304, "crc" : "311f3247", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic14.ic14", "size" : 4194304, "crc" : "3ad3c089", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic11.ic11", "size" : 4194304, "crc" : "b993e65a", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic13.ic13", "size" : 4194304, "crc" : "ad00023c", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "ic35.bin", "size" : 131072, "crc" : "34737d1d", "set" : "speedup" },
+						{ "name" : "ic34.bin", "size" : 131072, "crc" : "e89e829b", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "speedup20",
+			"title" : "Speed Up (version 2.00, 18 February)",
+			"parent" : "speedup",
+			"mach" : "speedup",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_e_v2.00_18-2_ic10_c5a4_27c040.bin", "size" : 524288, "crc" : "cbab8d60" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_o_v2.00_18-2_ic15_9c28_27c040.bin", "size" : 524288, "crc" : "4be05b03" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "sup_ic32.ic32", "size" : 2097152, "crc" : "aed151de", "set" : "speedup" },
+						{ "name" : "sup_ic33.ic33", "size" : 2097152, "crc" : "9be6ab7d", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic25.ic25", "size" : 4194304, "crc" : "284c7cd1", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic12.ic12", "size" : 4194304, "crc" : "311f3247", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic14.ic14", "size" : 4194304, "crc" : "3ad3c089", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic11.ic11", "size" : 4194304, "crc" : "b993e65a", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic13.ic13", "size" : 4194304, "crc" : "ad00023c", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "ic35.bin", "size" : 131072, "crc" : "34737d1d", "set" : "speedup" },
+						{ "name" : "ic34.bin", "size" : 131072, "crc" : "e89e829b", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "speedup20a",
+			"title" : "Speed Up (version 2.00, 17 February)",
+			"parent" : "speedup",
+			"mach" : "speedup",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_e-10_v2.00_17-2_d5bb_27c040.bin", "size" : 524288, "crc" : "1c9796d8" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_o-15_v2.00_17-2_a8d5_27c040.bin", "size" : 524288, "crc" : "3ebe3ce0" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "sup_ic32.ic32", "size" : 2097152, "crc" : "aed151de", "set" : "speedup" },
+						{ "name" : "sup_ic33.ic33", "size" : 2097152, "crc" : "9be6ab7d", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic25.ic25", "size" : 4194304, "crc" : "284c7cd1", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic12.ic12", "size" : 4194304, "crc" : "311f3247", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic14.ic14", "size" : 4194304, "crc" : "3ad3c089", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic11.ic11", "size" : 4194304, "crc" : "b993e65a", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic13.ic13", "size" : 4194304, "crc" : "ad00023c", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "ic35.bin", "size" : 131072, "crc" : "34737d1d", "set" : "speedup" },
+						{ "name" : "ic34.bin", "size" : 131072, "crc" : "e89e829b", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "speedup12",
+			"title" : "Speed Up (version 1.20)",
+			"parent" : "speedup",
+			"mach" : "speedup",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_10.ic10", "size" : 524288, "crc" : "07e70bae" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_15.ic15", "size" : 524288, "crc" : "7947c28d" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "sup_ic32.ic32", "size" : 2097152, "crc" : "aed151de", "set" : "speedup" },
+						{ "name" : "sup_ic33.ic33", "size" : 2097152, "crc" : "9be6ab7d", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic25.ic25", "size" : 4194304, "crc" : "284c7cd1", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic12.ic12", "size" : 4194304, "crc" : "311f3247", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic14.ic14", "size" : 4194304, "crc" : "3ad3c089", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic11.ic11", "size" : 4194304, "crc" : "b993e65a", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic13.ic13", "size" : 4194304, "crc" : "ad00023c", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "ic35.bin", "size" : 131072, "crc" : "34737d1d", "set" : "speedup" },
+						{ "name" : "ic34.bin", "size" : 131072, "crc" : "e89e829b", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "speedup10",
+			"title" : "Speed Up (version 1.00)",
+			"parent" : "speedup",
+			"mach" : "speedup",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "ic10_1.00.ic10", "size" : 524288, "crc" : "24ed8f48" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "ic15_1.00.ic15", "size" : 524288, "crc" : "b3fda7f1" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "sup_ic32.ic32", "size" : 2097152, "crc" : "aed151de", "set" : "speedup" },
+						{ "name" : "sup_ic33.ic33", "size" : 2097152, "crc" : "9be6ab7d", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic25.ic25", "size" : 4194304, "crc" : "284c7cd1", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic12.ic12", "size" : 4194304, "crc" : "311f3247", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic14.ic14", "size" : 4194304, "crc" : "3ad3c089", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic11.ic11", "size" : 4194304, "crc" : "b993e65a", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "sup_ic13.ic13", "size" : 4194304, "crc" : "ad00023c", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "ic35.bin", "size" : 131072, "crc" : "34737d1d", "set" : "speedup" },
+						{ "name" : "ic34.bin", "size" : 131072, "crc" : "e89e829b", "set" : "speedup" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "surfplnt",
+			"title" : "Surf Planet (version 4.1)",
+			"mach" : "surfplnt",
+			"link" : { "cabinets" : 2, "seat" : { "in" : "eeprom", "byte" : "01D2", "first" : 1 } },
+			"controls" : [
+				{ "name" : "SURFBOARD", "id" : "board", "analog" : 0, "low" : "left", "span" : [ 0, 255 ], "role" : "steer" },
+				{ "name" : "START", "id" : "start", "switch" : "1P START", "port" : "0.7", "role" : "start" },
+				{ "name" : "VOLUME UP", "id" : "volume_up", "switch" : "1P PUSH5", "port" : "0.0", "role" : "button5", "keys" : [ "=" ], "pad" : [ "dpup" ] },
+				{ "name" : "VOLUME DOWN", "id" : "volume_down", "switch" : "1P PUSH6", "port" : "0.1", "role" : "button6", "keys" : [ "-" ], "pad" : [ "dpdown" ] }
+			],
+			"outputs" : [
+				{ "name" : "START LAMP", "id" : "start_lamp", "output" : 3, "role" : "lamp" },
+				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" }
+			],
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_5.ic5", "size" : 524288, "crc" : "c96e0a18" },
+						{ "name" : "pls_8.ic8", "size" : 524288, "crc" : "aef9e1d0" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_11.ic11", "size" : 524288, "crc" : "99211d2d" },
+						{ "name" : "pls_13.ic13", "size" : 524288, "crc" : "d9754369" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "pls_ic40.ic40", "size" : 4194304, "crc" : "26877ad3" },
+						{ "name" : "pls_ic37.ic37", "size" : 4194304, "crc" : "75893062" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic18.ic18", "size" : 4194304, "crc" : "a1b64695" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic7.ic7", "size" : 4194304, "crc" : "04bd1605" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic9.ic9", "size" : 4194304, "crc" : "f4400160" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic12.ic12", "size" : 4194304, "crc" : "edc2e826" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic15.ic15", "size" : 4194304, "crc" : "b0f6b8da" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_19.ic19", "size" : 131072, "crc" : "691bd7a7" },
+						{ "name" : "pls_20.ic20", "size" : 131072, "crc" : "fb293318" },
+						{ "name" : "pls_21.ic21", "size" : 131072, "crc" : "b80611fb" },
+						{ "name" : "pls_22.ic22", "size" : 131072, "crc" : "ccf88f7e" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "surfplnt40",
+			"title" : "Surf Planet (version 4.0)",
+			"parent" : "surfplnt",
+			"mach" : "surfplnt",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_5.ic5", "size" : 524288, "crc" : "572e0343" },
+						{ "name" : "pls_8.ic8", "size" : 524288, "crc" : "aef9e1d0", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_11.ic11", "size" : 524288, "crc" : "6056edaa" },
+						{ "name" : "pls_13.ic13", "size" : 524288, "crc" : "d9754369", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "pls_ic40.ic40", "size" : 4194304, "crc" : "26877ad3", "set" : "surfplnt" },
+						{ "name" : "pls_ic37.ic37", "size" : 4194304, "crc" : "75893062", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic18.ic18", "size" : 4194304, "crc" : "a1b64695", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic7.ic7", "size" : 4194304, "crc" : "04bd1605", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic9.ic9", "size" : 4194304, "crc" : "f4400160", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic12.ic12", "size" : 4194304, "crc" : "edc2e826", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic15.ic15", "size" : 4194304, "crc" : "b0f6b8da", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_19.ic19", "size" : 131072, "crc" : "691bd7a7", "set" : "surfplnt" },
+						{ "name" : "pls_20.ic20", "size" : 131072, "crc" : "fb293318", "set" : "surfplnt" },
+						{ "name" : "pls_21.ic21", "size" : 131072, "crc" : "b80611fb", "set" : "surfplnt" },
+						{ "name" : "pls_22.ic22", "size" : 131072, "crc" : "ccf88f7e", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "surfplnt31",
+			"title" : "Surf Planet (version 3.1)",
+			"parent" : "surfplnt",
+			"mach" : "surfplnt",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "3.1_0l_6bcc_ic5_skate_27c040.bin", "size" : 524288, "crc" : "e33186ce" },
+						{ "name" : "pls_8.ic8", "size" : 524288, "crc" : "aef9e1d0", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "3.1_1l_d75a_ic11_skate_27c040.bin", "size" : 524288, "crc" : "b832dd0e" },
+						{ "name" : "pls_13.ic13", "size" : 524288, "crc" : "d9754369", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "pls_ic40.ic40", "size" : 4194304, "crc" : "26877ad3", "set" : "surfplnt" },
+						{ "name" : "pls_ic37.ic37", "size" : 4194304, "crc" : "75893062", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic18.ic18", "size" : 4194304, "crc" : "a1b64695", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic7.ic7", "size" : 4194304, "crc" : "04bd1605", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic9.ic9", "size" : 4194304, "crc" : "f4400160", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic12.ic12", "size" : 4194304, "crc" : "edc2e826", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic15.ic15", "size" : 4194304, "crc" : "b0f6b8da", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_19.ic19", "size" : 131072, "crc" : "691bd7a7", "set" : "surfplnt" },
+						{ "name" : "pls_20.ic20", "size" : 131072, "crc" : "fb293318", "set" : "surfplnt" },
+						{ "name" : "pls_21.ic21", "size" : 131072, "crc" : "b80611fb", "set" : "surfplnt" },
+						{ "name" : "pls_22.ic22", "size" : 131072, "crc" : "ccf88f7e", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "surfplnt30",
+			"title" : "Surf Planet (version 3.0)",
+			"parent" : "surfplnt",
+			"mach" : "surfplnt",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_5.ic5", "size" : 524288, "crc" : "9845d0e9" },
+						{ "name" : "pls_8.ic8", "size" : 524288, "crc" : "aef9e1d0", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_11.ic11", "size" : 524288, "crc" : "aa3fe4ba" },
+						{ "name" : "pls_13.ic13", "size" : 524288, "crc" : "d9754369", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "pls_ic40.ic40", "size" : 4194304, "crc" : "26877ad3", "set" : "surfplnt" },
+						{ "name" : "pls_ic37.ic37", "size" : 4194304, "crc" : "75893062", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic18.ic18", "size" : 4194304, "crc" : "a1b64695", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic7.ic7", "size" : 4194304, "crc" : "04bd1605", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic9.ic9", "size" : 4194304, "crc" : "f4400160", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic12.ic12", "size" : 4194304, "crc" : "edc2e826", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic15.ic15", "size" : 4194304, "crc" : "b0f6b8da", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_19.ic19", "size" : 131072, "crc" : "691bd7a7", "set" : "surfplnt" },
+						{ "name" : "pls_20.ic20", "size" : 131072, "crc" : "fb293318", "set" : "surfplnt" },
+						{ "name" : "pls_21.ic21", "size" : 131072, "crc" : "b80611fb", "set" : "surfplnt" },
+						{ "name" : "pls_22.ic22", "size" : 131072, "crc" : "ccf88f7e", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "surfplnt20",
+			"title" : "Surf Planet (version 2.0)",
+			"parent" : "surfplnt",
+			"mach" : "surfplnt",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_5.ic5", "size" : 524288, "crc" : "93e0cf29" },
+						{ "name" : "pls_8.ic8", "size" : 524288, "crc" : "aef9e1d0", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_11.ic11", "size" : 524288, "crc" : "08e74d50" },
+						{ "name" : "pls_13.ic13", "size" : 524288, "crc" : "d9754369", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "pls_ic40.ic40", "size" : 4194304, "crc" : "26877ad3", "set" : "surfplnt" },
+						{ "name" : "pls_ic37.ic37", "size" : 4194304, "crc" : "75893062", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic18.ic18", "size" : 4194304, "crc" : "a1b64695", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic7.ic7", "size" : 4194304, "crc" : "04bd1605", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic9.ic9", "size" : 4194304, "crc" : "f4400160", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic12.ic12", "size" : 4194304, "crc" : "edc2e826", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic15.ic15", "size" : 4194304, "crc" : "b0f6b8da", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_19.ic19", "size" : 131072, "crc" : "691bd7a7", "set" : "surfplnt" },
+						{ "name" : "pls_20.ic20", "size" : 131072, "crc" : "fb293318", "set" : "surfplnt" },
+						{ "name" : "pls_21.ic21", "size" : 131072, "crc" : "b80611fb", "set" : "surfplnt" },
+						{ "name" : "pls_22.ic22", "size" : 131072, "crc" : "ccf88f7e", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "surfplnt12",
+			"title" : "Surf Planet (version 1.2)",
+			"parent" : "surfplnt",
+			"mach" : "surfplnt",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "snow_1.2_ic12_25-6_0l_8f33_27c040.bin", "size" : 524288, "crc" : "e64072d3" },
+						{ "name" : "pls_8.ic8", "size" : 524288, "crc" : "aef9e1d0", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "snow_1.2_ic11_25-6_1l_b99v_27c040.bin", "size" : 524288, "crc" : "fd50c3c3" },
+						{ "name" : "pls_13.ic13", "size" : 524288, "crc" : "d9754369", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "pls_ic40.ic40", "size" : 4194304, "crc" : "26877ad3", "set" : "surfplnt" },
+						{ "name" : "pls_ic37.ic37", "size" : 4194304, "crc" : "75893062", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic18.ic18", "size" : 4194304, "crc" : "a1b64695", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic7.ic7", "size" : 4194304, "crc" : "04bd1605", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic9.ic9", "size" : 4194304, "crc" : "f4400160", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic12.ic12", "size" : 4194304, "crc" : "edc2e826", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic15.ic15", "size" : 4194304, "crc" : "b0f6b8da", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_19.ic19", "size" : 131072, "crc" : "691bd7a7", "set" : "surfplnt" },
+						{ "name" : "pls_20.ic20", "size" : 131072, "crc" : "fb293318", "set" : "surfplnt" },
+						{ "name" : "pls_21.ic21", "size" : 131072, "crc" : "b80611fb", "set" : "surfplnt" },
+						{ "name" : "pls_22.ic22", "size" : 131072, "crc" : "ccf88f7e", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
+		},
+		{
+			"name" : "surfplnt10",
+			"title" : "Surf Planet (version 1.0)",
+			"parent" : "surfplnt",
+			"mach" : "surfplnt",
+			"sections" : [
+				{
+					"name" : "program0",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "1.0_snow_10-09_5_f375_0l_27c040.ic5", "size" : 524288, "crc" : "7db0a114" },
+						{ "name" : "pls_8.ic8", "size" : 524288, "crc" : "aef9e1d0", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "program1",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "1.0_snow_10-09_11_c6fd_1l_27c040.ic11", "size" : 524288, "crc" : "87bdb700" },
+						{ "name" : "pls_13.ic13", "size" : 524288, "crc" : "d9754369", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "tms",
+					"type" : "interleave",
+					"amnt" : 2,
+					"data" : [
+						{ "name" : "pls_ic40.ic40", "size" : 4194304, "crc" : "26877ad3", "set" : "surfplnt" },
+						{ "name" : "pls_ic37.ic37", "size" : 4194304, "crc" : "75893062", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "adsp",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic18.ic18", "size" : 4194304, "crc" : "a1b64695", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture0",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic7.ic7", "size" : 4194304, "crc" : "04bd1605", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture1",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic9.ic9", "size" : 4194304, "crc" : "f4400160", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture2",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic12.ic12", "size" : 4194304, "crc" : "edc2e826", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texture3",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "pls_ic15.ic15", "size" : 4194304, "crc" : "b0f6b8da", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "texmask",
+					"type" : "concatenate",
+					"data" : [
+						{ "name" : "pls_19.ic19", "size" : 131072, "crc" : "691bd7a7", "set" : "surfplnt" },
+						{ "name" : "pls_20.ic20", "size" : 131072, "crc" : "fb293318", "set" : "surfplnt" },
+						{ "name" : "pls_21.ic21", "size" : 131072, "crc" : "b80611fb", "set" : "surfplnt" },
+						{ "name" : "pls_22.ic22", "size" : 131072, "crc" : "ccf88f7e", "set" : "surfplnt" }
+					]
+				},
+				{
+					"name" : "boot",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+					]
+				}
+			]
 		}
 	]
 }

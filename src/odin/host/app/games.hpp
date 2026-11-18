@@ -81,6 +81,7 @@ struct PortSwitch {
  *
  * On a Gaelco board a control also says where it goes on the board, as
  * the test page of its game shows it: a switch its pin ("port" : "1.4"),
+ * a lever too, closed in the positions that close a switch,
  * an analog control the values its channel of the ADC ("analog", 0 to 3)
  * takes at its low end and at its high end ("span" : [254, 2]), or the half
  * of the stick that kicks the ball of the player it is ("ball" : "side",
@@ -206,7 +207,9 @@ any_on(const std::vector<GameOutput> &list, GameOutput::Role role, std::span<con
  * "cabinets", or on the "standard" one). */
 struct SoundPart {
 	enum class Kind : uint8_t { SPEAKER, WOOFER, SHAKER, UNWIRED };
-	enum class Place : uint8_t { NONE, FRONT_LEFT, FRONT_RIGHT, BASE, PANEL, SEAT_LEFT, SEAT_RIGHT, SEAT };
+	enum class Place : uint8_t {
+		NONE, FRONT_LEFT, FRONT_RIGHT, BASE, PANEL, SEAT_LEFT, SEAT_RIGHT, SEAT, FRONT, REAR_LEFT, REAR_RIGHT
+	};
 
 	Kind kind = Kind::SPEAKER;
 	Place at = Place::NONE;
@@ -357,7 +360,7 @@ struct Game {
 		/* FLASH: the settings Smashing Drive keeps in its program flash
 		 * (AtvTrack::set_flash_setting); NAND: those ATV Track keeps in
 		 * its NAND (set_nand_setting) */
-		enum class In { NONE, MIE, BACKUP, FLASH, NAND };
+		enum class In { NONE, MIE, BACKUP, FLASH, NAND, EEPROM };
 
 		unsigned cabinets = 0;
 		In seat_in = In::NONE;

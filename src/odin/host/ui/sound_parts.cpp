@@ -53,8 +53,8 @@ listed(const std::vector<std::string> &names)
 unsigned
 sound_feeds(SoundFamily family, int played, const SoundPart &part)
 {
-	const bool left = part.at == Place::FRONT_LEFT || part.at == Place::SEAT_LEFT;
-	const bool right = part.at == Place::FRONT_RIGHT || part.at == Place::SEAT_RIGHT;
+	const bool left = part.at == Place::FRONT_LEFT || part.at == Place::SEAT_LEFT || part.at == Place::REAR_LEFT;
+	const bool right = part.at == Place::FRONT_RIGHT || part.at == Place::SEAT_RIGHT || part.at == Place::REAR_RIGHT;
 	const auto pair = [left, right](unsigned l, unsigned r) { return left ? l : right ? r : l | r; };
 	const bool quad = played == 2 && family != SoundFamily::ONE;
 	/* Left and right: the main board, or the two last channels of a DAC */
@@ -90,6 +90,8 @@ sound_part_name(const SoundPart &part)
 		name = part.at == Place::FRONT_LEFT ? "Left screen speaker" :
 		       part.at == Place::FRONT_RIGHT ? "Right screen speaker" :
 		       part.at == Place::SEAT_LEFT ? "Left seat speaker" : part.at == Place::SEAT_RIGHT ? "Right seat speaker" :
+		       part.at == Place::FRONT ? "Screen speaker" : part.at == Place::SEAT ? "Seat speaker" :
+		       part.at == Place::REAR_LEFT ? "Left rear speaker" : part.at == Place::REAR_RIGHT ? "Right rear speaker" :
 		       "Speaker";
 		break;
 	case Kind::WOOFER:
@@ -114,14 +116,16 @@ sound_heard(const SoundScene &scene)
 		unsigned feeds = 0;
 		bool present = false;
 	};
-	std::array<Group, 6> groups = { { { "the screen speakers" }, { scene.lows ? "the woofer's lows" : "the woofer" },
+	std::array<Group, 7> groups = { { { "the screen speakers" }, { scene.lows ? "the woofer's lows" : "the woofer" },
 	                                  { "the panel shaker's signal" }, { "the seat speakers" },
-	                                  { "the seat shaker's signal" }, { "the fourth channel" } } };
+	                                  { "the seat shaker's signal" }, { "the fourth channel" },
+	                                  { "the rear speakers" } } };
 
 	for (const SoundPart &part : scene.parts) {
 		const size_t g = part.kind == Kind::UNWIRED ? 5 : part.kind == Kind::WOOFER ? 1 :
 		                 part.kind == Kind::SHAKER ? (part.at == Place::SEAT ? 4 : 2) :
-		                 part.at == Place::SEAT_LEFT || part.at == Place::SEAT_RIGHT ? 3 : 0;
+		                 part.at == Place::SEAT_LEFT || part.at == Place::SEAT_RIGHT || part.at == Place::SEAT ? 3 :
+		                 part.at == Place::REAR_LEFT || part.at == Place::REAR_RIGHT ? 6 : 0;
 
 		groups[g].present = true;
 		groups[g].feeds |= sound_feeds(scene.family, scene.played, part);

@@ -36,6 +36,7 @@
 #include "odin/host/app/games.hpp"
 #include "odin/host/app/hotkeys.hpp"
 #include "odin/host/app/atvtrack_play.hpp"
+#include "odin/host/app/gaelco3d_play.hpp"
 #include "odin/machine/boards/hikaru/hikaru.hpp"
 #include "odin/host/input/keyboard.hpp"
 #include "odin/host/app/library.hpp"
@@ -58,7 +59,7 @@ namespace {
 std::optional<Game>
 load_or_tell(const Options &options, const std::string &name, const GameList &games, const Settings &settings)
 {
-	RomFiles files(options.rom_path, options.bios_path);
+	RomFiles files(options.roms_of(games.machine(name)), options.bios_path);
 	std::optional<Game> loaded = games.load_game(files, name);
 
 	if (loaded) {
@@ -124,6 +125,14 @@ play(const Options &given, const std::string &name, const GameList &games, Setti
 	}
 	if (game->machine == "atvtrack" || game->machine == "smashdrv") {
 		const Ended ended = play_atvtrack(options, *game, games, settings, settings_file, display, keys, pointers,
+		                                  opened);
+
+		repeats::end();
+		return ended;
+	}
+	if (game->machine == "gaelco3d" || game->machine == "footbpow" || game->machine == "speedup" ||
+	    game->machine == "surfplnt") {
+		const Ended ended = play_gaelco3d(options, *game, games, settings, settings_file, display, keys, pointers,
 		                                  opened);
 
 		repeats::end();
@@ -340,7 +349,7 @@ main(int argc, char **argv)
 
 		odin::Options launch = options;
 		if (!opened.folder.empty())
-			launch.rom_path = opened.folder;
+			launch.rom_path = launch.gaelco_path = opened.folder;
 		opened = {};
 
 		odin::Ended ended =

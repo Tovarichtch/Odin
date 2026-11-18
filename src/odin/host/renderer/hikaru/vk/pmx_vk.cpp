@@ -213,7 +213,7 @@ struct VkDrawing::Pmx {
 			                                   bindings };
 
 		card.check(fn.vkCreateDescriptorSetLayout(card.device(), &set, nullptr, &images_layout), "the images of the Neon 250");
-		fog = card.make_image(VK_FORMAT_R8G8_UNORM, 128, 1, 1,
+		fog = card.make_image(VK_FORMAT_R8G8_UNORM, 256, 129, 1,
 		                      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 		fog_sampler = sampler(PmxDraw{}, 1);
 
@@ -558,6 +558,16 @@ VkDrawing::draw_pmx(const PmxScene &scene, unsigned anisotropy)
 		pmx.fog_table = scene.fog_table;
 		pmx.fog_loaded = true;
 	}
+	if (!scene.palette.empty()) {
+		const size_t bytes = scene.palette.size() * sizeof(uint16_t);
+		const vk::Slice in = m_card.stage(bytes, 4);
+		const VkBufferImageCopy region{ in.offset, 0, 0, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 }, { 0, 1, 0 }, { 256, 128, 1 } };
+
+		std::memcpy(in.bytes, scene.palette.data(), bytes);
+		m_card.barrier(cb, pmx.fog, vk::COPIED_TO);
+		m_fn.vkCmdCopyBufferToImage(cb, in.buffer, pmx.fog.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+		m_card.barrier(cb, pmx.fog, vk::SAMPLED);
+	}
 
 	const VkDeviceSize vertex_bytes = std::max<size_t>(scene.vertices.size(), 1) * sizeof(PmxVertex);
 	const vk::Slice vertices = m_card.stage(vertex_bytes, 16);
@@ -720,7 +730,8 @@ VkDrawing::draw_pmx(const PmxScene &scene, unsigned anisotropy)
 		const DrawPush push{ scene.most_w,
 			             draw.lod_bias,
 			             (draw.image ? 1 : 0) | (draw.use_alpha ? 2 : 0) | (draw.ignore_texture_alpha ? 4 : 0) |
-			                     (draw.offset ? 8 : 0) | draw.shading << 4 | draw.fog << 6,
+			                     (draw.offset ? 8 : 0) | draw.shading << 4 | draw.fog << 6 |
+			                     (draw.alpha_test ? 256 : 0) | (draw.indexed ? 512 : 0) | draw.bank << 16,
 			             static_cast<float>(m_scale),
 			             scene.fog_density,
 			             scene.fog_color,

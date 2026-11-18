@@ -193,10 +193,14 @@ apart by commas (see INPUTS below).
 
 [paths]
 
- roms          a folder        Games. Default: none (choose it in the
-                               library or with -R).
- bios          a folder        Shared sets (hikaru, mie...). Default:
-                               roms.
+ roms          a folder        Hikaru ROMs (Hikaru ROMs in the menu).
+                               Default: none (choose it in the library
+                               or with -R).
+ gaelco        a folder        Gaelco ROMs (Gaelco ROMs in the menu;
+                               -R puts all games in its folder).
+                               Default: roms.
+ bios          a folder        Shared sets (hikaru, mie, tms320c31...).
+                               Default: roms.
  saves         a folder        What each game keeps without power.
                                Default: saves/ in Odin's folder.
  states        a folder        Saved states (F2, F4).
@@ -226,7 +230,9 @@ apart by commas (see INPUTS below).
 [network]
 
  Link cabinets (Virtual-On, NASCAR, Star Wars Racer, Planet Harriers, ATV
- Track, Smashing Drive): each cabinet is one Odin.
+ Track, Smashing Drive, Radikal Bikers, Speed Up, Surf Planet): each
+ cabinet requires one Odin instance. Speed Up links up to four in a ring by
+ cabinet number.
 
  board         none, loop,     none: no link. loop: the cable looped back
                ring            on itself (a Gaelco game: as none). ring:
@@ -242,8 +248,9 @@ PER GAME
 --------
 
 <game> is the MAME name: airtrix, braveff, pharrier, sgnascar, swracer,
-von4; atvtrack, gfootbal, smashdrv. A version of a game (airtrixo,
-sgnascaro, atvtracka, smashdrvb, smashdrvs) shares the sections of its
+von4; atvtrack, gfootbal, smashdrv; footbpow, radikalb, speedup, surfplnt.
+A version of a game (airtrixo, sgnascaro, atvtracka, smashdrvb, smashdrvs,
+footbpow14, radikalba, speedup21, surfplnt40...) shares the sections of its
 parent; the lines of a section of its own (an older Odin wrote one) still
 count, after its parent's.
 
@@ -305,7 +312,7 @@ count, after its parent's.
 
 [sound.<game>]
 
- Games with a second sound board: pharrier, sgnascar, swracer.
+ Games with a second sound board: pharrier, sgnascar, swracer and speedup.
 
  mode             main, mix, quad  main: main board only. mix: both on two
                                    speakers. quad: four channels.

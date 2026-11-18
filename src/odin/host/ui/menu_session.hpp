@@ -247,6 +247,7 @@ private:
 	/* The game whose controls the page Input shows: its name and panel */
 	std::string game_shown() const;
 	const ControlPanel &panel_shown() const { return m_other ? *m_other : m_controls.panel(); }
+	ControlPanel &panel_shown() { return m_other ? *m_other : m_controls.panel(); }
 	/* The joystick of a player in the game shown (0: none), and what the
 	 * host holds for it: of a game that does not run, the gamepad and the
 	 * joystick its settings seat (fill_devices), which the game that runs

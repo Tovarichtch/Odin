@@ -163,6 +163,7 @@ MenuSession::fill_inputs(MenuState &state)
 	{
 		const HostState host = host_shown();
 
+		panel_shown().move_levers(host);
 		for (size_t c = 0; c < state.panel->controls().size(); c++) {
 			state.now.push_back(state.panel->now(host, c));
 			state.touched.push_back(state.now.back().on);

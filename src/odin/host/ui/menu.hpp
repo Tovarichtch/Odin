@@ -66,7 +66,7 @@ std::string shown_path(const std::string &path, const char *none);
 
 /* A folder the library or the menu asks the system for (the library the
  * first two only) */
-enum class MenuFolder { NONE, ROMS, BIOS, SAVES, STATES, ARTWORK, LOG };
+enum class MenuFolder { NONE, ROMS, GAELCO, BIOS, SAVES, STATES, ARTWORK, LOG };
 
 /* The library, what Odin shows when it starts without a game (as a double
  * click starts it): the games of the list, each with the files it lacks
@@ -92,7 +92,9 @@ struct LibraryState {
 	LibraryFilter filter;
 	std::vector<std::string> systems;
 	size_t hidden = 0;
-	std::string roms, bios;
+	/* The folders of the games, of the Gaelco games (empty: that of the
+	 * games) and of the BIOS */
+	std::string roms, gaelco, bios;
 	bool roms_given = false, bios_given = false;
 	using Folder = MenuFolder;
 	Folder choose = Folder::NONE;
@@ -355,13 +357,13 @@ struct MenuState : BarSettings {
 	bool link_running = false, link_board_now = false, link_linked = false, link_failed = false;
 	bool link_previous = false, link_next_plugged = false;
 
-	/* Paths: the folders of the games, of the files they share (the BIOS:
-	 * empty, that of the games) and of their saves, at the next launch
+	/* Paths: the folders of the games, of the Gaelco games and of the files
+	 * they share (the BIOS; both empty: that of the games) and of their saves, at the next launch
 	 * (those the command line or ODIN_SAVES gives are shown, not changed),
 	 * of the save states; the settings file and the lists of the 3D
 	 * programs (empty: none). The board saying each access
 	 * (BarSettings::verbose) given on the command line. */
-	std::string roms, bios, saves, states, artwork, settings_file, shader_lists, log_file;
+	std::string roms, gaelco, bios, saves, states, artwork, settings_file, shader_lists, log_file;
 	bool roms_given = false, bios_given = false, saves_given = false, artwork_given = false;
 	/* The folder of the log from the next launch ([paths] log; empty: by
 	 * default), and ODIN_LOG giving the file instead */

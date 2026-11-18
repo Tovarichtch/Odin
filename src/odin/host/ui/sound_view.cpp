@@ -99,7 +99,7 @@ blocks(bool seated)
 	return out;
 }
 
-/* The seven places, on the faces the player sees */
+/* The places, on the faces the player sees */
 Vec3
 spot(Place at, bool seated)
 {
@@ -120,6 +120,12 @@ spot(Place at, bool seated)
 		return { 28, 245, 100 };
 	case Place::SEAT:
 		return { 0, 245, 66 };
+	case Place::FRONT:
+		return { 0, 57, 130 + up };
+	case Place::REAR_LEFT:
+		return { -34, 250, 128 };
+	case Place::REAR_RIGHT:
+		return { 34, 250, 128 };
 	case Place::NONE:
 		break;
 	}

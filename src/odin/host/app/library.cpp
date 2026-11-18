@@ -46,13 +46,14 @@ scan_library(LibraryState &state, const GameList &games, const Options &options,
 	state.selected = 0;
 	state.hidden = 0;
 
-	RomFiles files(options.rom_path, options.bios_path);
+	RomFiles hikaru(options.rom_path, options.bios_path), gaelco(options.roms_of("gaelco"), options.bios_path);
 
 	for (const GameList::Entry &entry : games.entries()) {
 		const std::string &name = entry.name;
 		const bool theirs = entry.machine != "hikaru";
 		const std::string system = theirs ? "gaelco" : entry.machine;
 		LibraryState::Game game{ name, entry.title, entry.parent, {}, theirs, system };
+		RomFiles &files = theirs ? gaelco : hikaru;
 
 		if (std::find(state.systems.begin(), state.systems.end(), system) == state.systems.end())
 			state.systems.push_back(system);
@@ -85,6 +86,7 @@ scan_library(LibraryState &state, const GameList &games, const Options &options,
 		if (state.games[i].name == chosen)
 			state.selected = static_cast<int>(i);
 	state.roms = options.rom_path;
+	state.gaelco = options.gaelco_path;
 	state.bios = options.bios_path;
 	state.roms_given = options.given.roms;
 	state.bios_given = options.given.bios;
