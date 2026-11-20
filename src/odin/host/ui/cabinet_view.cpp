@@ -70,6 +70,21 @@ struct Light {
 	Light operator|(Light other) const { return { worked || other.worked, chosen || other.chosen }; }
 };
 
+/* Red, green and blue of `a` moved towards those of `b` by that share; the
+ * alpha of `a` */
+ImU32
+mix(ImU32 a, ImU32 b, float share)
+{
+	ImU32 out = a & IM_COL32_A_MASK;
+
+	for (const int shift : { IM_COL32_R_SHIFT, IM_COL32_G_SHIFT, IM_COL32_B_SHIFT }) {
+		const float from = static_cast<float>((a >> shift) & 0xFF), to = static_cast<float>((b >> shift) & 0xFF);
+
+		out |= static_cast<ImU32>(std::lround(from + (to - from) * share)) << shift;
+	}
+	return out;
+}
+
 /* An affine map of the plane: x' = a x + c y + e, y' = b x + d y + f */
 struct Map {
 	float a = 1.0f, b = 0.0f, c = 0.0f, d = 1.0f, e = 0.0f, f = 0.0f;
@@ -127,12 +142,16 @@ public:
 	}
 	/* What follows is of a control that lights so (none: it does not) */
 	void light(Light how = {}) { m_light = how; }
+	/* The fills that follow mixed with a colour of the real cabinet by
+	 * that share (none: the palette's alone) */
+	void tint(ImU32 colour = 0, float share = 0.0f) { m_tint = colour, m_tint_share = share; }
 
 	void shape(std::vector<ImVec2> points, bool closed, Ink ink, float width = 0.0f, float alpha = 1.0f);
 	void circle(float x, float y, float r, Ink ink, float alpha = 1.0f) { ellipse(x, y, r, r, ink, alpha); }
 	void ellipse(float x, float y, float rx, float ry, Ink ink, float alpha = 1.0f);
 	void rect(float x, float y, float w, float h, float r, Ink ink, float alpha = 1.0f);
 	void ring(float x, float y, float outer, float inner);
+	void band(std::span<const ImVec2> line, float half, Ink ink);
 	void line(float x1, float y1, float x2, float y2, Ink ink, float width = 0.0f);
 	void arc(float x, float y, float r, float from, float to, Ink ink, float width, float alpha = 1.0f);
 	void curve(ImVec2 p0, ImVec2 p1, ImVec2 p2, ImVec2 p3, Ink ink, float width);
@@ -153,6 +172,8 @@ private:
 	ImDrawList *m_list;
 	bool m_measuring = true;
 	Light m_light;
+	ImU32 m_tint = 0;
+	float m_tint_share = 0.0f;
 	ImVec2 m_lo = { 1e9f, 1e9f }, m_hi = { -1e9f, -1e9f };
 	ImVec2 m_origin = {};
 	float m_scale = 1.0f;
@@ -206,6 +227,8 @@ Pen::shape(std::vector<ImVec2> points, bool closed, Ink ink, float width, float 
 	if (closed && points.size() > 2 && (ink == Ink::BODY || ink == Ink::PART || ink == Ink::LIT)) {
 		ImU32 fill = ink == Ink::BODY ? palette.body : ink == Ink::PART ? palette.part : palette.accent;
 
+		if (m_tint_share > 0.0f && ink != Ink::LIT)
+			fill = mix(fill, m_tint, m_tint_share);
 		if (alpha < 1.0f)
 			fill = MenuKit::alpha(fill, alpha);
 		m_list->AddConcavePolyFilled(points.data(), static_cast<int>(points.size()), fill);
@@ -268,6 +291,37 @@ Pen::ring(float x, float y, float outer, float inner)
 	}
 	stroke(out, true, Ink::BODY, 0.0f);
 	stroke(in, true, Ink::BODY, 0.0f);
+}
+
+/* A tube along a line of points, `half` on each side of it, filled piece
+ * by piece (bent, its outline is no shape the fill of a polygon takes
+ * well), then outlined */
+void
+Pen::band(std::span<const ImVec2> line, float half, Ink ink)
+{
+	std::vector<ImVec2> left, right;
+
+	for (size_t k = 0; k < line.size(); k++) {
+		const ImVec2 a = line[k == 0 ? 0 : k - 1], b = line[k + 1 < line.size() ? k + 1 : k];
+		const float dx = b.x - a.x, dy = b.y - a.y, len = std::max(std::hypot(dx, dy), 1e-3f);
+
+		left.push_back(at({ line[k].x - dy / len * half, line[k].y + dx / len * half }));
+		right.push_back(at({ line[k].x + dy / len * half, line[k].y - dx / len * half }));
+	}
+	if (m_measuring || line.size() < 2)
+		return;
+
+	const MenuPalette &palette = m_kit.palette();
+	ImU32 fill = ink == Ink::LIT ? palette.accent : ink == Ink::BODY ? palette.body : palette.part;
+
+	if (m_tint_share > 0.0f && ink != Ink::LIT)
+		fill = mix(fill, m_tint, m_tint_share);
+	for (size_t k = 0; k + 1 < left.size(); k++)
+		m_list->AddQuadFilled(left[k], left[k + 1], right[k + 1], right[k], fill);
+	if (ink == Ink::LIT)
+		return;
+	left.insert(left.end(), right.rbegin(), right.rend());
+	stroke(left, true, ink, 0.0f);
 }
 
 void
@@ -1352,6 +1406,497 @@ radikal_bikers(Pen &pen, const Controls &c)
 	pen.light();
 }
 
+/* A polygon of those corners, each rounded by r */
+std::vector<ImVec2>
+rounded(std::span<const ImVec2> corners, float r)
+{
+	std::vector<ImVec2> points;
+	const size_t n = corners.size();
+
+	for (size_t k = 0; k < n; k++) {
+		const ImVec2 p = corners[k];
+		const auto towards = [&](ImVec2 q) {
+			const float t = std::min(r / std::max(std::hypot(q.x - p.x, q.y - p.y), 1e-3f), 0.5f);
+
+			return ImVec2{ p.x + (q.x - p.x) * t, p.y + (q.y - p.y) * t };
+		};
+		const ImVec2 from = towards(corners[(k + n - 1) % n]), to = towards(corners[(k + 1) % n]);
+
+		points.push_back(from);
+		add_curve(points, from, { (from.x + 2 * p.x) / 3, (from.y + 2 * p.y) / 3 },
+		          { (to.x + 2 * p.x) / 3, (to.y + 2 * p.y) / 3 }, to, 6);
+	}
+	return points;
+}
+
+/* The colours of the photos of real Rolling Extreme cabinets, and how much
+ * of them the palette's fills take */
+constexpr ImU32 GREEN = IM_COL32(0x2E, 0xB4, 0x3C, 0xFF), BLUE = IM_COL32(0x24, 0x44, 0xB8, 0xFF);
+constexpr ImU32 BLACK = IM_COL32(0x06, 0x06, 0x08, 0xFF), GREY = IM_COL32(0xBC, 0xC0, 0xC6, 0xFF);
+constexpr ImU32 RED = IM_COL32(0xC8, 0x2C, 0x2C, 0xFF);
+constexpr float MUCH = 0.55f;
+
+/* Where a point is turned about another by those degrees */
+ImVec2
+about(ImVec2 p, ImVec2 o, float degrees)
+{
+	const float r = degrees * PI / 180.0f, cs = std::cos(r), sn = std::sin(r);
+
+	return { o.x + cs * (p.x - o.x) - sn * (p.y - o.y), o.y + sn * (p.x - o.x) + cs * (p.y - o.y) };
+}
+
+/* Rolling Extreme's upright, face on as the player stands at it, in
+ * millimetres: the proportions of the photos of real ones at recreativas
+ * m5063 and m10521 (the 28" screen 405 mm high), the desk and the handlebar
+ * at m12544 and m13971, the parts of UR p. 22, 27-29. The blue sides, the
+ * green hood with the attraction panel and the two black openings of the
+ * speakers beside it, the screen in its bevelled frame; the printed blue
+ * desk as seen from above, the
+ * green oval the handlebar comes out of, START at its front left and VIEW
+ * CHANGE at its front right; the grey U of the handlebar with its logo
+ * disk, tilting on its shaft under the desk, so that its stem moves along
+ * the slot of the oval, 20 degrees each way (HEURISTIC: no manual gives its
+ * travel nor where the shaft is); on each blue grip the green
+ * SMASH button at the top and the red trigger (UR p. 22), the brake of that
+ * side, which is in front of the grip (drawn beside it). The names stand
+ * beside the cabinet, a line from each to its control. */
+void
+rolling_extreme_upright(Pen &pen, const Controls &c)
+{
+	/* Units in a millimetre; the back edge of the desk; the shaft the
+	 * handlebar tilts on, under the slot; the grips */
+	constexpr float MM = 0.31f, DESK = 1031.0f, PY = 1388.0f, GX = 105.0f;
+	const float turn = c.value("handlebar") * 20.0f;
+
+	pen.push();
+	pen.scale(MM, MM, 0, 0);
+
+	/* The sides, the hood */
+	pen.tint(BLUE, MUCH);
+	pen.rect(-386, 34, 40, DESK, 14, Ink::BODY);
+	pen.rect(346, 34, 40, DESK, 14, Ink::BODY);
+	std::vector<ImVec2> hood = { { -360, DESK + 40 } };
+
+	add_curve(hood, hood.back(), { -368, 700 }, { -372, 300 }, { -366, 60 });
+	add_curve(hood, hood.back(), { -364, 20 }, { -344, 4 }, { -306, 2 });
+	add_curve(hood, hood.back(), { -120, -6 }, { 120, -6 }, { 306, 2 });
+	add_curve(hood, hood.back(), { 344, 4 }, { 364, 20 }, { 366, 60 });
+	add_curve(hood, hood.back(), { 372, 300 }, { 368, 700 }, { 360, DESK + 40 });
+	pen.tint(GREEN, MUCH);
+	pen.shape(hood, true, Ink::BODY);
+	pen.tint();
+	const ImVec2 bevel[] = { { -304, 514 }, { 304, 514 }, { 286, 990 }, { -286, 990 } };
+
+	pen.shape(rounded(bevel, 46), true, Ink::DETAIL);
+
+	/* The attraction panel, the hood coming down into it in the middle,
+	 * its logo; the speakers beside it */
+	const ImVec2 panel[] = { { -256, 74 }, { -64, 74 }, { 0, 100 }, { 64, 74 }, { 256, 74 }, { 190, 454 },
+	                         { -190, 454 } };
+
+	pen.tint(BLUE, MUCH);
+	pen.shape(rounded(panel, 40), true, Ink::PART);
+	pen.tint();
+	pen.rect(-178, 116, 330, 140, 30, Ink::DETAIL);
+	pen.text(-13, 222, "ROLLing", Align::CENTRE, BIG, true);
+	pen.circle(200, 150, 32, Ink::DETAIL);
+	pen.text(200, 163, "e", Align::CENTRE);
+	pen.text(10, 340, "eX.tre.me", Align::CENTRE);
+	pen.text(10, 400, "(street luge)", Align::CENTRE, 14.0f);
+	for (const float s : { -1.0f, 1.0f }) {
+		const float x = s * 264, y = 404;
+		std::vector<ImVec2> drop = { { x, y - 100 } };
+
+		add_curve(drop, drop.back(), { x + 24, y - 54 }, { x + 50, y + 42 }, { x, y + 100 });
+		add_curve(drop, drop.back(), { x - 50, y + 42 }, { x - 24, y - 54 }, { x, y - 100 });
+		drop.pop_back();
+		pen.push();
+		pen.turn(s * 14.0f, x, y);
+		pen.tint(BLACK, MUCH);
+		pen.shape(drop, true, Ink::PART);
+		pen.pop();
+	}
+
+	/* The screen */
+	pen.tint(BLACK, MUCH);
+	pen.rect(-250, 545, 500, 405, 30, Ink::PART);
+	pen.tint();
+	pen.rect(-232, 562, 464, 371, 20, Ink::DETAIL);
+
+	/* The desk: its front, its top, what is printed on it, the oval and
+	 * its slot */
+	std::vector<ImVec2> edge = { { -390, 1290 } };
+
+	add_curve(edge, edge.back(), { -392, 1340 }, { -362, 1370 }, { -302, 1374 });
+	add_curve(edge, edge.back(), { -160, 1392 }, { 160, 1392 }, { 302, 1374 });
+	add_curve(edge, edge.back(), { 362, 1370 }, { 392, 1340 }, { 390, 1290 });
+	std::vector<ImVec2> front = edge;
+
+	for (auto at = edge.rbegin(); at != edge.rend(); ++at)
+		front.push_back({ at->x, at->y + 64 });
+	pen.tint(BLACK, MUCH);
+	pen.shape(front, true, Ink::BODY);
+	std::vector<ImVec2> top = { { -386, DESK }, { 386, DESK } };
+
+	top.insert(top.end(), edge.rbegin(), edge.rend());
+	pen.tint(BLUE, MUCH);
+	pen.shape(top, true, Ink::BODY);
+	pen.tint();
+	pen.rect(-352, 1058, 214, 66, 14, Ink::DETAIL);
+	pen.text(-245, 1106, "ROLLing", Align::CENTRE, 13.0f);
+	const ImVec2 sight = { -262, 1222 };
+
+	pen.ellipse(sight.x, sight.y, 66, 38, Ink::DETAIL);
+	pen.ellipse(sight.x, sight.y, 52, 30, Ink::DETAIL);
+	pen.ellipse(sight.x, sight.y, 22, 13, Ink::DETAIL);
+	pen.line(sight.x - 22, sight.y, sight.x + 22, sight.y, Ink::DETAIL);
+	pen.line(sight.x, sight.y - 13, sight.x, sight.y + 13, Ink::DETAIL);
+	const ImVec2 cross = { -58, 1342 };
+
+	pen.shape({ { cross.x - 56, cross.y - 28 }, { cross.x - 40, cross.y - 28 }, { cross.x, cross.y - 6 },
+	            { cross.x + 40, cross.y - 28 }, { cross.x + 56, cross.y - 28 }, { cross.x + 12, cross.y },
+	            { cross.x + 56, cross.y + 28 }, { cross.x + 40, cross.y + 28 }, { cross.x, cross.y + 6 },
+	            { cross.x - 40, cross.y + 28 }, { cross.x - 56, cross.y + 28 }, { cross.x - 12, cross.y } },
+	          true, Ink::DETAIL);
+	pen.tint(GREEN, MUCH);
+	pen.ellipse(0, 1237, 173, 72, Ink::PART);
+	pen.tint(BLACK, MUCH);
+	pen.rect(-78, 1226, 156, 24, 10, Ink::PART);
+	pen.tint();
+
+	/* START and VIEW CHANGE, lit and sinking when pressed */
+	for (const auto &[id, x, y] : { std::tuple{ "start", -272.0f, 1268.0f }, std::tuple{ "view", 280.0f, 1270.0f } }) {
+		const bool on = c.on(id);
+
+		pen.light(c.light(id));
+		pen.ellipse(x, y, 40, 24, Ink::DETAIL);
+		pen.push();
+		pen.sink(on, x, y);
+		pen.tint(GREEN, MUCH);
+		pen.ellipse(x, y, 30, 17, Ink::PART);
+		pen.tint();
+		if (on)
+			pen.ellipse(x, y, 28, 15, Ink::LIT);
+		pen.pop();
+	}
+
+	/* The handlebar, turned: its stem, its U and the logo disk, then each
+	 * grip with its trigger (pulled towards it) and SMASH on top */
+	pen.push();
+	pen.turn(turn, 0, PY);
+	pen.light(c.light("handlebar"));
+	const ImVec2 stem[] = { { 0, 1190 }, { 0, 1240 } };
+	std::vector<ImVec2> bar = { { -GX, 1080 } };
+
+	add_curve(bar, bar.back(), { -GX + 2, 1150 }, { -72, 1172 }, { -24, 1176 });
+	add_curve(bar, bar.back(), { -8, 1177 }, { 8, 1177 }, { 24, 1176 });
+	add_curve(bar, bar.back(), { 72, 1172 }, { GX - 2, 1150 }, { GX, 1080 });
+	pen.tint(GREY, MUCH);
+	pen.band(stem, 10, Ink::PART);
+	pen.band(bar, 11, Ink::PART);
+	pen.circle(0, 1196, 40, Ink::PART);
+	pen.tint();
+	pen.circle(0, 1196, 28, Ink::DETAIL);
+	for (const float s : { -1.0f, 1.0f }) {
+		const float x = s * GX, y = 1000;
+		const char *const brake = s < 0 ? "left_brake" : "right_brake";
+		const char *const smash = s < 0 ? "left_smash" : "right_smash";
+		const float pulled = c.on(brake) ? 9.0f : 0.0f;
+		const bool on = c.on(smash);
+		std::vector<ImVec2> trigger = { { x + s * 20, 950 } };
+
+		add_curve(trigger, trigger.back(), { x + s * (40 - pulled), 952 }, { x + s * (46 - pulled), 972 },
+		          { x + s * (36 - pulled), 994 }, 8);
+		pen.light(c.light(brake));
+		pen.tint(RED, 0.4f);
+		pen.band(trigger, 6, c.on(brake) ? Ink::LIT : Ink::PART);
+		pen.light(c.light("handlebar"));
+		pen.tint(BLUE, MUCH);
+		pen.rect(x - 23, y - 90, 46, 180, 20, Ink::PART);
+		pen.tint();
+		pen.line(x, y - 50, x, y + 72, Ink::DETAIL);
+		pen.light(c.light(smash));
+		pen.rect(x - 21, 896, 42, 32, 10, Ink::DETAIL);
+		pen.push();
+		pen.sink(on, x, 912);
+		pen.tint(GREEN, MUCH);
+		pen.rect(x - 17, 900, 34, 24, 8, Ink::PART);
+		pen.tint();
+		if (on)
+			pen.rect(x - 16, 901, 32, 22, 7, Ink::LIT);
+		pen.pop();
+	}
+	pen.light();
+	pen.pop();
+
+	/* The names beside the cabinet, a line from each to its control */
+	const float side = 410.0f, mid = TEXT * 0.32f / MM;
+	const auto name = [&](const char *id, float s, float y, ImVec2 to, const char *label) {
+		pen.light(c.light(id));
+		pen.text(s * side, y, label, s < 0 ? Align::RIGHT : Align::LEFT);
+		pen.line(s * (side - 14), y - mid, to.x, to.y, Ink::DETAIL);
+		pen.light();
+	};
+
+	for (const float s : { -1.0f, 1.0f }) {
+		name(s < 0 ? "left_smash" : "right_smash", s, 876, about({ s * (GX + 21), 912 }, { 0, PY }, turn), "SMASH");
+		name(s < 0 ? "left_brake" : "right_brake", s, 990, about({ s * (GX + 46), 972 }, { 0, PY }, turn), "BRAKE");
+	}
+	name("handlebar", 1, 1140, about({ 99, 1140 }, { 0, PY }, turn), "HANDLEBAR");
+	name("start", -1, 1282, { -312, 1268 }, "START");
+	name("view", 1, 1262, { 320, 1270 }, "VIEW");
+	pen.light(c.light("view"));
+	pen.text(side, 1262 + 21.0f / MM, "CHANGE", Align::LEFT);
+	pen.light();
+	pen.pop();
+}
+
+/* Rolling Extreme's sit-down from behind and above, as the player comes to
+ * it, in millimetres: the photos of real ones at recreativas m1933 and
+ * m14267 and in MAME's PR 16579, the parts of SD p. 6-7, 25, 33-35. The
+ * monitor cabinet with its green marquee, the screen and the speakers under
+ * it; the two brake pedals over the aluminium foot rests in front of it; the
+ * coin tower on the right, its door towards the seat, START and VIEW CHANGE
+ * on its top, START on the left (SD p. 34); the blue seat on the green cover
+ * of its platform, tilting on its axis 12 degrees each way (HEURISTIC: no
+ * manual gives its travel); on each side the grey bar, fixed to the
+ * platform, and its blue grip: SMASH on top and the trigger in front (drawn
+ * beside it), one switch (SD p. 25, 38). The names stand beside the
+ * cabinet, a line from each to its control. */
+void
+rolling_extreme_sitdown(Pen &pen, const Controls &c)
+{
+	/* Units in a millimetre; the axis the seat tilts on; the grips */
+	constexpr float MM = 0.31f, AXIS = 1330.0f, GX = 382.0f, GY = 926.0f;
+	const float tilt = c.value("handlebar") * 12.0f;
+	/* A shape of that right half and of its mirror */
+	const auto both = [](std::vector<ImVec2> half) {
+		for (size_t k = half.size(); k-- > 0;)
+			if (std::abs(half[k].x) > 0.5f)
+				half.push_back({ -half[k].x, half[k].y });
+		return half;
+	};
+
+	pen.push();
+	pen.scale(MM, MM, 0, 0);
+
+	/* The monitor cabinet, further than the seat, drawn smaller: the
+	 * marquee and its lit panel, the blue sides, the screen, the speakers
+	 * and the sticker under it */
+	pen.push();
+	pen.scale(0.8f, 0.8f, 0, 0);
+	pen.tint(GREEN, MUCH);
+	pen.rect(-392, 0, 784, 152, 44, Ink::BODY);
+	pen.tint(BLUE, MUCH);
+	pen.rect(-340, 22, 680, 108, 18, Ink::PART);
+	pen.tint();
+	pen.text(-110, 100, "ROLLing", Align::CENTRE, TEXT, true);
+	pen.text(196, 100, "eX.tre.me", Align::CENTRE, 12.0f);
+	pen.tint(BLUE, MUCH);
+	pen.rect(-392, 152, 784, 690, 12, Ink::BODY);
+	pen.tint(BLACK, MUCH);
+	pen.rect(-356, 158, 712, 678, 10, Ink::BODY);
+	pen.rect(-306, 186, 612, 380, 26, Ink::PART);
+	pen.tint();
+	pen.rect(-288, 202, 576, 348, 18, Ink::DETAIL);
+	pen.line(-356, 600, 356, 600, Ink::DETAIL);
+	for (const float s : { -1.0f, 1.0f }) {
+		pen.tint(BLACK, MUCH);
+		pen.circle(s * 262, 706, 54, Ink::PART);
+		pen.tint();
+		pen.circle(s * 262, 706, 38, Ink::DETAIL);
+		pen.circle(s * 262, 706, 14, Ink::DETAIL);
+	}
+	pen.tint(BLUE, MUCH);
+	pen.rect(-150, 652, 300, 92, 16, Ink::PART);
+	pen.tint();
+	pen.text(0, 712, "ROLLing", Align::CENTRE, 15.0f);
+	pen.pop();
+
+	/* The bridge to the platform; the foot rests and over them the pedals,
+	 * tipping forwards as pushed */
+	pen.tint(GREY, MUCH);
+	pen.rect(-80, 668, 160, 40, 8, Ink::PART);
+	for (const float s : { -1.0f, 1.0f }) {
+		const char *const id = s < 0 ? "left_brake" : "right_brake";
+		const ImVec2 plate[] = { { s * 140, 750 }, { s * 300, 750 }, { s * 346, 1010 }, { s * 150, 1010 } };
+		const ImVec2 pad[] = { { s * 152, 682 }, { s * 286, 682 }, { s * 298, 772 }, { s * 142, 772 } };
+
+		pen.tint(GREY, MUCH);
+		pen.shape(rounded(plate, 10), true, Ink::PART);
+		pen.tint();
+		for (int row = 0; row < 7; row++)
+			for (float x = 170.0f + static_cast<float>(row % 2) * 19.0f; x < 316.0f; x += 38.0f) {
+				const float y = 790.0f + static_cast<float>(row) * 32.0f, d = row % 2 ? 6.0f : -6.0f;
+
+				pen.line(s * (x - 7), y + d, s * (x + 7), y - d, Ink::DETAIL);
+			}
+		pen.light(c.light(id));
+		pen.push();
+		if (c.on(id))
+			pen.scale(1.0f, 0.8f, 0, 772);
+		pen.tint(GREY, MUCH);
+		pen.shape(rounded(pad, 12), true, Ink::PART);
+		pen.tint();
+		if (c.on(id))
+			pen.shape(rounded(pad, 12), true, Ink::LIT, 0.0f, 0.9f);
+		for (float x = 166.0f; x < 280.0f; x += 13.0f)
+			pen.line(s * x, 694, s * (x + 2), 760, Ink::DETAIL);
+		pen.pop();
+		pen.light();
+	}
+
+	/* The coin tower: its door, the printed top, START and VIEW CHANGE by
+	 * its back edge, lit and sinking when pressed */
+	pen.tint(BLUE, MUCH);
+	pen.shape({ { 372, 690 }, { 552, 690 }, { 566, 770 }, { 360, 770 } }, true, Ink::PART);
+	pen.rect(360, 770, 206, 270, 10, Ink::BODY);
+	pen.tint(BLACK, MUCH);
+	pen.rect(388, 800, 150, 214, 12, Ink::PART);
+	pen.tint();
+	pen.rect(412, 824, 22, 40, 4, Ink::DETAIL);
+	pen.rect(492, 824, 22, 40, 4, Ink::DETAIL);
+	pen.rect(428, 958, 70, 32, 6, Ink::DETAIL);
+	pen.shape({ { 386, 698 }, { 538, 698 }, { 542, 720 }, { 382, 720 } }, true, Ink::DETAIL);
+	for (const auto &[id, x] : { std::pair{ "start", 418.0f }, std::pair{ "view", 508.0f } }) {
+		const bool on = c.on(id);
+
+		pen.light(c.light(id));
+		pen.rect(x - 36, 728, 72, 36, 10, Ink::DETAIL);
+		pen.push();
+		pen.sink(on, x, 746);
+		pen.tint(GREEN, MUCH);
+		pen.rect(x - 29, 733, 58, 26, 8, Ink::PART);
+		pen.tint();
+		if (on)
+			pen.rect(x - 28, 734, 56, 24, 7, Ink::LIT);
+		pen.pop();
+	}
+	pen.light();
+
+	/* The platform: its grey base, its green cover, the door at its back */
+	std::vector<ImVec2> base = { { -420, 1420 } };
+
+	add_curve(base, base.back(), { -420, 1476 }, { -300, 1508 }, { 0, 1508 });
+	add_curve(base, base.back(), { 300, 1508 }, { 420, 1476 }, { 420, 1420 });
+	pen.tint(GREY, MUCH);
+	pen.shape(base, true, Ink::BODY);
+	std::vector<ImVec2> cover = { { 0, 1304 } };
+
+	add_curve(cover, cover.back(), { 150, 1304 }, { 230, 1296 }, { 270, 1272 });
+	add_curve(cover, cover.back(), { 316, 1244 }, { 350, 1186 }, { 392, 1188 });
+	add_curve(cover, cover.back(), { 430, 1240 }, { 440, 1360 }, { 414, 1440 });
+	add_curve(cover, cover.back(), { 320, 1474 }, { 150, 1474 }, { 0, 1474 });
+	pen.tint(GREEN, MUCH);
+	pen.shape(both(cover), true, Ink::BODY);
+	pen.tint();
+	pen.rect(-112, 1364, 224, 88, 16, Ink::DETAIL);
+
+	/* The bars and the grips: SMASH on top, the trigger beside, pulled
+	 * towards the grip, both of one switch */
+	for (const float s : { -1.0f, 1.0f }) {
+		const char *const id = s < 0 ? "left_smash" : "right_smash";
+		const bool on = c.on(id);
+		const float pulled = on ? 9.0f : 0.0f;
+		std::vector<ImVec2> bar = { { s * 398, 1236 } };
+		std::vector<ImVec2> trigger = { { s * (GX + 22), GY + 14 } };
+
+		add_curve(bar, bar.back(), { s * 412, 1170 }, { s * GX, 1120 }, { s * GX, 1040 });
+		pen.tint(GREY, MUCH);
+		pen.band(bar, 13, Ink::PART);
+		add_curve(trigger, trigger.back(), { s * (GX + 42 - pulled), GY + 16 }, { s * (GX + 48 - pulled), GY + 36 },
+		          { s * (GX + 38 - pulled), GY + 58 }, 8);
+		pen.light(c.light(id));
+		pen.tint(BLUE, MUCH);
+		pen.band(trigger, 6, on ? Ink::LIT : Ink::PART);
+		pen.rect(s * GX - 26, GY, 52, 128, 22, Ink::PART);
+		pen.ellipse(s * GX, GY + 4, 30, 18, Ink::PART);
+		pen.tint();
+		pen.ellipse(s * GX, GY + 2, 20, 12, Ink::DETAIL);
+		pen.push();
+		pen.sink(on, s * GX, GY + 2);
+		pen.tint(RED, 0.4f);
+		pen.ellipse(s * GX, GY + 2, 15, 8.5f, Ink::PART);
+		pen.tint();
+		if (on)
+			pen.ellipse(s * GX, GY + 2, 14, 7.5f, Ink::LIT);
+		pen.pop();
+		pen.light();
+	}
+
+	/* The seat, tilted on its axis: its green cover and its slides, the
+	 * shell, the sticker on its back */
+	pen.push();
+	pen.turn(tilt, 0, AXIS);
+	pen.light(c.light("handlebar"));
+	std::vector<ImVec2> under = { { 0, 1250 } };
+
+	add_curve(under, under.back(), { 120, 1250 }, { 230, 1252 }, { 246, 1270 });
+	add_curve(under, under.back(), { 258, 1290 }, { 250, 1320 }, { 220, 1326 });
+	add_curve(under, under.back(), { 150, 1330 }, { 80, 1330 }, { 0, 1330 });
+	pen.tint(GREEN, MUCH);
+	pen.shape(both(under), true, Ink::PART);
+	pen.tint(GREY, MUCH);
+	pen.rect(-180, 1246, 24, 50, 6, Ink::PART);
+	pen.rect(156, 1246, 24, 50, 6, Ink::PART);
+	std::vector<ImVec2> shell = { { 0, 712 } };
+
+	add_curve(shell, shell.back(), { 60, 712 }, { 110, 712 }, { 135, 724 });
+	add_curve(shell, shell.back(), { 156, 736 }, { 162, 760 }, { 160, 790 });
+	add_curve(shell, shell.back(), { 158, 820 }, { 150, 846 }, { 148, 862 });
+	add_curve(shell, shell.back(), { 146, 876 }, { 146, 890 }, { 150, 900 });
+	add_curve(shell, shell.back(), { 176, 918 }, { 236, 926 }, { 248, 960 });
+	add_curve(shell, shell.back(), { 258, 976 }, { 258, 994 }, { 256, 1010 });
+	add_curve(shell, shell.back(), { 254, 1120 }, { 252, 1220 }, { 244, 1266 });
+	add_curve(shell, shell.back(), { 180, 1276 }, { 84, 1278 }, { 0, 1278 });
+	pen.tint(BLUE, MUCH);
+	pen.shape(both(shell), true, Ink::BODY);
+	pen.tint();
+	pen.curve({ -140, 868 }, { -70, 850 }, { 70, 850 }, { 140, 868 }, Ink::DETAIL, 0.0f);
+	pen.curve({ -212, 1004 }, { -110, 976 }, { 110, 976 }, { 212, 1004 }, Ink::DETAIL, 0.0f);
+	const ImVec2 sticker[] = { { -146, 1040 }, { 146, 1040 }, { 160, 1216 }, { -160, 1216 } };
+
+	pen.tint(BLUE, 0.3f);
+	pen.shape(rounded(sticker, 24), true, Ink::PART);
+	pen.tint();
+	pen.arc(-104, 1078, 24, -PI * 0.1f, PI * 1.3f, Ink::DETAIL, 3.0f);
+	pen.text(0, 1146, "ROLLing", Align::CENTRE, 15.0f, true, true);
+	pen.text(0, 1194, "eX.tre.me", Align::CENTRE, 11.0f, false, true);
+	pen.light();
+	pen.pop();
+
+	/* The names beside the cabinet, a line from each to its control */
+	const float left = -480.0f, right = 640.0f, mid = TEXT * 0.32f / MM;
+	const auto name = [&](const char *id, float x, float y, ImVec2 to, const char *label) {
+		pen.light(c.light(id));
+		pen.text(x, y, label, x < 0 ? Align::RIGHT : Align::LEFT);
+		pen.line(x < 0 ? x + 14 : x - 14, y - mid, to.x, to.y, Ink::DETAIL);
+		pen.light();
+	};
+
+	name("left_brake", left, 742, { -296, 726 }, "BRAKE");
+	name("left_smash", left, 940, { -GX - 21, GY + 2 }, "SMASH");
+	name("handlebar", left, 1130, about({ -255, 1100 }, { 0, AXIS }, tilt), "SEAT");
+	name("right_brake", right, 636, { 292, 700 }, "BRAKE");
+	name("start", right, 700, { 418, 728 }, "START");
+	name("view", right, 772, { 544, 746 }, "VIEW");
+	pen.light(c.light("view"));
+	pen.text(right, 772 + 21.0f / MM, "CHANGE", Align::LEFT);
+	pen.light();
+	name("right_smash", right, 1230, { GX + 21, GY + 2 }, "SMASH");
+	pen.pop();
+}
+
+/* Rolling Extreme: the upright, or the sit-down */
+void
+rolling_extreme(Pen &pen, const Controls &c)
+{
+	if (c.cabinet() == "sitdown")
+		rolling_extreme_sitdown(pen, c);
+	else
+		rolling_extreme_upright(pen, c);
+}
+
 using Drawing = void (*)(Pen &, const Controls &);
 
 Drawing
@@ -1369,7 +1914,7 @@ drawing_of(const std::string &game)
 		{ "speedup12", speed_up }, { "speedup10", speed_up },
 		{ "surfplnt", surf_planet }, { "surfplnt40", surf_planet }, { "surfplnt31", surf_planet },
 		{ "surfplnt30", surf_planet }, { "surfplnt20", surf_planet }, { "surfplnt12", surf_planet },
-		{ "surfplnt10", surf_planet },
+		{ "surfplnt10", surf_planet }, { "rollext", rolling_extreme },
 	};
 
 	for (const auto &[name, drawing] : DRAWINGS)
