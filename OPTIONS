@@ -84,9 +84,10 @@ apart by commas (see INPUTS below).
 [display]
 
  scale         1 to 6          3D resolution, times 640 x 480. Default 1.
-                               Gaelco 3D: 1 is the board's own exact
-                               picture; above 1, the graphics card
-                               redraws its scenes, close to the board.
+                               Gaelco 3D and Rolling Extreme: 1 is the
+                               board's own exact picture; above 1, the
+                               graphics card redraws its scenes, close
+                               to the board.
  upscale_mode  raw, snap,      How flat 2D pieces (HUD, text) are drawn
                native          above scale 1. raw: fine like the rest;
                                snap: corners on the board's pixels;

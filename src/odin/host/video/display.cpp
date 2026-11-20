@@ -360,6 +360,7 @@ Display::set_scene(PmxScene scene)
 	finish();
 	m_own_scene = std::move(scene);
 	m_own_is_gaelco3d = false;
+	m_own_d3plus.reset();
 	m_own_fresh = true;
 }
 
@@ -372,6 +373,16 @@ Display::set_scene(Gaelco3dScene scene)
 		scene.palette = std::move(m_own_gaelco3d.palette);
 	m_own_gaelco3d = std::move(scene);
 	m_own_is_gaelco3d = true;
+	m_own_d3plus.reset();
+	m_own_fresh = true;
+}
+
+void
+Display::set_scene(std::shared_ptr<const D3plusScene> scene)
+{
+	finish();
+	m_own_d3plus = std::move(scene);
+	m_own_is_gaelco3d = false;
 	m_own_fresh = true;
 }
 
@@ -395,7 +406,9 @@ Display::draw_own(bool late, unsigned w, unsigned h, bool bar)
 			m_own->set_scale(m_scale);
 			m_own_built = m_scale;
 		}
-		if (m_own_is_gaelco3d)
+		if (m_own_d3plus)
+			m_own->draw_d3plus(*m_own_d3plus);
+		else if (m_own_is_gaelco3d)
 			m_own->draw_gaelco3d(m_own_gaelco3d);
 		else
 			m_own->draw_pmx(m_own_scene, m_anisotropy);
@@ -428,6 +441,7 @@ Display::detach()
 	if (m_own) {
 		run([this] { m_own.reset(); });
 		m_own_scene = {};
+		m_own_d3plus.reset();
 		m_own_fresh = m_own_blank = false;
 		m_picture.id = 0;
 		m_title = "Odin";

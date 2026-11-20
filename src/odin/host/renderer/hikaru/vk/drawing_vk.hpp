@@ -111,6 +111,7 @@ public:
 	void present(PictureRect rect, unsigned window_w, unsigned window_h) override;
 	void draw_pmx(const PmxScene &scene, unsigned anisotropy) override;
 	void draw_gaelco3d(const Gaelco3dScene &scene) override;
+	void draw_d3plus(const D3plusScene &scene) override;
 	void prepare_pmx(const std::vector<uint64_t> &keys,
 	                 const std::function<void(unsigned, unsigned)> &progress) override;
 	void list_pmx_in(const std::string &path) override;
@@ -132,6 +133,9 @@ private:
 	/* The pipelines and images of the Gaelco 3D boards (gaelco3d_vk.cpp) */
 	struct Gaelco3d;
 	std::shared_ptr<Gaelco3d> m_gaelco3d;
+	/* The pipelines and images of Rolling Extreme (d3plus_vk.cpp) */
+	struct D3plus;
+	std::shared_ptr<D3plus> m_d3plus;
 	/* Descriptor sets of one layout, each kept until it is freed, from
 	 * pools made as they fill */
 	struct KeptSets {

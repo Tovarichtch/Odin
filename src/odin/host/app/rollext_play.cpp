@@ -142,6 +142,8 @@ private:
 	KeptRanges m_ranges;
 	/* The gamepad of the upright (shake_pad) */
 	std::optional<PadShake> m_pad;
+	/* The card cannot hold the texture ROMs: told once */
+	bool m_too_large = false;
 	/* Left, right, the woofer and the seat (filter_sound) */
 	std::array<DacStage, 4> m_stages{ DacStage(FRONT, DAC_RATE, FRONT.r_iv, COUPLING),
 		                          DacStage(FRONT, DAC_RATE, FRONT.r_iv, COUPLING),
@@ -274,6 +276,20 @@ void
 RollextGame::run_frame()
 {
 	read_controls();
+	/* Above the board's resolution, the GPU draws each picture (as it draws
+	 * the Gaelco 3D's fields); on a card whose textures cannot
+	 * hold the texture ROMs, the board draws its own picture, as at 1x, and
+	 * the user is told once */
+	const unsigned largest = m_display.largest_texture();
+	const bool fits = D3plusScene::SHEET_W <= largest && D3plusScene::SHEET_H <= largest;
+	const bool fine = m_display.scale() > 1 && fits;
+
+	if (m_display.scale() > 1 && !fits && !m_too_large) {
+		std::fprintf(stderr, "renderer: the graphics card's textures are too small for Rolling Extreme's "
+		                     "(%u rows): its own picture is shown, as at 1x\n", D3plusScene::SHEET_H);
+		m_too_large = true;
+	}
+	m_board->d3plus().set_gpu(fine, m_display.upscale_mode() == DisplayUpscaleMode::NATIVE);
 	m_board->run_frame();
 	filter_sound();
 	m_ranges.follow(*m_board);
@@ -291,7 +307,10 @@ RollextGame::run_frame()
 		std::printf("rollext: frame %u outputs %X motor %d jolt %.1f pad %04X\n", m_board->frame(), m_shown_outputs,
 		            m_shown_motor, m_board->motor_jolt(), m_pad ? m_pad->heavy : 0);
 	}
-	m_display.set_scene(picture_scene(m_board->picture(), Rollext::WIDTH, Rollext::HEIGHT));
+	if (fine)
+		m_display.set_scene(m_board->d3plus().scene());
+	else
+		m_display.set_scene(picture_scene(m_board->picture(), Rollext::WIDTH, Rollext::HEIGHT));
 }
 
 } /* namespace */

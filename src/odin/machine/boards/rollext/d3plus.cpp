@@ -7,6 +7,7 @@
  *  ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝
  *
  * Copyright (C) 2026 Réda Chérif-Touil
+ * Copyright (C) 2026 Daniel Martin
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,6 +48,8 @@ constexpr uint32_t ROM_SIZE = SHEET_W * SHEET_H / 4;
 constexpr uint32_t BLACK = 0xFF000000u;
 /* The palette: 32,768 big-endian words */
 constexpr uint32_t PALETTE_BYTES = 0x10000;
+/* The table: a bit per texel of the sheet's first 2048 rows */
+constexpr uint32_t TABLE_BYTES = 2048 * SHEET_W / 8;
 /* A depth that any pixel passes: the depth buffer as cleared */
 constexpr double FAR = std::numeric_limits<double>::infinity();
 
@@ -180,6 +183,7 @@ D3plus::attach(const uint8_t *palette, const uint8_t *table)
 void
 D3plus::palette_written(uint32_t offset, uint32_t bytes)
 {
+	m_palette_changed = true;
 	if (!m_palette)
 		return;
 	m_colours.resize(PALETTE_BYTES / 2);
@@ -200,6 +204,7 @@ D3plus::palette_written(uint32_t offset, uint32_t bytes)
 void
 D3plus::set_textures(const std::array<std::vector<uint8_t>, 4> &roms)
 {
+	m_gpu_sheet.reset();
 	for (uint32_t y = 0; y < SHEET_H; y++)
 		for (uint32_t odd = 0; odd < 2; odd++) {
 			const std::vector<uint8_t> &rom = roms[(y & 1) * 2 + odd];
@@ -223,6 +228,8 @@ D3plus::reset()
 	std::fill(m_drawn.begin(), m_drawn.end(), BLACK);
 	std::fill(m_shown.begin(), m_shown.end(), BLACK);
 	std::fill(m_depth.begin(), m_depth.end(), FAR);
+	m_scene = {};
+	m_last_scene.reset();
 }
 
 /* The chip takes the packet at the head of the FIFO once it is whole and
@@ -266,7 +273,10 @@ D3plus::finish_pictures()
 void
 D3plus::next_picture()
 {
-	queue(Job{ {}, {}, m_s.drawn_marker, m_s.drawn_frame, true });
+	if (m_gpu)
+		end_scene();
+	else
+		queue(Job{ {}, {}, m_s.drawn_marker, m_s.drawn_frame, true });
 	m_s.drawn_frame = m_s.marker_frame[0];
 	m_s.drawn_marker = m_s.markers - m_s.waiting_markers + 1;
 }
@@ -308,6 +318,10 @@ D3plus::take(const std::array<uint64_t, PACKET> &packet)
 		 * edges included */
 		m_s.clip = { signed9(w1 >> 23 & 511), signed9(w1 >> 11 & 511), signed9(w3 >> 11 & 511),
 		             signed9(w3 >> 23 & 511) };
+		return;
+	}
+	if (m_gpu) {
+		scene_packet(packet);
 		return;
 	}
 	m_queued.emplace_back(packet, m_s.clip, 0, 0, false);
@@ -593,6 +607,279 @@ D3plus::draw(const std::array<uint64_t, PACKET> &packet, const std::array<int32_
 			}
 		}
 	}
+}
+
+void
+D3plus::set_gpu(bool on, bool native)
+{
+	/* At 1x, Native changes nothing */
+	if (on == m_gpu && (native == m_native || !on))
+		return;
+	settle();
+	if (on && !m_gpu_sheet)
+		/* The same bytes: two rows of 2048 texels make a row of 4096 */
+		m_gpu_sheet = std::make_shared<std::vector<uint8_t>>(m_sheet);
+	if (on != m_gpu) {
+		m_scene = {};
+		m_last_scene.reset();
+	}
+	m_gpu = on;
+	m_native = native;
+}
+
+std::shared_ptr<const D3plusScene>
+D3plus::scene()
+{
+	if (!m_last_scene) {
+		auto blank = std::make_shared<D3plusScene>();
+
+		blank->sheet = m_gpu_sheet;
+		blank->table = gpu_table();
+		blank->palettes.push_back(gpu_palette());
+		m_last_scene = std::move(blank);
+	}
+	return m_last_scene;
+}
+
+/* The palette's words as they are now, made again once it has changed */
+std::shared_ptr<const std::vector<uint16_t>>
+D3plus::gpu_palette()
+{
+	if (m_palette_changed || !m_gpu_palette) {
+		auto words = std::make_shared<std::vector<uint16_t>>(PALETTE_BYTES / 2, 0);
+
+		if (m_palette)
+			for (size_t e = 0; e < words->size(); e++)
+				(*words)[e] = static_cast<uint16_t>(m_palette[2 * e] << 8 | m_palette[2 * e + 1]);
+		m_gpu_palette = std::move(words);
+		m_palette_changed = false;
+	}
+	return m_gpu_palette;
+}
+
+std::shared_ptr<const std::vector<uint8_t>>
+D3plus::gpu_table()
+{
+	if (m_table_changed || !m_gpu_table) {
+		m_gpu_table = m_table ? std::make_shared<std::vector<uint8_t>>(m_table, m_table + TABLE_BYTES)
+		                      : std::make_shared<std::vector<uint8_t>>(TABLE_BYTES, 0);
+		m_table_changed = false;
+	}
+	return m_gpu_table;
+}
+
+/* The scene of a picture, finished at its marker as the frame drawn at 1x
+ * is (next_picture). MEASURED: the table is never
+ * written between two packets of a picture: one table a picture */
+void
+D3plus::end_scene()
+{
+	auto scene = std::make_shared<D3plusScene>(std::move(m_scene));
+
+	m_scene = {};
+	m_scene.vertices.reserve(scene->vertices.size());
+	if (scene->palettes.empty())
+		scene->palettes.push_back(gpu_palette());
+	scene->sheet = m_gpu_sheet;
+	scene->table = gpu_table();
+	m_last_scene = std::move(scene);
+}
+
+/* A packet into the scene, with what draw() reads of it (same words, same
+ * fields); the GPU works its points out (d3plus_draw.frag). A quad is two
+ * triangles, 0 1 2 and 0 2 3: MEASURED, they hold every
+ * point of the board's outline. Native 2D: a flat packet becomes the points
+ * of the board draw() would cover, worked out by its own rule */
+void
+D3plus::scene_packet(const std::array<uint64_t, PACKET> &packet)
+{
+	const auto word = [&packet](unsigned i) {
+		return static_cast<uint32_t>(i & 1 ? packet[i / 2] : packet[i / 2] >> 32);
+	};
+	const auto real = [&word](unsigned i) { return std::bit_cast<float>(word(i)); };
+	const uint32_t w0 = word(0);
+
+	if (!m_palette || !m_table)
+		return;
+
+	/* The palette as the chip takes the packet: a new piece of the picture
+	 * once it was written after the picture's first packet (MEASURED: only
+	 * at power-up, 3 pieces at most) */
+	if (m_palette_changed || m_scene.palettes.empty()) {
+		std::shared_ptr<const std::vector<uint16_t>> now = gpu_palette();
+
+		if (m_scene.vertices.empty())
+			m_scene.palettes.assign(1, std::move(now));
+		else if (m_scene.palettes.size() < D3plusScene::PALETTES)
+			m_scene.palettes.push_back(std::move(now));
+		else
+			/* Never seen: the last piece takes the last palette */
+			m_scene.palettes.back() = std::move(now);
+	}
+
+	const unsigned corners = w0 >> 30 == 3 ? 4 : 3;
+	const uint32_t address = word(2) >> 8;
+	const uint32_t x0 = address & 0x7FF, y0 = (address >> 11) + (w0 >> 24 & 1 ? 8192 : 0);
+	const uint32_t level = w0 >> 20 & 15;
+	D3plusVertex corner{};
+
+	corner.q[0] = real(10);
+	corner.q[1] = real(12);
+	corner.q[2] = real(20);
+	corner.depth = static_cast<float>(word(4) >> 7);
+	corner.u[0] = real(6);
+	corner.u[1] = real(8);
+	corner.u[2] = real(18);
+	corner.v[0] = real(14);
+	corner.v[1] = real(16);
+	corner.v[2] = real(22);
+	corner.texture = x0 | y0 << 11;
+	corner.mode = (w0 >> 8 & 0x7F) | level << 8 | static_cast<uint32_t>(m_scene.palettes.size() - 1) << 12;
+	for (unsigned k = 0; k < 4; k++)
+		corner.rect[k] = static_cast<int16_t>(m_s.clip[k]);
+
+	const size_t first = m_scene.vertices.size();
+	const auto put = [&](double x, double y) {
+		corner.x = static_cast<float>(x);
+		corner.y = static_cast<float>(y);
+		m_scene.vertices.push_back(corner);
+	};
+	std::array<double, 4> vx{}, vy{};
+
+	for (unsigned k = 0; k < corners; k++) {
+		vx[k] = real(1 + 4 * k);
+		vy[k] = real(3 + 4 * k);
+	}
+	if (!m_native || corner.q[0] != 0.0f || corner.q[1] != 0.0f) {
+		for (const unsigned k : { 0u, 1u, 2u })
+			put(vx[k], vy[k]);
+		if (corners == 4)
+			for (const unsigned k : { 0u, 2u, 3u })
+				put(vx[k], vy[k]);
+	} else {
+		/* The lines and points draw() covers: its rule and its
+		 * arithmetic, line by line; lines of the same points make one
+		 * rectangle of the board's points */
+		const auto [xmin, xmax, ymin, ymax] = m_s.clip;
+		double top = vy[0], bottom = vy[0];
+
+		for (unsigned k = 1; k < corners; k++) {
+			if (vy[k] > top)
+				top = vy[k];
+			if (vy[k] < bottom)
+				bottom = vy[k];
+		}
+
+		struct Edge {
+			double ax, ay, dx, dy, low, high;
+		};
+		std::array<Edge, 4> edges{};
+		unsigned sides = 0;
+
+		for (unsigned k = 0; k < corners; k++) {
+			const double ax = vx[k], ay = vy[k], bx = vx[(k + 1) % corners], by = vy[(k + 1) % corners];
+
+			if (ay == by)
+				continue;
+			edges[sides++] = { ax, ay, bx - ax, by - ay, ay < by ? ay : by, ay < by ? by : ay };
+		}
+
+		int high = std::min(ymax, 192), low = std::max(ymin, -191);
+
+		if (top < 192.0)
+			high = top >= -191.0 ? std::min(high, static_cast<int>(std::floor(top))) : -192;
+		if (bottom > -191.0)
+			low = bottom <= 192.0 ? std::max(low, static_cast<int>(std::ceil(bottom))) : 193;
+
+		int kept_first = 0, kept_last = -1, kept_top = 0, kept_bottom = 0;
+		const auto flush = [&] {
+			if (kept_first > kept_last)
+				return;
+			corner.mode |= D3plusVertex::NATIVE;
+			corner.rect[0] = static_cast<int16_t>(kept_first);
+			corner.rect[1] = static_cast<int16_t>(kept_last);
+			corner.rect[2] = static_cast<int16_t>(kept_bottom);
+			corner.rect[3] = static_cast<int16_t>(kept_top);
+
+			const double l = kept_first - 0.5, r = kept_last + 0.5, t = kept_top + 0.5, b = kept_bottom - 0.5;
+
+			put(l, t);
+			put(r, t);
+			put(r, b);
+			put(l, t);
+			put(r, b);
+			put(l, b);
+			kept_last = kept_first - 1;
+		};
+
+		for (int sy = high; sy >= low; sy--) {
+			const double y = sy;
+
+			if (sy > ymax || sy < ymin || y > top || y < bottom) {
+				flush();
+				continue;
+			}
+
+			double left = 0.0, right = 0.0;
+			unsigned crossed = 0;
+
+			for (unsigned k = 0; k < sides; k++) {
+				const Edge &e = edges[k];
+
+				if (!(e.low <= y && y < e.high))
+					continue;
+
+				const double x = e.ax + (y - e.ay) * e.dx / e.dy;
+
+				if (crossed == 0) {
+					left = right = x;
+				} else {
+					if (x < left)
+						left = x;
+					if (x > right)
+						right = x;
+				}
+				crossed++;
+			}
+
+			const double from = std::max(std::ceil(left), static_cast<double>(xmin));
+			const double to = std::min(std::ceil(right) - 1.0, static_cast<double>(xmax));
+
+			if (crossed < 2 || !std::isfinite(left) || !std::isfinite(right) || from > to) {
+				flush();
+				continue;
+			}
+
+			const int from_x = std::max(static_cast<int>(from), -256), to_x = std::min(static_cast<int>(to), 255);
+
+			if (kept_first <= kept_last && from_x == kept_first && to_x == kept_last) {
+				kept_bottom = sy;
+				continue;
+			}
+			flush();
+			kept_first = from_x;
+			kept_last = to_x;
+			kept_top = kept_bottom = sy;
+		}
+		flush();
+	}
+
+	const uint32_t added = static_cast<uint32_t>(m_scene.vertices.size() - first);
+
+	if (!added)
+		return;
+
+	const bool translucent = level != 0, tested = !(w0 >> 29 & 1);
+
+	if (!m_scene.runs.empty()) {
+		D3plusRun &last = m_scene.runs.back();
+
+		if (last.translucent == translucent && last.tested == tested && last.first + last.count == first) {
+			last.count += added;
+			return;
+		}
+	}
+	m_scene.runs.push_back({ static_cast<uint32_t>(first), added, translucent, tested });
 }
 
 void
