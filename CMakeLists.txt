@@ -16,6 +16,12 @@ include(GNUInstallDirs)
 option(ODIN_NATIVE "Tune for this machine's CPU (-march=native)" ON)
 option(ODIN_LTO "Link-time optimisation (-flto)" ON)
 option(ODIN_GLES "Use OpenGL ES for embedded systems" OFF)
+# Android: OpenGL ES (and Vulkan), the program a library SDL's activity loads
+if(ANDROID)
+	set(ODIN_GLES ON CACHE BOOL "Use OpenGL ES for embedded systems" FORCE)
+	# Bionic's PAGE_SIZE macro would stand for Sh4::PAGE_SIZE
+	add_compile_definitions(__BIONIC_NO_PAGE_SIZE_MACRO)
+endif()
 set(ODIN_OPT_FLAGS "-O3 -fomit-frame-pointer -fno-stack-protector" CACHE STRING
 	"Optimisation flags")
 set(ODIN_PGO "" CACHE STRING "Profile-guided build: generate or use")
@@ -119,18 +125,25 @@ function(odin_library name folder target)
 	message(STATUS "${ARGN}: from 3rdparty/${folder}")
 endfunction()
 
-if(ODIN_GLES AND NOT (UNIX AND NOT APPLE))
+if(ODIN_GLES AND NOT (UNIX AND NOT APPLE) AND NOT ANDROID)
 	message(FATAL_ERROR "ODIN_GLES is for Linux")
 endif()
 find_package(PkgConfig QUIET)
 
-set(SDL_SHARED OFF)
-set(SDL_STATIC ON)
 set(SDL_TEST_LIBRARY OFF)
 set(SDL_TESTS OFF)
 set(SDL_EXAMPLES OFF)
 set(SDL_INSTALL OFF)
-odin_library(sdl SDL SDL3::SDL3-static sdl3)
+if(ANDROID)
+	# libSDL3.so, which SDL's activity loads before libmain.so
+	set(SDL_SHARED ON)
+	set(SDL_STATIC OFF)
+	odin_library(sdl SDL SDL3::SDL3-shared sdl3)
+else()
+	set(SDL_SHARED OFF)
+	set(SDL_STATIC ON)
+	odin_library(sdl SDL SDL3::SDL3-static sdl3)
+endif()
 
 set(JANSSON_BUILD_SHARED_LIBS OFF)
 set(JANSSON_EXAMPLES OFF)
@@ -180,6 +193,8 @@ target_link_libraries(odin_deps INTERFACE odin_jansson odin_vulkan_headers)
 if(APPLE)
 	target_link_libraries(odin_deps INTERFACE odin_glew "-framework OpenGL")
 	set(HOST_WARN_FLAGS -Wno-sign-conversion)
+elseif(ANDROID)
+	target_link_libraries(odin_deps INTERFACE GLESv3 EGL android log)
 elseif(UNIX AND ODIN_GLES)
 	odin_system_only(gles glesv2)
 	odin_system_only(x11 x11)
@@ -433,8 +448,16 @@ set_source_files_properties(src/odin/host/app/rom_files.cpp PROPERTIES
 set_source_files_properties(src/odin/host/gfx/host_graphics_vk.cpp PROPERTIES
 	COMPILE_DEFINITIONS "${VULKAN_FLAGS}")
 
-add_executable(odin ${ODIN_SOURCES}
-	$<TARGET_OBJECTS:odin_imgui> $<TARGET_OBJECTS:odin_archive> $<TARGET_OBJECTS:odin_embedded>)
+if(ANDROID)
+	add_library(odin SHARED ${ODIN_SOURCES}
+		$<TARGET_OBJECTS:odin_imgui> $<TARGET_OBJECTS:odin_archive> $<TARGET_OBJECTS:odin_embedded>)
+	set_target_properties(odin PROPERTIES OUTPUT_NAME main)
+	# Pages of 16 KB (Android 15 and later)
+	target_link_options(odin PRIVATE -Wl,-z,max-page-size=16384)
+else()
+	add_executable(odin ${ODIN_SOURCES}
+		$<TARGET_OBJECTS:odin_imgui> $<TARGET_OBJECTS:odin_archive> $<TARGET_OBJECTS:odin_embedded>)
+endif()
 set_target_properties(odin PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF
 	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 target_include_directories(odin PRIVATE src)

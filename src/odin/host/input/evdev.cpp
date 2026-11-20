@@ -32,7 +32,7 @@
 #include "odin/host/input/pointer_names.hpp"
 #include "odin/host/input/seats.hpp"
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
 
 #include <algorithm>
 #include <array>

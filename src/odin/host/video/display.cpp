@@ -179,6 +179,12 @@ set_icon(SDL_Window *window)
 SDL_Window *
 make_window(uint64_t flags)
 {
+#if defined(__ANDROID__)
+	/* A phone: the whole screen, which SDL keeps without the bars of the
+	 * system (immersive), the app back in front too; a window not on the
+	 * whole display has SDL show them (SDLActivity.setWindowStyle) */
+	flags |= SDL_WINDOW_FULLSCREEN;
+#endif
 	SDL_Window *const window = SDL_CreateWindow("Odin", Renderer::WIDTH, Renderer::HEIGHT, flags | SDL_WINDOW_RESIZABLE);
 
 	if (!window) {
