@@ -45,7 +45,8 @@ constexpr uint32_t WRITE_CYCLE_US = 4000;
 
 } /* namespace */
 
-Eeprom93c46::Eeprom93c46(uint32_t clock_hz)
+template <unsigned Bytes>
+MicrowireEeprom<Bytes>::MicrowireEeprom(uint32_t clock_hz)
 	: m_write_cycles(static_cast<uint32_t>((static_cast<uint64_t>(clock_hz) * WRITE_CYCLE_US) / 1000000u))
 {
 	m_data.fill(0xFF);
@@ -54,7 +55,8 @@ Eeprom93c46::Eeprom93c46(uint32_t clock_hz)
 
 /* Power-up state: write disabled, no command in progress. The contents
  * survive a reset. */
-void Eeprom93c46::reset()
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::reset()
 {
 	m_busy_cycles = 0;
 	m_state = State::IDLE;
@@ -68,13 +70,15 @@ void Eeprom93c46::reset()
 	m_do = true;
 }
 
-void Eeprom93c46::load(std::span<const uint8_t> in)
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::load(std::span<const uint8_t> in)
 {
 	const size_t n = std::min(in.size(), static_cast<size_t>(SIZE));
 	std::copy_n(in.begin(), n, m_data.begin());
 }
 
-void Eeprom93c46::save(Eeprom93c46State &out) const
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::save(MicrowireEepromState<Bytes> &out) const
 {
 	out.data = m_data;
 	out.busy_cycles = m_busy_cycles;
@@ -92,7 +96,8 @@ void Eeprom93c46::save(Eeprom93c46State &out) const
 	out.dout = m_do;
 }
 
-void Eeprom93c46::load(const Eeprom93c46State &in)
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::load(const MicrowireEepromState<Bytes> &in)
 {
 	m_data = in.data;
 	m_busy_cycles = in.busy_cycles;
@@ -110,7 +115,8 @@ void Eeprom93c46::load(const Eeprom93c46State &in)
 	m_do = in.dout != 0;
 }
 
-void Eeprom93c46::set_pins(bool cs, bool sk, bool di, bool org)
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::set_pins(bool cs, bool sk, bool di, bool org)
 {
 	m_di = di;
 	if (!m_cs && cs) {
@@ -131,7 +137,8 @@ void Eeprom93c46::set_pins(bool cs, bool sk, bool di, bool org)
 
 /* DO is high impedance (pulled up) outside a read. With CS high and no
  * command in progress it reports READY/BUSY after a write. */
-bool Eeprom93c46::do_read() const
+template <unsigned Bytes>
+bool MicrowireEeprom<Bytes>::do_read() const
 {
 	if (m_state == State::READING) {
 		return m_do;
@@ -142,7 +149,8 @@ bool Eeprom93c46::do_read() const
 	return true;
 }
 
-void Eeprom93c46::tick(uint32_t cycles)
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::tick(uint32_t cycles)
 {
 	if (m_busy_cycles > cycles) {
 		m_busy_cycles -= cycles;
@@ -151,14 +159,16 @@ void Eeprom93c46::tick(uint32_t cycles)
 	}
 }
 
-void Eeprom93c46::on_cs_rise()
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::on_cs_rise()
 {
 	m_state = State::START;
 	m_bits = 0;
 	m_shift = 0;
 }
 
-void Eeprom93c46::on_cs_fall()
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::on_cs_fall()
 {
 	/* Programming starts when CS drops after the instruction. */
 	if (m_state == State::DONE) {
@@ -168,7 +178,8 @@ void Eeprom93c46::on_cs_fall()
 	m_do = true;
 }
 
-void Eeprom93c46::on_sk_rise()
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::on_sk_rise()
 {
 	switch (m_state) {
 	case State::START:
@@ -213,7 +224,8 @@ void Eeprom93c46::on_sk_rise()
 }
 
 /* Opcode and address are in; decide what the instruction does. */
-void Eeprom93c46::execute()
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::execute()
 {
 	const uint16_t addr_mask = static_cast<uint16_t>((1u << address_bits()) - 1);
 	m_opcode = static_cast<uint8_t>((m_shift >> address_bits()) & 3);
@@ -269,7 +281,8 @@ void Eeprom93c46::execute()
 
 /* Data bits are in: WRITE one cell or WRAL all of them. The cycle itself
  * starts when CS drops. */
-void Eeprom93c46::execute_write()
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::execute_write()
 {
 	if (m_write_enabled) {
 		if (m_opcode == OP_WRITE) {
@@ -286,29 +299,35 @@ void Eeprom93c46::execute_write()
 	}
 }
 
-uint16_t Eeprom93c46::cell_read(uint16_t index) const
+template <unsigned Bytes>
+uint16_t MicrowireEeprom<Bytes>::cell_read(uint16_t index) const
 {
 	if (m_org) {
-		const uint32_t byte = (index & 0x3F) * 2u;
+		const uint32_t byte = (index & (SIZE / 2 - 1)) * 2u;
 		return static_cast<uint16_t>((m_data[byte] << 8) | m_data[byte + 1]);
 	}
-	return m_data[index & 0x7F];
+	return m_data[index & (SIZE - 1)];
 }
 
-void Eeprom93c46::cell_write(uint16_t index, uint16_t value)
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::cell_write(uint16_t index, uint16_t value)
 {
 	if (m_org) {
-		const uint32_t byte = (index & 0x3F) * 2u;
+		const uint32_t byte = (index & (SIZE / 2 - 1)) * 2u;
 		m_data[byte] = static_cast<uint8_t>(value >> 8);
 		m_data[byte + 1] = static_cast<uint8_t>(value);
 	} else {
-		m_data[index & 0x7F] = static_cast<uint8_t>(value);
+		m_data[index & (SIZE - 1)] = static_cast<uint8_t>(value);
 	}
 }
 
-void Eeprom93c46::start_write_cycle()
+template <unsigned Bytes>
+void MicrowireEeprom<Bytes>::start_write_cycle()
 {
 	m_busy_cycles = m_write_cycles;
 }
+
+template class MicrowireEeprom<128>;
+template class MicrowireEeprom<512>;
 
 } /* namespace odin */

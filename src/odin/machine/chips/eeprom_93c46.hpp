@@ -26,6 +26,7 @@
 #define ODIN_EEPROM_93C46_HPP
 
 #include <array>
+#include <bit>
 #include <cstdint>
 #include <span>
 
@@ -35,10 +36,13 @@ namespace odin {
  * bits; ORG high: 64 x 16, 6 address bits. Pins: CS, SK, DI in, DO out.
  * Instructions, the dummy zero bit before read data and the READY/BUSY
  * output after a write come from the 93C46 data sheets (Microchip
- * 93C46B, ST M93C46). */
+ * 93C46B, ST M93C46). The 93C66 is the same chip with 4 Kbit: 512 x 8 or
+ * 256 x 16, 9 or 8 address bits (Microchip 93C66A/B/C data sheet).
+ * `Bytes` is the size: 128 for the 93C46, 512 for the 93C66. */
 /* Everything the chip keeps between two pin changes. Plain data. */
-struct Eeprom93c46State {
-	std::array<uint8_t, 128> data;
+template <unsigned Bytes>
+struct MicrowireEepromState {
+	std::array<uint8_t, Bytes> data;
 	uint32_t busy_cycles;
 	uint32_t out_shift;
 	uint16_t shift;
@@ -51,12 +55,13 @@ struct Eeprom93c46State {
 	uint8_t dout;
 };
 
-class Eeprom93c46 {
+template <unsigned Bytes>
+class MicrowireEeprom {
 public:
-	static constexpr uint32_t SIZE = 128;
+	static constexpr uint32_t SIZE = Bytes;
 
 	/* `clock_hz` is the clock of the cycles passed to tick(). */
-	explicit Eeprom93c46(uint32_t clock_hz);
+	explicit MicrowireEeprom(uint32_t clock_hz);
 
 	void reset();
 
@@ -70,8 +75,8 @@ public:
 	std::span<uint8_t> data() { return m_data; }
 	void load(std::span<const uint8_t> in);
 
-	void save(Eeprom93c46State &out) const;
-	void load(const Eeprom93c46State &in);
+	void save(MicrowireEepromState<Bytes> &out) const;
+	void load(const MicrowireEepromState<Bytes> &in);
 	/* For the tests */
 	bool write_enabled() const { return m_write_enabled; }
 
@@ -90,7 +95,8 @@ private:
 	void on_sk_rise();
 	void execute();
 	void execute_write();
-	uint8_t address_bits() const { return m_org ? 6 : 7; }
+	/* log2 of the cells: 7 or 6 for the 93C46, 9 or 8 for the 93C66 */
+	uint8_t address_bits() const { return static_cast<uint8_t>(std::bit_width(Bytes) - (m_org ? 2 : 1)); }
 	uint8_t data_bits() const { return m_org ? 16 : 8; }
 	uint16_t cell_read(uint16_t index) const;
 	void cell_write(uint16_t index, uint16_t value);
@@ -109,6 +115,9 @@ private:
 	uint32_t m_out_shift;
 	bool m_do;
 };
+
+using Eeprom93c46State = MicrowireEepromState<128>;
+using Eeprom93c46 = MicrowireEeprom<128>;
 
 } /* namespace odin */
 
