@@ -24,6 +24,7 @@
 
 #include "odin/machine/core/host_code.hpp"
 
+#include <atomic>
 #include <cstring>
 
 #if defined(ODIN_HOST_X86_64) || defined(ODIN_HOST_AARCH64)
@@ -93,18 +94,29 @@ void give_back(uint8_t *code, uint32_t size)
 }
 
 /* Memory the host may run, within reach of a direct call from the code of
- * the program when there is some free. */
+ * the program when there is some free. On x86-64 each new buffer starts
+ * 2.375 MB further into its step than the one before (eight places, then
+ * again): Intel's branch predictors tell code apart by the low bits of its
+ * address only, and the starts of buffers a step apart, where the code
+ * runs most, were mistaken for each other (17 % of the time of Rolling
+ * Extreme's C82 on a Golden Cove core) */
 uint8_t *take_near(uint32_t size)
 {
 	const uintptr_t step = REACH / 32;
 	const uintptr_t here = reinterpret_cast<uintptr_t>(&take) & ~(step - 1);
+#if defined(ODIN_HOST_X86_64)
+	static std::atomic<unsigned> taken{0};
+	const uintptr_t apart = (taken++ % 8) * 0x260000;
+#else
+	const uintptr_t apart = 0;
+#endif
 
 	for (uintptr_t n = 1; n < 24; n++) {
-		if (uint8_t *code = take(here + n * step, size)) {
+		if (uint8_t *code = take(here + n * step + apart, size)) {
 			return code;
 		}
 		if (here > n * step) {
-			if (uint8_t *code = take(here - n * step, size)) {
+			if (uint8_t *code = take(here - n * step + apart, size)) {
 				return code;
 			}
 		}
