@@ -70,7 +70,11 @@ const std::vector<std::vector<const char *>> WANTED = {
  * Chinese, Japanese and Korean (Noto Sans CJK, else Droid Sans Fallback,
  * else WenQuanYi); Thai; Hindi */
 const std::vector<std::vector<const char *>> WANTED = {
+#if defined(__ANDROID__)
+	{ "DejaVuSans.ttf", "NotoSans-Regular.ttf", "Roboto-Regular.ttf" },
+#else
 	{ "DejaVuSans.ttf", "NotoSans-Regular.ttf" },
+#endif
 	{ "NotoSansCJK-Regular.ttc", "DroidSansFallbackFull.ttf", "DroidSansFallback.ttf", "wqy-microhei.ttc",
 	  "wqy-zenhei.ttc" },
 	{ "NotoSansThai-Regular.ttf" }, { "NotoSansDevanagari-Regular.ttf" },
@@ -95,6 +99,9 @@ find_files()
 		folders.push_back(std::string(home) + "/Library/Fonts");
 	folders.push_back("/Library/Fonts");
 	folders.push_back("/System/Library/Fonts");
+#elif defined(__ANDROID__)
+	folders.push_back("/system/fonts");
+	folders.push_back("/product/fonts");
 #else
 	const std::string home = env_text("HOME"), data = env_text("XDG_DATA_HOME");
 

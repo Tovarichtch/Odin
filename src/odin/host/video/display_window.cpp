@@ -190,6 +190,10 @@ Display::display_size(unsigned &w, unsigned &h) const
 void
 Display::toggle_fullscreen()
 {
+#if defined(__ANDROID__)
+	/* Always the whole screen on a phone (make_window) */
+	return;
+#endif
 	const bool on = fullscreen(), said = (SDL_GetWindowFlags(m_window) & SDL_WINDOW_FULLSCREEN) != 0;
 	unsigned w = 0, h = 0;
 
