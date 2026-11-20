@@ -84,7 +84,7 @@ struct LibraryState {
 		std::string name, title, parent;
 		std::vector<std::string> missing;
 		bool gaelco;
-		std::string system;	/* "hikaru", "gaelco" (PowerVR), "gaelco3d" */
+		std::string system;	/* "hikaru", "gaelco" (PowerVR), "gaelco3d", "c82" */
 		/* It lacks a file from a set that is not a game of the list
 		 * (tms320c31 for the Gaelco 3D games), which may be in the BIOS
 		 * folder */
@@ -176,6 +176,9 @@ struct BarSettings {
 	/* The game that runs is on a Gaelco 3D board: its own picture at 1×,
 	 * its scenes redrawn by the graphics card above 1× */
 	bool own_picture = false;
+	/* The game that runs is Rolling Extreme: its board's own picture at
+	 * every resolution, only enlarged by the graphics card */
+	bool board_picture = false;
 	/* Audio: the device chosen (empty: the system's), the volume of Odin
 	 * from 0 to 100, its sound kept while its window is in the background */
 	std::string device;

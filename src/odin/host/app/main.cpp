@@ -37,6 +37,7 @@
 #include "odin/host/app/hotkeys.hpp"
 #include "odin/host/app/atvtrack_play.hpp"
 #include "odin/host/app/gaelco3d_play.hpp"
+#include "odin/host/app/rollext_play.hpp"
 #include "odin/machine/boards/hikaru/hikaru.hpp"
 #include "odin/host/input/keyboard.hpp"
 #include "odin/host/app/library.hpp"
@@ -129,6 +130,14 @@ play(const Options &given, const std::string &name, const GameList &games, Setti
 	if (powervr || gaelco3d_machine(game->machine)) {
 		const auto play_gaelco = powervr ? play_atvtrack : play_gaelco3d;
 		const Ended ended = play_gaelco(options, *game, games, settings, settings_file, display, keys, pointers, opened);
+
+		repeats::end();
+		return ended;
+	}
+	/* Gaelco's TMS320C82 board (Rolling Extreme) */
+	if (rollext_machine(game->machine)) {
+		const Ended ended = play_rollext(options, *game, games, settings, settings_file, display, keys, pointers,
+		                                 opened);
 
 		repeats::end();
 		return ended;

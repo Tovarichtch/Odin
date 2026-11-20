@@ -261,7 +261,8 @@ PER GAME
 --------
 
 <game> is the MAME name: airtrix, braveff, pharrier, sgnascar, swracer,
-von4; atvtrack, gfootbal, smashdrv; footbpow14, radikalb, speedup, surfplnt.
+von4; atvtrack, gfootbal, smashdrv; footbpow14, radikalb, speedup, surfplnt;
+rollext.
 A version of a game (airtrixo, sgnascaro, atvtracka, smashdrvb, smashdrvs,
 footbpow, radikalba, speedup21, surfplnt40...) shares the sections of its
 parent; the lines of a section of its own (an older Odin wrote one) still
@@ -274,8 +275,9 @@ versions.
  p1, p2           <GUID> <name>   Gamepad of player 1, 2.
  joy1, joy2       <GUID> <name>   Wheel or other joystick of player 1, 2
                                   (a wheel: NASCAR, ATV Track, Smashing
-                                  Drive, Speed Up, Radikal Bikers, one
-                                  player; it steers Surf Planet too).
+                                  Drive, Speed Up, Radikal Bikers, Rolling
+                                  Extreme, one player; it steers Surf
+                                  Planet too).
  p1_path,         <path>          The very gamepad of player 1, 2 when two
  p2_path,                         alike share a GUID: its path, as the log
  joy1_path,                       names it ("pad: ... plugged, <GUID> at
@@ -310,14 +312,15 @@ versions.
                                   Default on.
  vibration_force  0 to 200        Shake strength, in %. Default 100.
  wheel_force      0 to 200        Force feedback strength, in % (NASCAR,
-                                  ATV Track, Smashing Drive, Speed Up).
-                                  Default 100.
+                                  ATV Track, Smashing Drive, Speed Up,
+                                  Rolling Extreme's upright). Default 100.
  wheel_rotation   0, 270, 360,    How far the wheel turns from one end to
                   540, 900, 1080  the other (0: all the way). Default 0.
  keep_calibration on, off         Experimental (Speed Up, ATV Track,
-                                  Smashing Drive): the game starts with the
-                                  wheel and pedal ranges it learned last
-                                  time (calibration.bin in its saves). The
+                                  Smashing Drive, Rolling Extreme): the
+                                  game starts with the wheel, pedal or
+                                  handlebar ranges it learned last time
+                                  (calibration.bin in its saves). The
                                   cabinet relearns them at each power-on.
                                   Default off.
  invert           <id>, ...       Controls turned the other way, on every
@@ -328,11 +331,14 @@ versions.
                   deluxe,         minideluxe (Star Wars Racer), vibrator
                   minideluxe,     (ATV Track: Odin sets its MOTION SYSTEM
                   vibrator,       to VIBRATOR; on another cabinet, a
-                  upright, atari  VIBRATOR goes back to PLATFORM HARD),
-                                  upright (Smashing Drive), atari (Radikal
+                  upright, atari, VIBRATOR goes back to PLATFORM HARD),
+                  sitdown         upright (Smashing Drive), atari (Radikal
                                   Bikers, Surf Planet: the cabinet or kit
-                                  Atari sold). Default standard
-                                  (radikalba: atari).
+                                  Atari sold), sitdown (Rolling Extreme:
+                                  its seat, its pedals, no motor; Odin
+                                  sets its cabinet mode to sit down, the
+                                  standard upright back to up right).
+                                  Default standard (radikalba: atari).
  card             <name>          Virtual-On card in hand (von4).
 
 [sound.<game>]
@@ -349,8 +355,11 @@ versions.
                   200, off        that many Hz (off: all of its sound).
                                   Default 120.
 
- Games with a woofer: atvtrack, gfootbal, smashdrv, footbpow14, radikalb
- and surfplnt.
+ Games with a woofer: atvtrack, gfootbal, smashdrv, footbpow14, radikalb,
+ surfplnt and rollext (its fourth channel: the seat's speakers on the sit
+ down cabinet). Rolling Extreme's four channels go through its board's own
+ filters in every mode: left and right below about 8 kHz, the woofer and
+ the seat below about 350 Hz and 3 dB louder, all four above about 12 Hz.
 
  mode             main, mix, quad  main: left and right only. mix: the
                                    woofer's lows in both. quad: left,
@@ -528,6 +537,18 @@ versions.
 
  surfplnt:
   joystick      pad:leftx, joy:axis0 (_left key:Left, _right key:Right)
+  start         key:1, pad:start, joy:start
+  volume_up     key:=, pad:dpup
+  volume_down   key:-, pad:dpdown
+
+ rollext (the sit-down: the seat for the handlebar, the brakes on the
+ pedals, joy:brake and joy:gas):
+  handlebar     pad:leftx, joy:axis0 (_left key:Left, _right key:Right)
+  left_brake    key:Z, pad:lefttrigger, joy:paddle_left
+  right_brake   key:X, pad:righttrigger, joy:paddle_right
+  left_smash    key:A, pad:leftshoulder
+  right_smash   key:S, pad:rightshoulder
+  view          key:Left Shift, pad:x
   start         key:1, pad:start, joy:start
   volume_up     key:=, pad:dpup
   volume_down   key:-, pad:dpdown

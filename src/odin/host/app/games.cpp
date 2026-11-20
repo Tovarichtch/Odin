@@ -672,7 +672,8 @@ goes_right(const GameControl &control, bool gaelco)
 bool
 wired(const Game &game)
 {
-	const bool gaelco = game.machine == "atvtrack" || game.machine == "smashdrv" || gaelco3d_machine(game.machine);
+	const bool gaelco = game.machine == "atvtrack" || game.machine == "smashdrv" || gaelco3d_machine(game.machine) ||
+	                    rollext_machine(game.machine);
 	unsigned halves[2][2] = {};	/* [player][side, forward] */
 
 	for (const GameControl &control : game.controls) {
@@ -761,7 +762,12 @@ read_cabinet(const json_t *rom, const json_t *cabinet, size_t c, Game &game)
 			return false;
 		}
 	}
-	if (const json_t *const setting = json_object_get(cabinet, "nand_setting")) {
+	for (const char *const key : { "nand_setting", "eeprom_setting" }) {
+		const json_t *const setting = json_object_get(cabinet, key);
+
+		if (!setting)
+			continue;
+
 		const auto byte = parse_hex_number(json_object_get(setting, "byte"), 2);
 		const json_t *const value = json_object_get(setting, "value"), *const standard = json_object_get(setting, "standard");
 		const auto a_byte = [](const json_t *v) {
@@ -769,12 +775,13 @@ read_cabinet(const json_t *rom, const json_t *cabinet, size_t c, Game &game)
 		};
 
 		if (!byte || !a_byte(value) || !a_byte(standard)) {
-			std::fprintf(stderr, "ERROR: game '%s': cabinet '%s': \"nand_setting\" is not a byte, its value and "
-			             "the standard one\n", name, id);
+			std::fprintf(stderr, "ERROR: game '%s': cabinet '%s': \"%s\" is not a byte, its value and "
+			             "the standard one\n", name, id, key);
 			return false;
 		}
-		kept.nand_setting = Game::Cabinet::Setting{ *byte, static_cast<uint8_t>(json_integer_value(value)),
-		                                            static_cast<uint8_t>(json_integer_value(standard)) };
+		(std::strcmp(key, "nand_setting") ? kept.eeprom_setting : kept.nand_setting) =
+			Game::Cabinet::Setting{ *byte, static_cast<uint8_t>(json_integer_value(value)),
+			                        static_cast<uint8_t>(json_integer_value(standard)) };
 	}
 	if (json_object_get(cabinet, "motion_platform")) {
 		bool on = false;
@@ -789,6 +796,13 @@ read_cabinet(const json_t *rom, const json_t *cabinet, size_t c, Game &game)
 		if (!read_true_false(cabinet, "seated", name, on))
 			return false;
 		kept.seated = on;
+	}
+	if (json_object_get(cabinet, "wheel_motor")) {
+		bool on = false;
+
+		if (!read_true_false(cabinet, "wheel_motor", name, on))
+			return false;
+		kept.wheel_motor = on;
 	}
 	if (const json_t *const woofer = json_object_get(cabinet, "woofer")) {
 		bool on = false;
@@ -1075,6 +1089,8 @@ Game::use_cabinet(const std::string &id)
 				motion_platform = *other.motion_platform;
 			if (other.seated)
 				seated = *other.seated;
+			if (other.wheel_motor)
+				wheel_motor = *other.wheel_motor;
 			if (other.woofer)
 				woofer_wired = *other.woofer;
 			if (other.outputs)

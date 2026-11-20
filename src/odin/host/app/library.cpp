@@ -51,8 +51,12 @@ scan_library(LibraryState &state, const GameList &games, const Options &options,
 	for (const GameList::Entry &entry : games.entries()) {
 		const std::string &name = entry.name;
 		const bool theirs = entry.machine != "hikaru";
-		/* Gaelco's two systems: its own 3D chips, or PowerVR (ATV Track's) */
-		const std::string system = !theirs ? entry.machine : gaelco3d_machine(entry.machine) ? "gaelco3d" : "gaelco";
+		/* Gaelco's three systems: its own 3D chips, PowerVR (ATV Track's),
+		 * or the TMS320C82 (Rolling Extreme's) */
+		const std::string system = !theirs                          ? entry.machine
+		                           : rollext_machine(entry.machine)  ? "c82"
+		                           : gaelco3d_machine(entry.machine) ? "gaelco3d"
+		                                                             : "gaelco";
 		LibraryState::Game game{ name, entry.title, entry.parent, {}, theirs, system };
 
 		if (std::find(state.systems.begin(), state.systems.end(), system) == state.systems.end())
