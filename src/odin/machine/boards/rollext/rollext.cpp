@@ -399,6 +399,7 @@ Rollext::write(uint32_t addr, unsigned size, uint64_t value)
 		 * by the 3D chip: once it has drawn what it took */
 		m_d3plus.settle();
 		c82_put(m_table.data() + (addr & (TABLE_SIZE - 1)), size, value);
+		m_d3plus.table_written();
 		return;
 	}
 	if ((addr & 0xFFFFFFF8u) == 0xA0000000u) {
@@ -702,6 +703,7 @@ Rollext::load_state(const std::string &path)
 	    !state.get(m_palette.data(), PALETTE_SIZE) || !state.get(m_table.data(), TABLE_SIZE) ||
 	    !state.get(*d3plus) || !m_d3plus.load_buffers(state)) {
 		m_d3plus.palette_written(0, PALETTE_SIZE);
+		m_d3plus.table_written();
 		std::fprintf(stderr, "ERROR: load state: '%s' is not a state of %s\n", path.c_str(), m_name.c_str());
 		return false;
 	}
@@ -712,6 +714,7 @@ Rollext::load_state(const std::string &path)
 	m_eeprom.load(eeprom);
 	m_d3plus.load(*d3plus);
 	m_d3plus.palette_written(0, PALETTE_SIZE);
+	m_d3plus.table_written();
 	return true;
 }
 

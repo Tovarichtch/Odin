@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "odin/machine/boards/rollext/d3plus_scene.hpp"
 #include "odin/machine/boards/rollext/rollext_clocks.hpp"
 
 namespace odin {
@@ -57,7 +58,10 @@ class Worker;
  * At the end of a frame the pictures finished are drawn (run waits for
  * them); only the packets of the next picture may still be drawing. What
  * reads the drawing's buffers and what changes what the drawing reads (the
- * palette, the table) waits for all of it first (settle). */
+ * palette, the table) waits for all of it first (settle).
+ *
+ * Above the board's resolution, the packets go to the host GPU as scenes
+ * instead, one a picture, and none is drawn here (set_gpu). */
 class D3plus {
 public:
 	/* A packet: 96 bytes */
@@ -117,6 +121,8 @@ public:
 	/* The palette's bytes from `offset` (`bytes` of them) have changed,
 	 * the drawing settled: the colours drawn follow */
 	void palette_written(uint32_t offset, uint32_t bytes);
+	/* The same for the table */
+	void table_written() { m_table_changed = true; }
 	void set_textures(const std::array<std::vector<uint8_t>, 4> &roms);
 
 	void reset();
@@ -215,6 +221,15 @@ public:
 	/* The picture last finished: RGBA bytes, WIDTH x HEIGHT, top line
 	 * first */
 	const std::vector<uint32_t> &picture() const { return m_shown; }
+	/* Above the board's resolution: `on`, the
+	 * packets taken go to the host GPU as scenes and none is drawn here;
+	 * `native`, the flat ones (Q the same everywhere) are kept on the
+	 * board's own points. The chip's timing does not depend on it. When
+	 * this draws again, its frames are those of the last picture it drew */
+	void set_gpu(bool on, bool native);
+	/* With set_gpu on: the scene of the picture last finished (black
+	 * before the first) */
+	std::shared_ptr<const D3plusScene> scene();
 
 	/* Doublewords in the FIFO; the n-th from its head */
 	unsigned waiting() const { return m_s.count; }
@@ -242,7 +257,11 @@ public:
 	}
 
 	void save(State &out) const { out = m_s; }
-	void load(const State &in) { m_s = in; }
+	void load(const State &in)
+	{
+		m_s = in;
+		m_scene = {};
+	}
 	/* The two frames and the depth buffer */
 	bool save_buffers(StateFile &state);
 	bool load_buffers(StateFile &state);
@@ -284,6 +303,12 @@ private:
 	/* On the drawing thread */
 	void end_picture(uint32_t frame, uint64_t marker);
 	void draw(const std::array<uint64_t, PACKET> &packet, const std::array<int32_t, 4> &clip);
+	/* Above the board's resolution: a packet put into the scene, the
+	 * scene of a picture finished */
+	void scene_packet(const std::array<uint64_t, PACKET> &packet);
+	void end_scene();
+	std::shared_ptr<const std::vector<uint16_t>> gpu_palette();
+	std::shared_ptr<const std::vector<uint8_t>> gpu_table();
 
 	State m_s{};
 	std::FILE *m_dump = nullptr;
@@ -306,6 +331,13 @@ private:
 	std::vector<Job> m_queued, m_sent;
 	/* The end of a picture is in m_queued; in m_sent, maybe not drawn */
 	bool m_end_queued = false, m_end_sent = false;
+	/* Above the board's resolution: the scene of the picture drawn now,
+	 * the last finished, and what they read (made again once changed) */
+	bool m_gpu = false, m_native = false, m_palette_changed = true, m_table_changed = true;
+	D3plusScene m_scene;
+	std::shared_ptr<const D3plusScene> m_last_scene;
+	std::shared_ptr<const std::vector<uint8_t>> m_gpu_sheet, m_gpu_table;
+	std::shared_ptr<const std::vector<uint16_t>> m_gpu_palette;
 	/* The last member: its thread ends first */
 	std::unique_ptr<Worker> m_drawing;
 };

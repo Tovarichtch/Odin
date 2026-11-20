@@ -108,6 +108,7 @@ public:
 	void present(PictureRect rect, unsigned window_w, unsigned window_h) override;
 	void draw_pmx(const PmxScene &scene, unsigned anisotropy) override;
 	void draw_gaelco3d(const Gaelco3dScene &scene) override;
+	void draw_d3plus(const D3plusScene &scene) override;
 	void prepare_pmx(const std::vector<uint64_t> &keys,
 	                 const std::function<void(unsigned, unsigned)> &progress) override;
 	/* All its programs are made before the first scene: none to list */
@@ -137,6 +138,9 @@ private:
 	/* The programs and pictures of the Gaelco 3D boards (gaelco3d_gl.cpp) */
 	struct Gaelco3d;
 	std::shared_ptr<Gaelco3d> m_gaelco3d;
+	/* The program and pictures of Rolling Extreme (d3plus_gl.cpp) */
+	struct D3plus;
+	std::shared_ptr<D3plus> m_d3plus;
 	/* Layers peeled at a time, each with a query of whether it drew, read
 	 * once the batch is done */
 	static constexpr unsigned PEEL_BATCH = 8;
