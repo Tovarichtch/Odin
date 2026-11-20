@@ -199,6 +199,11 @@ set(ODIN_SOURCES
 	machine/chips/pmx1/pmx1.cpp machine/chips/pmx1/pmx1_core.cpp machine/chips/pmx1/pmx1_scene.cpp
 	machine/chips/pmx1/pmx1_host.cpp machine/chips/pmx1/pmx1_ta.cpp
 	machine/boards/gaelco3d/gaelco3d.cpp machine/boards/gaelco3d/gaelco3d_video.cpp
+	host/app/rollext_play.cpp machine/boards/rollext/rollext.cpp machine/boards/rollext/d3plus.cpp
+	machine/cpu/tms320c82/tms320c82.cpp machine/cpu/tms320c82/c82_mp.cpp machine/cpu/tms320c82/c82_mp_ops.cpp
+	machine/cpu/tms320c82/c82_fpu.cpp machine/cpu/tms320c82/c82_tc.cpp machine/cpu/tms320c82/c82_pp.cpp
+	machine/cpu/tms320c82/c82_pp_ops.cpp machine/cpu/tms320c82/c82_pp_block.cpp machine/cpu/tms320c82/c82_pp_host.cpp machine/cpu/tms320c82/c82_pp_host_exec.cpp
+	machine/cpu/tms320c82/c82_mp_host.cpp machine/cpu/tms320c82/c82_mp_host_exec.cpp
 	machine/cpu/m68020/m68020.cpp machine/cpu/tms32031/tms32031.cpp machine/cpu/tms32031/tms32031_ops.cpp
 	machine/cpu/adsp2115/adsp2115.cpp machine/cpu/pic16c71x/pic16c71x.cpp
 	host/ui/menu_session.cpp host/ui/menu_session_input.cpp

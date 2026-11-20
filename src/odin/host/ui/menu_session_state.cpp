@@ -283,6 +283,7 @@ MenuSession::fill_game_shown(MenuState &state)
 	state.link_shown_names = shown_link.names;
 	state.link_shown_off = shown_link.off;
 	state.own_picture = m_game && gaelco3d_machine(m_game->machine);
+	state.board_picture = m_game && rollext_machine(m_game->machine);
 	/* A Gaelco 3D game reads its EEPROM once, as it starts (Gaelco3dGame) */
 	state.link_shown_restarts = !(m_other ? gaelco3d_machine(m_other_machine) : state.own_picture);
 	/* The outputs of the game shown, lit as the board left them; the light

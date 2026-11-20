@@ -647,7 +647,8 @@ Menu::page_display(MenuKit &kit, MenuState &state) const
 
 	std::snprintf(about, sizeof(about), "The 3D is drawn at %u × %u%s.%s", 640 * state.scale, 480 * state.scale,
 	              state.scale == 1 ? ", as on the cabinet" : "",
-	              !state.own_picture ? ""
+	              state.board_picture ? " Rolling Extreme's board draws its own exact 512 × 384 picture, enlarged."
+	              : !state.own_picture ? ""
 	              : state.scale == 1 ? " A Gaelco 3D board shows its own exact 576 × 432 picture."
 	                                 : " The graphics card redraws a Gaelco 3D board's scenes, close to the board.");
 	kit.next_tip(about);
@@ -676,16 +677,22 @@ Menu::page_display(MenuKit &kit, MenuState &state) const
 
 	kit.next_tip(state.own_picture ? OWN_MODES_TIP[upscale_mode] : UPSCALE_MODES_TIP[upscale_mode]);
 	watch(PREVIEW_MODE, [&] {
-		if (kit.choice("Upscaling mode", state.scale == 1 ? "no effect at 1×" : nullptr, UPSCALE_MODES_SHOWN,
-		               upscale_mode))
+		/* Rolling Extreme: its board's picture, only enlarged; the mode is
+		 * for the 3D the card draws (Display::draw_own) */
+		const char *const note = state.board_picture ? "no effect on this game"
+		                         : state.scale == 1  ? "no effect at 1×"
+		                                             : nullptr;
+
+		if (kit.choice("Upscaling mode", note, UPSCALE_MODES_SHOWN, upscale_mode))
 			state.upscale_mode = static_cast<unsigned>(upscale_mode);
 	});
 
 	int filter = anisotropy_index(state.anisotropy);
+	const char *const no_filter = state.own_picture || state.board_picture ? "no effect on this game" : nullptr;
 
 	kit.next_tip("Sharpens distant textures, such as roads and floors (NASCAR, Virtual-On). The cabinet has none.");
 	watch(PREVIEW_FILTER, [&] {
-		if (kit.choice("Anisotropic filtering", state.own_picture ? "no effect on this game" : nullptr, FILTERS, filter,
+		if (kit.choice("Anisotropic filtering", no_filter, FILTERS, filter,
 		               state.anisotropy_given ? "set on the command line: -a" : nullptr))
 			state.anisotropy = ANISOTROPY[filter];
 	});

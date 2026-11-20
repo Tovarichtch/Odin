@@ -8,7 +8,7 @@
 Odin (ᚨ), Copyright (C) 2026 Réda Chérif-Touil
 Released under the GNU GPL, version 3 or later (see LICENSE).
 
-Odin emulates three arcade systems, for Linux, Windows and macOS, drawing
+Odin emulates four arcade systems, for Linux, Windows and macOS, drawing
 with OpenGL or Vulkan:
 
  SEGA Hikaru       low-level, running the real chips' programs where known
@@ -19,11 +19,14 @@ with OpenGL or Vulkan:
                    sound and the PIC under each ball of Football Power;
                    its 3D chips emulated on the CPU, as the board's
                    schematic wires them
+ Gaelco C82        low-level: the TMS320C82 (its master processor, its two
+                   parallel processors and its transfer controller) and
+                   the D3PLUS-4 3D chip, emulated on the CPU
 
 Odin runs the six Hikaru games, two of them in two versions, and the Gaelco
 games. They play with a keyboard, gamepads, wheels with force
-feedback (NASCAR, ATV Track, Smashing Drive, Speed Up) or light guns
-(Brave Firefighters).
+feedback (NASCAR, ATV Track, Smashing Drive, Speed Up, Rolling Extreme) or
+light guns (Brave Firefighters).
 Virtual-On saves to its card.
 Odin links cabinets over the network and sends the cabinet outputs as MAME
 does.
@@ -71,6 +74,9 @@ Gaelco 3D (see INSTALL)
  surfplnt12 Surf Planet (version 1.2)
  surfplnt10 Surf Planet (version 1.0)
 
+Gaelco C82 (see INSTALL)
+ rollext    Rolling Extreme
+
 Each name is a MAME set. The Hikaru games also need the shared sets hikaru
 and mie; jvs13551, 18wheelr and srally2 are optional. The Gaelco 3D games
 need the boot program of the TMS320C31 (see INSTALL).
@@ -83,7 +89,9 @@ INSTALL tells how to build and start Odin, OPTIONS lists every option and
 setting, TODO what is missing or guessed.
 
 The Gaelco games use Odin's controls. In Gaelco Football and Football
-Power the right stick kicks: pull it back first to lift the ball.
+Power the right stick kicks: pull it back first to lift the ball. Rolling
+Extreme learns the travel of its handlebar (or seat) at each start: turn it
+to both ends once, as an operator does at power-on.
 
 
 REPORTING A PROBLEM

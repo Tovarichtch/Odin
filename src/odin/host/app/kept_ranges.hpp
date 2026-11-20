@@ -76,9 +76,9 @@ write_kept_ranges(const std::string &path, const LearnedRanges &ranges)
 	return !path.empty() && write_kept(path, bytes);
 }
 
-/* The ranges a board's game learns (AtvTrack, Gaelco3d), widened each frame
- * to those kept from its last start ([players.<game>] keep_calibration,
- * experimental), and those to keep for the next one */
+/* The ranges a board's game learns (AtvTrack, Gaelco3d, Rollext), widened
+ * each frame to those kept from its last start ([players.<game>]
+ * keep_calibration, experimental), and those to keep for the next one */
 class KeptRanges {
 public:
 	void restore(const std::string &path) { m_kept = read_kept_ranges(path); }

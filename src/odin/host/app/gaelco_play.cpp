@@ -25,8 +25,10 @@
 
 #include "odin/host/app/gaelco_play.hpp"
 
+#include <array>
 #include <cmath>
 #include <cstdio>
+#include <memory>
 
 #include "odin/host/app/user_files.hpp"
 #include "odin/machine/boards/atvtrack/atvtrack.hpp"
@@ -50,6 +52,43 @@ link_status_of(const GaelcoLink *link, bool failed)
 	status.previous = link && link->previous_linked();
 	status.next = link && link->next_linked();
 	return status;
+}
+
+/* HEURISTIC: enlarged smoothly (bilinear); with nearest sampling, some
+ * columns and lines would be doubled (one in nine of the Gaelco 3D's 576 x
+ * 432, one in four of Rolling Extreme's 512 x 384) */
+PmxScene
+picture_scene(const std::vector<uint32_t> &picture, unsigned width, unsigned height)
+{
+	constexpr uint32_t IMAGE = 1;
+	constexpr float LEFT = 0.0f, TOP = 0.0f, RIGHT = 640.0f, BOTTOM = 480.0f;
+	constexpr uint8_t COMPARE_ALWAYS = 7, NO_FOG = 2;
+	auto image = std::make_shared<PmxImage>();
+	PmxScene scene;
+	PmxDraw draw{};
+
+	image->id = IMAGE;
+	image->width = width;
+	image->height = height;
+	image->levels.push_back(picture);
+	scene.gone_images.push_back(IMAGE);
+	scene.new_images.push_back(std::move(image));
+	const std::array<std::array<float, 2>, 6> corners{
+		{ { LEFT, TOP }, { RIGHT, TOP }, { LEFT, BOTTOM }, { RIGHT, TOP }, { RIGHT, BOTTOM }, { LEFT, BOTTOM } }
+	};
+
+	for (const auto &[x, y] : corners)
+		scene.vertices.push_back({ x, y, 1.0f, (x - LEFT) / (RIGHT - LEFT), (y - TOP) / (BOTTOM - TOP), 0xFFFFFFFFu, 0 });
+	draw.count = static_cast<uint32_t>(scene.vertices.size());
+	draw.image = IMAGE;
+	draw.compare = COMPARE_ALWAYS;
+	draw.fog = NO_FOG;
+	draw.wrap_u = draw.wrap_v = PmxWrap::CLAMP;
+	draw.smooth = true;
+	draw.ignore_texture_alpha = true;
+	scene.draws.push_back(draw);
+	scene.rendered = true;
+	return scene;
 }
 
 GaelcoPlay::GaelcoPlay(const Options &options, const Game &game, const GameList &games, Settings &settings,

@@ -152,44 +152,6 @@ private:
 	int m_let_go_hit = 0;
 };
 
-/* The board's picture stretched over the whole 640 x 480 the display draws
- * on, as it filled the cabinet's screen; the display then fits it to the
- * window like any game's picture. HEURISTIC: enlarged smoothly (bilinear);
- * with nearest sampling, one column and one line in nine would be doubled */
-PmxScene
-picture_scene(const std::vector<uint32_t> &picture)
-{
-	constexpr uint32_t IMAGE = 1;
-	constexpr float LEFT = 0.0f, TOP = 0.0f, RIGHT = 640.0f, BOTTOM = 480.0f;
-	constexpr uint8_t COMPARE_ALWAYS = 7, NO_FOG = 2;
-	auto image = std::make_shared<PmxImage>();
-	PmxScene scene;
-	PmxDraw draw{};
-
-	image->id = IMAGE;
-	image->width = Gaelco3d::WIDTH;
-	image->height = Gaelco3d::HEIGHT;
-	image->levels.push_back(picture);
-	scene.gone_images.push_back(IMAGE);
-	scene.new_images.push_back(std::move(image));
-	const std::array<std::array<float, 2>, 6> corners{
-		{ { LEFT, TOP }, { RIGHT, TOP }, { LEFT, BOTTOM }, { RIGHT, TOP }, { RIGHT, BOTTOM }, { LEFT, BOTTOM } }
-	};
-
-	for (const auto &[x, y] : corners)
-		scene.vertices.push_back({ x, y, 1.0f, (x - LEFT) / (RIGHT - LEFT), (y - TOP) / (BOTTOM - TOP), 0xFFFFFFFFu, 0 });
-	draw.count = static_cast<uint32_t>(scene.vertices.size());
-	draw.image = IMAGE;
-	draw.compare = COMPARE_ALWAYS;
-	draw.fog = NO_FOG;
-	draw.wrap_u = draw.wrap_v = PmxWrap::CLAMP;
-	draw.smooth = true;
-	draw.ignore_texture_alpha = true;
-	scene.draws.push_back(draw);
-	scene.rendered = true;
-	return scene;
-}
-
 /* The texture ROMs' slots of 4 MB: 8 when the game fills one of the upper
  * four, else 4 */
 unsigned
@@ -393,7 +355,7 @@ Gaelco3dGame::run_frame()
 	if (fine)
 		m_display.set_scene(m_board->take_scene());
 	else
-		m_display.set_scene(picture_scene(m_board->picture()));
+		m_display.set_scene(picture_scene(m_board->picture(), Gaelco3d::WIDTH, Gaelco3d::HEIGHT));
 }
 
 } /* namespace */

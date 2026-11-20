@@ -72,13 +72,15 @@ FIRST START
    pharrier, sgnascar, sgnascaro, swracer, von4. Two shared sets are
    needed too, in the same folder (or in a BIOS folder): hikaru and mie.
    The Gaelco games (atvtrack, atvtracka, gfootbal, smashdrv, smashdrvb,
-   smashdrvs; radikalb, footbpow14, speedup, surfplnt and their versions)
-   go in the same folder. They keep their operator settings and scores in
-   kept.bin in their saves folder. Radikal Bikers, Football Power, Speed
-   Up and Surf Planet need the boot program of their TMS320C31,
-   c31boot.bin: in the game's own set when it holds it, else in one
-   shared set, in the same folder (or in a BIOS folder): tms320c31 (or
-   tms32031). The others need none.
+   smashdrvs; radikalb, footbpow14, speedup, surfplnt and their versions;
+   rollext) go in the same folder. They keep their operator settings and
+   scores in kept.bin in their saves folder. Radikal Bikers, Football
+   Power, Speed Up and Surf Planet need the boot program of their
+   TMS320C31, c31boot.bin: in the game's own set when it holds it, else in
+   one shared set, in the same folder (or in a BIOS folder): tms320c31 (or
+   tms32031). The others need none. Rolling Extreme needs MAME's roe.ic17
+   (CRC 30f51686): an older dump of that chip (CRC a52bf5a1) has one bit
+   wrong, and the game's own check finds it (sum DC6D, not DC65).
 
 2. Start Odin. Its library shows the games. Click "Games folder..." and
    choose your folder. A game with missing files says which files, and in
@@ -91,7 +93,8 @@ FIRST START
    test menu (TEST: key 0, or Guide held with R3), as on the cabinet:
    every game has a page for it (Air Trix: CALIBRATION, Brave
    Firefighters: NOZZLE SENSOR SETTING...). The game then reads your
-   controls right.
+   controls right. Rolling Extreme has none: it learns its handlebar at
+   each start, once it is turned to both ends.
 
 From a terminal:
 
