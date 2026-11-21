@@ -1,3 +1,5 @@
+// license:BSD-3-Clause
+// copyright-holders:Aaron Giles
 /*
  *  ██████╗ ██████╗ ██╗███╗   ██╗
  * ██╔═══██╗██╔══██╗██║████╗  ██║
@@ -7,6 +9,7 @@
  *  ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝
  *
  * Copyright (C) 2026 Réda Chérif-Touil
+ * Copyright (C) 2026 Daniel Martin
  *
  * Odin is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free
@@ -21,6 +24,9 @@
  * You should have received a copy of the GNU General Public License along
  * with Odin.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+/* Based on MAME's gaelco3d_v.cpp (BSD-3-Clause, Aaron Giles); those parts
+ * keep their licence */
 
 /* Sources: Speed Up's schematic (sheets 2, 4, 7) and the dump of its PAL
  * IC88 (m1_c_2af3); the C31 programs of the four games, which give the words

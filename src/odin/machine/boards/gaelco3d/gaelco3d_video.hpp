@@ -1,3 +1,5 @@
+// license:BSD-3-Clause
+// copyright-holders:Aaron Giles
 /*
  *  ██████╗ ██████╗ ██╗███╗   ██╗
  * ██╔═══██╗██╔══██╗██║████╗  ██║
@@ -7,6 +9,7 @@
  *  ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝
  *
  * Copyright (C) 2026 Réda Chérif-Touil
+ * Copyright (C) 2026 Daniel Martin
  *
  * Odin is free software: you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free
