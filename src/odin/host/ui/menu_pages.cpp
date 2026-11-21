@@ -158,6 +158,7 @@ icon_of(GameOutput::Role role)
 {
 	switch (role) {
 	case GameOutput::Role::LOCK:
+	case GameOutput::Role::COIN_LOCK:
 		return MenuKit::Icon::LOCK;
 	case GameOutput::Role::RUMBLE:
 		return MenuKit::Icon::RUMBLE;
@@ -207,6 +208,10 @@ output_tiles(const MenuKit &kit, const MenuState &state, const Box &box)
 			              output.on ? palette.accent : palette.stroke);
 			centred({ a.x + pad, a.y + pad + side + kit.px(4.0f) }, tile_w - 2.0f * pad, size, output.name.c_str(),
 			        output.on ? palette.accent : palette.dim);
+			/* A coin lock's coil lets coins in while the game drives it */
+			if (output.role == GameOutput::Role::COIN_LOCK &&
+			    ImGui::IsMouseHoveringRect(a, { a.x + tile_w, a.y + tile_h }))
+				kit.tip("Lit: coins go in. Off: coins are refused.");
 		}
 		centred({ box.a.x + inside, top + tiles_h + (rows ? gap : 0.0f) }, width, small, caption, palette.faint);
 	});
@@ -218,10 +223,13 @@ std::string
 link_set(const MenuState &state, bool on)
 {
 	if (!on)
-		return "The link is off: Odin sets NO LINK.";
+		return "The link is off: Odin sets " + (state.link_shown_off.empty() ? "NO LINK" : state.link_shown_off) + ".";
 	if (state.link_cabinet > state.link_shown_cabinets)
 		return "This game links up to " + std::to_string(state.link_shown_cabinets) + " cabinets: choose 1 to " +
 		       std::to_string(state.link_shown_cabinets) + ".";
+
+	if (!state.link_shown_names.empty() && state.link_cabinet > 0)
+		return "This Odin: " + state.link_shown_names[state.link_cabinet - 1] + ".";
 
 	std::string set = state.link_cabinet == 1 ? "This Odin: master" : "This Odin: slave";
 
@@ -279,7 +287,9 @@ link_tiles(const MenuKit &kit, const MenuState &state, const Box &box, bool on)
 			const std::string number = "Cabinet " + std::to_string(n);
 			std::string seat = n == 1 ? "master" : "slave";
 
-			if (state.link_shown_seat == MenuState::SEAT_LETTER)
+			if (n <= state.link_shown_names.size())
+				seat = state.link_shown_names[i];
+			else if (state.link_shown_seat == MenuState::SEAT_LETTER)
 				seat += " · seat " + std::string(1, static_cast<char>('A' + n - 1));
 			else if (state.link_shown_seat == MenuState::SEAT_NUMBER)
 				seat += " · seat " + std::to_string(n);
@@ -384,6 +394,10 @@ scene_of(const MenuState &state, const SoundGame *game)
 				scene.parts.push_back(part);
 		scene.seated = audio.seated && std::find(audio.standing.begin(), audio.standing.end(), cabinet) ==
 		                                   audio.standing.end();
+		scene.no_woofer = std::find(audio.no_woofer.begin(), audio.no_woofer.end(), cabinet) != audio.no_woofer.end();
+		scene.woofer_optional = std::find(audio.optional_woofer.begin(), audio.optional_woofer.end(), cabinet) !=
+		                        audio.optional_woofer.end();
+		scene.cabinet_later = state.cabinet_later;
 		scene.family = audio.family;
 	}
 	if (game) {
@@ -391,7 +405,7 @@ scene_of(const MenuState &state, const SoundGame *game)
 			return part.option && part.kind == SoundPart::Kind::UNWIRED;
 		});
 
-		scene.played = unwired && !game->locked ? 0 : game->played;
+		scene.played = (unwired || scene.no_woofer) && !game->locked ? 0 : game->played;
 		scene.lows = game->woofer && game->played == 1 && std::string_view(WOOFER_CUTOFFS[game->cutoff]) != "off";
 	}
 	scene.pointed = state.audio_pointed < static_cast<int>(scene.parts.size()) ? state.audio_pointed : -1;
@@ -454,35 +468,37 @@ cabinet_sound(MenuKit &kit, SoundGame &game, const SoundScene &scene)
 		const bool speakers = has([](const SoundPart &part) {
 			return part.option && part.kind == SoundPart::Kind::SPEAKER;
 		});
-		const bool rear = has([](const SoundPart &part) {
-			return part.option && (part.at == SoundPart::Place::REAR_LEFT || part.at == SoundPart::Place::REAR_RIGHT);
-		});
-		const char *const which = rear ? "rear" : "seat";
 		const bool fourth = has([](const SoundPart &part) { return part.kind == SoundPart::Kind::UNWIRED; });
-		/* A cabinet that does not wire the optional board plays the main one */
-		const bool unwired = has([](const SoundPart &part) {
+		/* A cabinet that does not wire the optional board, or has no woofer,
+		 * plays the main one */
+		const bool unwired = scene.no_woofer || has([](const SoundPart &part) {
 			return part.option && part.kind == SoundPart::Kind::UNWIRED;
 		});
 		const std::string tip =
+			scene.no_woofer ? "This cabinet has no woofer: only its two speakers are heard; the woofer's channel is not "
+			                  "wired." :
 			unwired ? "This cabinet does not wire the optional board: only the main board is heard." :
-			game.woofer ? std::string("Main: without the woofer. Both: with its lows, mixed into your two speakers. "
-			                          "Quad: with the woofer") +
-			                      (fourth ? " and the fourth channel" : "") + ", on a rear pair of speakers." :
-			speakers ? std::string("Main: without the ") + which + " speakers. Both: with them, mixed into your two "
-			                   "speakers. Quad: with them, on a rear pair of speakers." :
+			game.woofer ? std::string(scene.woofer_optional ? "This cabinet's woofer is optional. " : "") +
+			                  "Main: without the woofer. Both: with its lows, mixed into your two speakers. "
+			                  "Quad: with the woofer" +
+			                  (fourth ? " and the fourth channel" : "") + ", on a rear pair of speakers." :
+			speakers ? std::string("Main: without the seat speakers. Both: with them, mixed into your two speakers. "
+			                       "Quad: with them, on a rear pair of speakers.") +
+			               (game.seat_woofer ? " The seat woofer's lows play through them." : "") :
 			           "Main: without the panel shaker's signal. Both: with it, mixed into your two speakers. Quad: "
 			           "with it, on a rear pair of speakers.";
 
 		int main_only = 0;
 		int &played = unwired && !game.locked ? main_only : game.played;
-		const char *const locked = game.locked ? "set on the command line: -o" :
-		                           unwired     ? "not wired on this cabinet" :
-		                                         nullptr;
+		const char *const locked = game.locked     ? "set on the command line: -o" :
+		                           scene.no_woofer ? "no woofer on this cabinet" :
+		                           unwired         ? "not wired on this cabinet" :
+		                                             nullptr;
 
 		kit.next_tip(tip.c_str());
 		kit.choice("Mode", nullptr, Menu::PLAYED, played, locked, false,
-		           game.later ? "Reset the game to apply" : nullptr);
-		if (game.woofer) {
+		           game.later || scene.cabinet_later ? "Reset the game to apply" : nullptr);
+		if (game.woofer && !scene.no_woofer) {
 			kit.next_tip("How loud the woofer is in your two speakers, from -60 to +12 dB.");
 			kit.slider("Woofer", only_both, game.level, -60.0f, 12.0f, 1.0f, level.c_str(), nullptr, game.played != 1);
 			kit.next_tip("Only the woofer's sounds below this frequency are mixed in, as the cabinet's woofer plays "
@@ -491,14 +507,18 @@ cabinet_sound(MenuKit &kit, SoundGame &game, const SoundScene &scene)
 			kit.choice("Woofer cutoff", only_both, CUTOFFS, game.cutoff, nullptr, game.played != 1);
 		} else if (!unwired) {
 			const std::string about =
-				(speakers ? std::string("How loud the ") + which + " speakers are" :
-				            std::string("How loud the panel shaker's signal is")) +
+				std::string(speakers ? "How loud the seat speakers are" : "How loud the panel shaker's signal is") +
 				" in your two speakers, from -60 to +12 dB" + knob_of(game.name) + ".";
 
 			kit.next_tip(about.c_str());
-			kit.slider(speakers ? (rear ? "Rear speakers" : "Seat speakers") : "Panel shaker", only_both, game.level,
-			           -60.0f, 12.0f, 1.0f,
+			kit.slider(speakers ? "Seat speakers" : "Panel shaker", only_both, game.level, -60.0f, 12.0f, 1.0f,
 			           level.c_str(), nullptr, game.played != 1);
+			if (game.seat_woofer) {
+				kit.next_tip("Only the seat woofer's sounds below this frequency play through the seat speakers, as "
+				             "the cabinet's woofer plays only its lows. No manual gives the frequency: 120 Hz is a "
+				             "guess. Off: the whole woofer channel. From the next start of the game.");
+				kit.choice("Woofer cutoff", only_both, CUTOFFS, game.cutoff, nullptr, game.played != 1);
+			}
 		}
 	}
 	if (game.start >= 0) {
@@ -1037,7 +1057,10 @@ Menu::page_link(MenuKit &kit, MenuState &state) const
 		if (locked)
 			kit.text("This cabinet", locked, cabinet >= 0 ? numbers[static_cast<size_t>(cabinet)].c_str() : "as it is");
 		else {
-			kit.next_tip("Cabinet 1 is the master: it leads the others.");
+			kit.next_tip(state.link_shown_names.size() >= 2
+			                     ? "The game calls cabinet 1 " + state.link_shown_names[0] + ", cabinet 2 " +
+			                           state.link_shown_names[1] + "..."
+			                     : std::string("Cabinet 1 is the master: it leads the others."));
 			if (kit.dropdown("This cabinet", nullptr, numbers, cabinet) && cabinet >= 0)
 				state.link_cabinet = static_cast<unsigned>(cabinet) + 1;
 		}
@@ -1087,13 +1110,18 @@ Menu::page_link(MenuKit &kit, MenuState &state) const
 		}
 		kit.end_group();
 	}
-	kit.paragraph("HOW TO LINK",
-	              "1. One computer per cabinet, all on the same wired network: Wi-Fi is too slow.\n"
-	              "2. On each one, set Link cabinets to On and give it its own number: 1, 2, 3...\n"
-	              "3. In Next cabinet, type the address of the next number; on the last one, the address of "
-	              "cabinet 1.\n"
-	              "4. Start the same game on all of them. Odin sets the master, the slaves and the seats; a game run "
-	              "for the first time restarts once by itself to take its seat.");
+	const std::string how =
+		std::string("1. One computer per cabinet, all on the same wired network: Wi-Fi is too slow.\n"
+		            "2. On each one, set Link cabinets to On and give it its own number: 1, 2, 3...\n"
+		            "3. In Next cabinet, type the address of the next number; on the last one, the address of "
+		            "cabinet 1.\n"
+		            "4. Start the same game on all of them. ") +
+		(state.link_shown_restarts ? "Odin sets the master, the slaves and the seats; a game run for the first time "
+		                             "restarts once by itself to take its seat."
+		                           : "Odin gives each cabinet its place in the game; a game run for the first time "
+		                             "takes it only at its next start: start it once more.");
+
+	kit.paragraph("HOW TO LINK", how.c_str());
 	end_settings(kit, top, room);
 }
 
@@ -1105,15 +1133,12 @@ Menu::page_paths(MenuKit &kit, MenuState &state) const
 
 	kit.begin_group("GAMES");
 	kit.next_tip("One zip, 7z or folder per game, named as in MAME.");
-	if (kit.value("Hikaru ROMs", "at the next launch", shown_path(state.roms, "not set").c_str(), change, nullptr,
+	if (kit.value("Games (ROMs)", "at the next launch", shown_path(state.roms, "not set").c_str(), change, nullptr,
 	              state.roms_given ? "set on the command line: -R" : nullptr))
 		state.choose = MenuState::Folder::ROMS;
-	kit.next_tip("One zip, 7z or folder per game, named as in MAME; not set: with the Hikaru ROMs.");
-	if (kit.value("Gaelco ROMs", "at the next launch", shown_path(state.gaelco, "the Hikaru ROMs").c_str(), change,
-	              nullptr, state.roms_given ? "set on the command line: -R" : nullptr))
-		state.choose = MenuState::Folder::GAELCO;
-	kit.next_tip("hikaru, mie and tms320c31, named as in MAME; jvs13551, 18wheelr and srally2 are optional.");
-	if (kit.value("BIOS", "at the next launch", shown_path(state.bios, "with the ROMs").c_str(), change, nullptr,
+	kit.next_tip("hikaru and mie for the Hikaru games, tms320c31 for the Gaelco 3D ones, named as in MAME; jvs13551, "
+	             "18wheelr and srally2 are optional.");
+	if (kit.value("BIOS", "at the next launch", shown_path(state.bios, "the games folder").c_str(), change, nullptr,
 	              state.bios_given ? "set on the command line: -B" : nullptr))
 		state.choose = MenuState::Folder::BIOS;
 	kit.next_tip("Files named after the game's MAME name: swracer_title.png for the library (swracer_logo.png "

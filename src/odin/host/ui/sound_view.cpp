@@ -24,7 +24,7 @@
 
 
 /* The drawing of the page Audio: one generic cabinet for every game, the
- * parts of its sound at seven places (3/4 view, silhouette). */
+ * parts of its sound at nine places (3/4 view, silhouette). */
 
 #include "odin/host/ui/sound_view.hpp"
 
@@ -99,7 +99,7 @@ blocks(bool seated)
 	return out;
 }
 
-/* The places, on the faces the player sees */
+/* The nine places, on the faces the player sees */
 Vec3
 spot(Place at, bool seated)
 {
@@ -120,12 +120,11 @@ spot(Place at, bool seated)
 		return { 28, 245, 100 };
 	case Place::SEAT:
 		return { 0, 245, 66 };
-	case Place::FRONT:
-		return { 0, 57, 130 + up };
-	case Place::REAR_LEFT:
-		return { -34, 250, 128 };
-	case Place::REAR_RIGHT:
-		return { 34, 250, 128 };
+	/* On either side of the wheel (Speed Up) */
+	case Place::DASH_LEFT:
+		return { -30, 78, 92 + up };
+	case Place::DASH_RIGHT:
+		return { 30, 78, 92 + up };
 	case Place::NONE:
 		break;
 	}

@@ -475,7 +475,7 @@ Gaelco boards
 - The chips of the ball sensors of Gaelco Football are not known: their
   signals follow what the program reads (atvtrack.cpp).
 - A real foot's kick is not known: the travel of the right stick, cubed,
-  gives the program a power of 10 to 127 (atvtrack_play.cpp).
+  gives the program a power of 10 to 127 (ball_kick.cpp).
 - The speed of the link cable is in the FPGA, not known: a word comes in
   at the first slice of the SH-4 after it arrives (atvtrack.hpp).
 - A new mode of the link's port drops the words that came in before it
@@ -516,7 +516,7 @@ PowerVR Neon 250 (PMX1)
   16 (pmx1_core.hpp); Racer's Mini Deluxe seat shaker takes the main board
   below 120 Hz (session.hpp); the coin pulse, the kick's timing and the
   ball's height of Gaelco Football, how long Odin holds the volume buttons
-  of Smashing Drive (atvtrack_play.cpp).
+  of Smashing Drive (atvtrack_play.cpp, ball_kick.cpp).
 - The TA's user clip, its modes past copythrough, and reads or copies
   outside the frame buffer are not done; odin.log says so (pmx1_ta.cpp).
 - When the host's GPU cannot sort translucent pixels, the first pass's
@@ -525,6 +525,54 @@ PowerVR Neon 250 (PMX1)
 - A triangle whose 1/W is not a number is not drawn (pmx1_scene.cpp).
 - The smaller levels of a palettised texture are taken after its palette,
   as VQ's are: the guide does not say where they are (pmx1_scene.cpp).
+
+Gaelco 3D boards
+
+- The amplifiers come out of reset at power-on, so the sound starts after
+  51 fields (0.85 s), as on Speed Up's schematic; the other boards are
+  taken as wired the same (gaelco3d.cpp).
+- D14 and D15 of 0x51002C are pulled up on Football Power as on Speed
+  Up's ROM board: no schematic of Football Power's board is known
+  (gaelco3d.cpp).
+- The analog inputs read at rest until their first conversion; Radikal
+  Bikers' converters are read as Speed Up's schematic wires them
+  (gaelco3d.cpp).
+- The link: when a board reads a byte the others have read it too; the
+  next byte of another cabinet comes once the program has seen the bus
+  free; words arrive a frame late; linked cabinets stay within a frame of
+  each other, and one silent for 2 s is given up on (gaelco3d.cpp).
+- The 3D chips, where neither the schematic nor the designer's slides
+  settle it: the place of the corner of the screen (Y 215, X -288); the
+  bits of the slopes kept; u and v rounded down to a 16th of a texel; the
+  pixels of a polygon's edges; a polygon starts at the DSP's IACK and the
+  words of one that never ends are dropped; the even lines first, and the
+  field OH/L gives; pixel pairs on even columns, the second mask lookup
+  at the right pixel's texel; u and v added to the texture's start as one
+  address; with one bank of texture ROMs, address bit 24 reads it again;
+  the texture ROMs of the games other than Speed Up laid out as MAME has
+  them (gaelco3d_video.cpp, gaelco3d_video.hpp).
+- From MAME alone: the depth rounded toward zero, a negative one always
+  passing; nothing drawn where the plane is behind the eye; CUS-COL
+  weighting four texels by their fractions and keeping 8 of the 13 bits
+  of each channel (gaelco3d_video.cpp; above 1x, gaelco3d_draw.frag and
+  gaelco3d_show.frag).
+- One picture of both fields on a flat screen (Interlaced picture: One
+  picture): the new field, with the older one where nothing moved
+  (gaelco3d_video.cpp); above 1x, the colours the board writes into one
+  pixel of each pair a field mixed half and half with those under them
+  (gaelco3d_show.frag). The board's picture is enlarged to 640 x 480
+  smoothly (gaelco3d_play.cpp).
+- The 68EC020 takes 2 clocks an instruction and 3 a data access: what
+  each instruction costs, only a real chip can give. On Radikal Bikers'
+  and Football Power's code, the total falls between the manual's best
+  case and its cache case (m68020.cpp).
+- Football Power's balls: the softest kick its PIC takes, the levels a
+  kick holds the sensors at, the lift of the ball (gaelco3d_play.cpp); the
+  kick on the right stick, as for Gaelco Football (ball_kick.cpp).
+- A coin's pulse lasts 6 frames (gaelco3d_play.cpp).
+- Speed Up's wheel force follows the voltage of its motor (a motor at
+  stall); the strength of its gamepad's shakes and which of its two
+  motors each goes to (gaelco3d_play.cpp).
 
 Host and user interface
 

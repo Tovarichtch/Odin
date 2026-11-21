@@ -63,6 +63,7 @@ public:
 	void set_scale(unsigned scale) override;
 	bool draws_native() const override { return m_card.geometry_shaders(); }
 	bool sorts_per_pixel() const override { return m_card.geometry_shaders(); }
+	unsigned largest_texture() const override { return m_card.limits().maxImageDimension2D; }
 
 	void begin_scene(const odin_display_list_t &list, const SceneDebug &debug) override;
 	void clear_depth() override;
@@ -109,6 +110,7 @@ public:
 	void compose(const Compose &compose, unsigned shown, const bool layers[2]) override;
 	void present(PictureRect rect, unsigned window_w, unsigned window_h) override;
 	void draw_pmx(const PmxScene &scene, unsigned anisotropy) override;
+	void draw_gaelco3d(const Gaelco3dScene &scene) override;
 	void prepare_pmx(const std::vector<uint64_t> &keys,
 	                 const std::function<void(unsigned, unsigned)> &progress) override;
 	void list_pmx_in(const std::string &path) override;
@@ -127,6 +129,9 @@ public:
 private:
 	struct Pmx;
 	std::shared_ptr<Pmx> m_pmx;
+	/* The pipelines and images of the Gaelco 3D boards (gaelco3d_vk.cpp) */
+	struct Gaelco3d;
+	std::shared_ptr<Gaelco3d> m_gaelco3d;
 	/* Descriptor sets of one layout, each kept until it is freed, from
 	 * pools made as they fill */
 	struct KeptSets {

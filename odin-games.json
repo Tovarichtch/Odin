@@ -862,6 +862,7 @@
 			],
 			"woofer" : true,
 			"wheel_motor" : true,
+			"learns_range" : true,
 			"link" : { "cabinets" : 2, "seat" : { "in" : "nand", "byte" : "0017", "first" : 1 } },
 			"motion_platform" : true,
 			"cabinets" : [
@@ -1058,6 +1059,7 @@
 			],
 			"woofer" : true,
 			"wheel_motor" : true,
+			"learns_range" : true,
 			"link" : { "cabinets" : 2, "seat" : { "in" : "flash", "byte" : "01E1", "first" : 1 } },
 			"controls" : [
 				{ "name" : "STEERING WHEEL", "id" : "wheel", "analog" : 0, "low" : "left", "span" : [ 2, 254 ], "role" : "steer" },
@@ -1184,21 +1186,32 @@
 			"name" : "radikalb",
 			"title" : "Radikal Bikers",
 			"mach" : "gaelco3d",
-			"seated" : true,
-			"link" : { "cabinets" : 2, "seat" : { "in" : "eeprom", "byte" : "01F8", "first" : 1 } },
+			"sound_parts" : [
+				{ "part" : "speaker", "at" : "front_left", "channel" : 3 },
+				{ "part" : "speaker", "at" : "front_right", "channel" : 2 },
+				{ "part" : "woofer", "at" : "base", "channel" : 1, "cabinet" : "standard" },
+				{ "part" : "unwired", "channel" : 0 }
+			],
+			"woofer" : true,
+			"link" : { "cabinets" : 2, "names" : [ "MASTER", "SLAVE" ], "off" : "NO LINKED", "seat" : { "in" : "eeprom", "byte" : "01F8", "first" : 1 } },
 			"controls" : [
-				{ "name" : "HANDLEBAR", "id" : "handlebar", "analog" : 0, "low" : "left", "span" : [ 16, 240 ], "role" : "steer" },
-				{ "name" : "ACCELERATOR", "id" : "accelerator", "switch" : "1P PUSH1", "port" : "0.6", "role" : "button1", "keys" : [ "Up" ], "pad" : [ "righttrigger" ] },
-				{ "name" : "BRAKE", "id" : "brake", "switch" : "1P PUSH2", "port" : "0.5", "role" : "button2", "keys" : [ "Down" ], "pad" : [ "lefttrigger" ] },
-				{ "name" : "VIEW", "id" : "view", "switch" : "1P PUSH3", "port" : "0.4", "role" : "button3" },
-				{ "name" : "HANDLE UP", "id" : "handle_up", "switch" : "1P UP", "port" : "0.3", "role" : "up" },
+				{ "name" : "HANDLE", "id" : "handlebar", "analog" : 0, "low" : "left", "span" : [ 16, 240 ], "role" : "steer" },
+				{ "name" : "ACCELERATOR", "id" : "accelerator", "switch" : "1P PUSH1", "port" : "0.6", "role" : "button1", "keys" : [ "Up" ], "pad" : [ "righttrigger" ], "wheel" : "gas" },
+				{ "name" : "BRAKE", "id" : "brake", "switch" : "1P PUSH2", "port" : "0.5", "role" : "button2", "keys" : [ "Down" ], "pad" : [ "lefttrigger" ], "wheel" : "brake" },
+				{ "name" : "VIEW CHANGE", "id" : "view", "switch" : "1P PUSH3", "port" : "0.4", "role" : "button3" },
+				{ "name" : "HANDLE UP", "id" : "handle_up", "switch" : "1P UP", "port" : "0.3", "role" : "up", "keys" : [ "Left Ctrl" ], "pad" : [ "a" ] },
 				{ "name" : "START", "id" : "start", "switch" : "1P START", "port" : "0.7", "role" : "start" },
 				{ "name" : "VOLUME UP", "id" : "volume_up", "switch" : "1P PUSH5", "port" : "0.0", "role" : "button5", "keys" : [ "=" ], "pad" : [ "dpup" ] },
 				{ "name" : "VOLUME DOWN", "id" : "volume_down", "switch" : "1P PUSH6", "port" : "0.1", "role" : "button6", "keys" : [ "-" ], "pad" : [ "dpdown" ] }
 			],
 			"outputs" : [
-				{ "name" : "START LAMP", "id" : "start_lamp", "output" : 3, "role" : "lamp" },
-				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" }
+				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" },
+				{ "name" : "BLOCK", "id" : "coin_block", "output" : 2, "role" : "coin_lock" },
+				{ "name" : "START LAMP", "id" : "start_lamp", "output" : 3, "role" : "lamp" }
+			],
+			"cabinets" : [
+				{ "id" : "atari", "name" : "Atari", "woofer" : false,
+				  "outputs" : [ { "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" } ] }
 			],
 			"sections" : [
 				{
@@ -1315,8 +1328,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -1325,6 +1338,7 @@
 			"name" : "radikalba",
 			"title" : "Radikal Bikers (Atari license)",
 			"parent" : "radikalb",
+			"cabinet" : "atari",
 			"mach" : "gaelco3d",
 			"sections" : [
 				{
@@ -1441,42 +1455,17 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
 		},
 		{
 			"name" : "footbpow",
-			"title" : "Football Power (version 4.6)",
+			"title" : "Football Power (version 4.6, prototype)",
+			"parent" : "footbpow14",
 			"mach" : "footbpow",
-			"controls" : [
-				{ "name" : "1P UP", "id" : "1p_up", "switch" : "1P UP", "port" : "0.0", "role" : "up", "pad" : [ "dpup", "-lefty" ] },
-				{ "name" : "1P DOWN", "id" : "1p_down", "switch" : "1P DOWN", "port" : "0.1", "role" : "down", "pad" : [ "dpdown", "+lefty" ] },
-				{ "name" : "1P RIGHT", "id" : "1p_right", "switch" : "1P RIGHT", "port" : "0.2", "role" : "right", "pad" : [ "dpright", "+leftx" ] },
-				{ "name" : "1P LEFT", "id" : "1p_left", "switch" : "1P LEFT", "port" : "0.3", "role" : "left", "pad" : [ "dpleft", "-leftx" ] },
-				{ "name" : "1P DRIBBLING", "id" : "1p_button1", "switch" : "1P PUSH1", "port" : "0.4", "role" : "button1" },
-				{ "name" : "1P DEFENSE", "id" : "1p_button2", "switch" : "1P PUSH2", "port" : "0.5", "role" : "button2" },
-				{ "name" : "1P START", "id" : "1p_start", "switch" : "1P START", "port" : "0.7", "role" : "start" },
-				{ "name" : "1P KICK SIDE", "id" : "1p_kick_x", "analog" : 1, "low" : "left", "ball" : "side", "role" : "stick2_x" },
-				{ "name" : "1P KICK FORWARD", "id" : "1p_kick_y", "analog" : 0, "low" : "up", "ball" : "forward", "role" : "stick2_y" },
-				{ "name" : "VOLUME DOWN", "id" : "volume_down", "switch" : "1P PUSH6", "port" : "0.6", "role" : "button6", "keys" : [ "-" ] },
-				{ "name" : "2P UP", "id" : "2p_up", "switch" : "2P UP", "port" : "1.0", "role" : "up", "player" : 2, "pad" : [ "dpup", "-lefty" ] },
-				{ "name" : "2P DOWN", "id" : "2p_down", "switch" : "2P DOWN", "port" : "1.1", "role" : "down", "player" : 2, "pad" : [ "dpdown", "+lefty" ] },
-				{ "name" : "2P RIGHT", "id" : "2p_right", "switch" : "2P RIGHT", "port" : "1.2", "role" : "right", "player" : 2, "pad" : [ "dpright", "+leftx" ] },
-				{ "name" : "2P LEFT", "id" : "2p_left", "switch" : "2P LEFT", "port" : "1.3", "role" : "left", "player" : 2, "pad" : [ "dpleft", "-leftx" ] },
-				{ "name" : "2P DRIBBLING", "id" : "2p_button1", "switch" : "2P PUSH1", "port" : "1.4", "role" : "button1", "player" : 2 },
-				{ "name" : "2P DEFENSE", "id" : "2p_button2", "switch" : "2P PUSH2", "port" : "1.5", "role" : "button2", "player" : 2 },
-				{ "name" : "2P START", "id" : "2p_start", "switch" : "2P START", "port" : "1.7", "role" : "start", "player" : 2 },
-				{ "name" : "2P KICK SIDE", "id" : "2p_kick_x", "analog" : 3, "low" : "left", "ball" : "side", "role" : "stick2_x", "player" : 2 },
-				{ "name" : "2P KICK FORWARD", "id" : "2p_kick_y", "analog" : 2, "low" : "up", "ball" : "forward", "role" : "stick2_y", "player" : 2 },
-				{ "name" : "VOLUME UP", "id" : "volume_up", "switch" : "1P PUSH5", "port" : "1.6", "role" : "button5", "keys" : [ "=" ] }
-			],
-			"outputs" : [
-				{ "name" : "START LAMP", "id" : "start_lamp", "output" : 3, "role" : "lamp" },
-				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" }
-			],
 			"sections" : [
 				{
 					"name" : "program0",
@@ -1564,8 +1553,15 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
+					]
+				},
+				{
+					"name" : "pic",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_621_pic16c710.u1", "size" : 16384, "crc" : "4e5d0dc5" }
 					]
 				}
 			]
@@ -1573,8 +1569,42 @@
 		{
 			"name" : "footbpow14",
 			"title" : "Football Power (version 1.4)",
-			"parent" : "footbpow",
+			"cloneof" : "footbpow",
 			"mach" : "footbpow",
+			"sound_parts" : [
+				{ "part" : "speaker", "at" : "front_left", "channel" : 3 },
+				{ "part" : "speaker", "at" : "front_right", "channel" : 2 },
+				{ "part" : "woofer", "at" : "base", "channel" : 1 },
+				{ "part" : "unwired", "channel" : 0 }
+			],
+			"woofer" : true,
+			"controls" : [
+				{ "name" : "1P UP", "id" : "1p_up", "switch" : "1P UP", "port" : "0.0", "role" : "up", "pad" : [ "dpup", "-lefty" ] },
+				{ "name" : "1P DOWN", "id" : "1p_down", "switch" : "1P DOWN", "port" : "0.1", "role" : "down", "pad" : [ "dpdown", "+lefty" ] },
+				{ "name" : "1P LEFT", "id" : "1p_left", "switch" : "1P LEFT", "port" : "0.3", "role" : "left", "pad" : [ "dpleft", "-leftx" ] },
+				{ "name" : "1P RIGHT", "id" : "1p_right", "switch" : "1P RIGHT", "port" : "0.2", "role" : "right", "pad" : [ "dpright", "+leftx" ] },
+				{ "name" : "1P DRIBBLING", "id" : "1p_button1", "switch" : "1P PUSH1", "port" : "0.4", "role" : "button1" },
+				{ "name" : "1P DEFENSE", "id" : "1p_button2", "switch" : "1P PUSH2", "port" : "0.5", "role" : "button2" },
+				{ "name" : "1P KICK SIDE", "id" : "1p_kick_x", "analog" : 1, "low" : "left", "ball" : "side", "role" : "stick2_x" },
+				{ "name" : "1P KICK FORWARD", "id" : "1p_kick_y", "analog" : 0, "low" : "up", "ball" : "forward", "role" : "stick2_y" },
+				{ "name" : "1P START", "id" : "1p_start", "switch" : "1P START", "port" : "0.7", "role" : "start" },
+				{ "name" : "2P UP", "id" : "2p_up", "switch" : "2P UP", "port" : "1.0", "role" : "up", "player" : 2, "pad" : [ "dpup", "-lefty" ] },
+				{ "name" : "2P DOWN", "id" : "2p_down", "switch" : "2P DOWN", "port" : "1.1", "role" : "down", "player" : 2, "pad" : [ "dpdown", "+lefty" ] },
+				{ "name" : "2P LEFT", "id" : "2p_left", "switch" : "2P LEFT", "port" : "1.3", "role" : "left", "player" : 2, "pad" : [ "dpleft", "-leftx" ] },
+				{ "name" : "2P RIGHT", "id" : "2p_right", "switch" : "2P RIGHT", "port" : "1.2", "role" : "right", "player" : 2, "pad" : [ "dpright", "+leftx" ] },
+				{ "name" : "2P DRIBBLING", "id" : "2p_button1", "switch" : "2P PUSH1", "port" : "1.4", "role" : "button1", "player" : 2 },
+				{ "name" : "2P DEFENSE", "id" : "2p_button2", "switch" : "2P PUSH2", "port" : "1.5", "role" : "button2", "player" : 2 },
+				{ "name" : "2P KICK SIDE", "id" : "2p_kick_x", "analog" : 3, "low" : "left", "ball" : "side", "role" : "stick2_x", "player" : 2 },
+				{ "name" : "2P KICK FORWARD", "id" : "2p_kick_y", "analog" : 2, "low" : "up", "ball" : "forward", "role" : "stick2_y", "player" : 2 },
+				{ "name" : "2P START", "id" : "2p_start", "switch" : "2P START", "port" : "1.7", "role" : "start", "player" : 2 },
+				{ "name" : "VOLUME UP", "id" : "volume_up", "switch" : "1P PUSH5", "port" : "1.6", "role" : "button5", "keys" : [ "=" ] },
+				{ "name" : "VOLUME DOWN", "id" : "volume_down", "switch" : "1P PUSH6", "port" : "0.6", "role" : "button6", "keys" : [ "-" ] }
+			],
+			"outputs" : [
+				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" },
+				{ "name" : "1P START LAMP", "id" : "1p_start_lamp", "output" : 3, "role" : "lamp" },
+				{ "name" : "2P START LAMP", "id" : "2p_start_lamp", "output" : 4, "role" : "lamp", "player" : 2 }
+			],
 			"sections" : [
 				{
 					"name" : "program0",
@@ -1662,8 +1692,15 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
+					]
+				},
+				{
+					"name" : "pic",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_621_pic16c710.u1", "size" : 16384, "crc" : "4e5d0dc5", "set" : "footbpow" }
 					]
 				}
 			]
@@ -1671,7 +1708,8 @@
 		{
 			"name" : "footbpow12",
 			"title" : "Football Power (version 1.2)",
-			"parent" : "footbpow",
+			"parent" : "footbpow14",
+			"cloneof" : "footbpow",
 			"mach" : "footbpow",
 			"sections" : [
 				{
@@ -1760,8 +1798,15 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
+					]
+				},
+				{
+					"name" : "pic",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_621_pic16c710.u1", "size" : 16384, "crc" : "4e5d0dc5", "set" : "footbpow" }
 					]
 				}
 			]
@@ -1769,7 +1814,8 @@
 		{
 			"name" : "footbpow11",
 			"title" : "Football Power (version 1.1)",
-			"parent" : "footbpow",
+			"parent" : "footbpow14",
+			"cloneof" : "footbpow",
 			"mach" : "footbpow",
 			"sections" : [
 				{
@@ -1858,8 +1904,15 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
+					]
+				},
+				{
+					"name" : "pic",
+					"type" : "alternative",
+					"data" : [
+						{ "name" : "fop_621_pic16c710.u1", "size" : 16384, "crc" : "4e5d0dc5", "set" : "footbpow" }
 					]
 				}
 			]
@@ -1870,21 +1923,23 @@
 			"mach" : "speedup",
 			"seated" : true,
 			"wheel_motor" : true,
+			"learns_range" : true,
 			"option_speakers" : true,
 			"sound_parts" : [
-				{ "part" : "speaker", "at" : "front", "board" : "main" },
-				{ "part" : "speaker", "at" : "seat", "board" : "main" },
-				{ "part" : "speaker", "at" : "rear_left", "board" : "option" },
-				{ "part" : "speaker", "at" : "rear_right", "board" : "option" }
+				{ "part" : "speaker", "at" : "dash_left", "board" : "main" },
+				{ "part" : "speaker", "at" : "dash_right", "board" : "main" },
+				{ "part" : "speaker", "at" : "seat_left", "board" : "option" },
+				{ "part" : "speaker", "at" : "seat_right", "board" : "option" },
+				{ "part" : "woofer", "at" : "seat", "board" : "option" }
 			],
-			"link" : { "cabinets" : 4, "seat" : { "in" : "eeprom", "byte" : "009F", "shift" : 6, "bits" : 2, "first" : 0 } },
+			"link" : { "cabinets" : 4, "names" : [ "1UP", "2UP", "3UP", "4UP" ], "off" : "1UP (it has no setting without link)", "seat" : { "in" : "eeprom", "byte" : "009F", "shift" : 6, "bits" : 2, "first" : 0 } },
 			"controls" : [
 				{ "name" : "STEERING WHEEL", "id" : "wheel", "analog" : 0, "low" : "left", "span" : [ 48, 208 ], "role" : "steer" },
 				{ "name" : "ACCELERATOR", "id" : "gas_pedal", "analog" : 1, "low" : "released", "span" : [ 0, 255 ], "role" : "accel" },
 				{ "name" : "BRAKE", "id" : "brake_pedal", "switch" : "1P PUSH1", "port" : "0.5", "role" : "button1", "keys" : [ "Down" ], "pad" : [ "lefttrigger" ], "wheel" : "brake" },
 				{ "name" : "GEAR", "id" : "gear", "positions" : [
-					{ "name" : "LOW", "switches" : [] },
-					{ "name" : "HIGH", "switches" : [ "1P PUSH2" ] } ],
+					{ "name" : "1", "switches" : [] },
+					{ "name" : "2", "switches" : [ "1P PUSH2" ] } ],
 					"port" : "0.6", "role" : "gear" },
 				{ "name" : "VIEW", "id" : "view", "switch" : "1P PUSH3", "port" : "0.4", "role" : "button3" },
 				{ "name" : "START", "id" : "start", "switch" : "1P START", "port" : "0.7", "role" : "start" },
@@ -1892,8 +1947,10 @@
 				{ "name" : "VOLUME DOWN", "id" : "volume_down", "switch" : "1P PUSH6", "port" : "0.1", "role" : "button6", "keys" : [ "-" ], "pad" : [ "dpdown" ] }
 			],
 			"outputs" : [
+				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" },
+				{ "name" : "BLOCK", "id" : "coin_block", "output" : 2, "role" : "coin_lock" },
 				{ "name" : "START LAMP", "id" : "start_lamp", "output" : 3, "role" : "lamp" },
-				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" }
+				{ "name" : "FIRST LAMP", "id" : "first_lamp", "output" : 4, "role" : "lamp" }
 			],
 			"sections" : [
 				{
@@ -1966,8 +2023,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2048,8 +2105,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2130,8 +2187,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2212,8 +2269,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2294,8 +2351,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2376,8 +2433,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2386,16 +2443,28 @@
 			"name" : "surfplnt",
 			"title" : "Surf Planet (version 4.1)",
 			"mach" : "surfplnt",
-			"link" : { "cabinets" : 2, "seat" : { "in" : "eeprom", "byte" : "01D2", "first" : 1 } },
+			"sound_parts" : [
+				{ "part" : "speaker", "at" : "front_left", "channel" : 3 },
+				{ "part" : "speaker", "at" : "front_right", "channel" : 2 },
+				{ "part" : "woofer", "at" : "base", "channel" : 1 },
+				{ "part" : "unwired", "channel" : 0 }
+			],
+			"woofer" : true,
+			"link" : { "cabinets" : 2, "names" : [ "1UP", "2UP" ], "off" : "Link mode: Off", "seat" : { "in" : "eeprom", "byte" : "01D2", "first" : 1 } },
 			"controls" : [
-				{ "name" : "SURFBOARD", "id" : "board", "analog" : 0, "low" : "left", "span" : [ 0, 255 ], "role" : "steer" },
+				{ "name" : "JOYSTICK", "id" : "joystick", "analog" : 0, "low" : "left", "span" : [ 0, 255 ], "role" : "steer" },
 				{ "name" : "START", "id" : "start", "switch" : "1P START", "port" : "0.7", "role" : "start" },
 				{ "name" : "VOLUME UP", "id" : "volume_up", "switch" : "1P PUSH5", "port" : "0.0", "role" : "button5", "keys" : [ "=" ], "pad" : [ "dpup" ] },
 				{ "name" : "VOLUME DOWN", "id" : "volume_down", "switch" : "1P PUSH6", "port" : "0.1", "role" : "button6", "keys" : [ "-" ], "pad" : [ "dpdown" ] }
 			],
 			"outputs" : [
-				{ "name" : "START LAMP", "id" : "start_lamp", "output" : 3, "role" : "lamp" },
-				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" }
+				{ "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" },
+				{ "name" : "BLOCK", "id" : "coin_block", "output" : 2, "role" : "coin_lock" },
+				{ "name" : "START LAMP", "id" : "start_lamp", "output" : 3, "role" : "lamp" }
+			],
+			"cabinets" : [
+				{ "id" : "atari", "name" : "Atari kit", "woofer" : "optional",
+				  "outputs" : [ { "name" : "COIN COUNTER", "id" : "coin_counter", "output" : 1, "role" : "counter" } ] }
 			],
 			"sections" : [
 				{
@@ -2472,8 +2541,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2558,8 +2627,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2644,8 +2713,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2730,8 +2799,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2816,8 +2885,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2902,8 +2971,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]
@@ -2988,8 +3057,8 @@
 					"name" : "boot",
 					"type" : "alternative",
 					"data" : [
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" },
-						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" }
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms320c31" },
+						{ "name" : "c31boot.bin", "size" : 16384, "crc" : "bddc2763", "set" : "tms32031" }
 					]
 				}
 			]

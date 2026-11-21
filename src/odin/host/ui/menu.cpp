@@ -53,7 +53,8 @@ PICTURE(upscale_1) PICTURE(upscale_2) PICTURE(upscale_3) PICTURE(upscale_4) PICT
 PICTURE(filter_1) PICTURE(filter_2) PICTURE(filter_4) PICTURE(filter_8) PICTURE(filter_16) PICTURE(screen)
 PICTURE(whole) PICTURE(torn) PICTURE(mode_cabinet) PICTURE(mode_raw) PICTURE(mode_snap) PICTURE(mode_native)
 PICTURE(crt_none) PICTURE(crt_sega_monitor_29) PICTURE(crt_sega_projector_50) PICTURE(crt_gaelco_monitor_28)
-PICTURE(crt_gaelco_monitor_34)
+PICTURE(crt_gaelco_monitor_34) PICTURE(fields_board) PICTURE(fields_one)
+PICTURE(edges_board) PICTURE(edges_fine) PICTURE(edges_wide)
 #undef PICTURE
 /* The font of the menu (menu_fonts.S) */
 extern "C" const unsigned char odin_font_cozette[], odin_font_cozette_end[];
@@ -81,6 +82,9 @@ const std::pair<const unsigned char *, const unsigned char *> PICTURE_FILES[] = 
 	{ odin_picture_crt_sega_projector_50, odin_picture_crt_sega_projector_50_end },
 	{ odin_picture_crt_gaelco_monitor_28, odin_picture_crt_gaelco_monitor_28_end },
 	{ odin_picture_crt_gaelco_monitor_34, odin_picture_crt_gaelco_monitor_34_end },
+	{ odin_picture_fields_board, odin_picture_fields_board_end }, { odin_picture_fields_one, odin_picture_fields_one_end },
+	{ odin_picture_edges_board, odin_picture_edges_board_end }, { odin_picture_edges_fine, odin_picture_edges_fine_end },
+	{ odin_picture_edges_wide, odin_picture_edges_wide_end },
 };
 
 /* The hints of the mouse Dear ImGui sets for itself (imgui_impl_sdl3.cpp):
@@ -641,8 +645,11 @@ Menu::page_display(MenuKit &kit, MenuState &state) const
 	kit.begin_group("3D QUALITY");
 	int scale = static_cast<int>(state.scale) - 1;
 
-	std::snprintf(about, sizeof(about), "The 3D is drawn at %u × %u%s.", 640 * state.scale, 480 * state.scale,
-	              state.scale == 1 ? ", as on the cabinet" : "");
+	std::snprintf(about, sizeof(about), "The 3D is drawn at %u × %u%s.%s", 640 * state.scale, 480 * state.scale,
+	              state.scale == 1 ? ", as on the cabinet" : "",
+	              !state.own_picture ? ""
+	              : state.scale == 1 ? " A Gaelco 3D board shows its own exact 576 × 432 picture."
+	                                 : " The graphics card redraws a Gaelco 3D board's scenes, close to the board.");
 	kit.next_tip(about);
 	watch(PREVIEW_UPSCALE, [&] {
 		if (kit.choice("Internal resolution", nullptr, SCALES, scale,
@@ -658,9 +665,16 @@ Menu::page_display(MenuKit &kit, MenuState &state) const
 		"Flat pieces cover the same pixels as on the cabinet, with finer textures: no seams, and edges look as on "
 		"the cabinet.",
 	};
+	/* A Gaelco 3D board: its corners are already whole pixels, and its
+	 * flat pieces are drawn as at 1× (gaelco3d_draw.frag) */
+	static constexpr const char *OWN_MODES_TIP[] = {
+		"The HUD and text are upscaled like the 3D.",
+		"Same as Raw: this board's corners are already whole pixels.",
+		"Flat pieces (HUD, text) are drawn on the board's pixels, as at 1×.",
+	};
 	int upscale_mode = static_cast<int>(std::min(state.upscale_mode, 2u));
 
-	kit.next_tip(UPSCALE_MODES_TIP[upscale_mode]);
+	kit.next_tip(state.own_picture ? OWN_MODES_TIP[upscale_mode] : UPSCALE_MODES_TIP[upscale_mode]);
 	watch(PREVIEW_MODE, [&] {
 		if (kit.choice("Upscaling mode", state.scale == 1 ? "no effect at 1×" : nullptr, UPSCALE_MODES_SHOWN,
 		               upscale_mode))
@@ -671,9 +685,35 @@ Menu::page_display(MenuKit &kit, MenuState &state) const
 
 	kit.next_tip("Sharpens distant textures, such as roads and floors (NASCAR, Virtual-On). The cabinet has none.");
 	watch(PREVIEW_FILTER, [&] {
-		if (kit.choice("Anisotropic filtering", nullptr, FILTERS, filter,
+		if (kit.choice("Anisotropic filtering", state.own_picture ? "no effect on this game" : nullptr, FILTERS, filter,
 		               state.anisotropy_given ? "set on the command line: -a" : nullptr))
 			state.anisotropy = ANISOTROPY[filter];
+	});
+
+	/* The two rows of the Gaelco 3D games, over another game */
+	const bool other_game = !state.library && !state.own_picture;
+
+	kit.next_tip(state.gaelco3d_board_fields
+		             ? "Speed Up, Surf Planet, Radikal Bikers, Football Power: both fields as the board keeps them, "
+		               "about 17 ms apart. On a flat screen, what moves is seen twice."
+		             : "Speed Up, Surf Planet, Radikal Bikers, Football Power: the new field, with the older one "
+		               "where nothing moved, as the eye saw it on the cabinet's tube. Experimental.");
+	watch(PREVIEW_FIELDS, [&] {
+		kit.choice("Interlaced picture (Gaelco 3D)", other_game ? "no effect on this game" : nullptr, FIELDS_SHOWN,
+		           state.gaelco3d_board_fields);
+	});
+
+	kit.next_tip(state.gaelco3d_wide_edges
+		             ? "Speed Up, Surf Planet, Radikal Bikers, Football Power, above 1×: each polygon is half a "
+		               "board pixel wider on every side, as the board draws it at 1×. Fewer seams, but a thin rim of "
+		               "the texture beside a piece may show."
+		             : "Speed Up, Surf Planet, Radikal Bikers, Football Power, above 1×: each polygon fills its own "
+		               "outline, by the board's rule on the finer grid. Where two pieces do not quite meet, a thin "
+		               "seam may show.");
+	watch(PREVIEW_EDGES, [&] {
+		const char *const note = other_game ? "no effect on this game" : state.scale == 1 ? "no effect at 1×" : nullptr;
+
+		kit.choice("Polygon edges (Gaelco 3D)", note, EDGES_SHOWN, state.gaelco3d_wide_edges);
 	});
 	kit.end_group();
 
@@ -764,7 +804,8 @@ Menu::page_display(MenuKit &kit, MenuState &state) const
 	}
 	kit.next_tip("Imitates a screen (Lola Retro filters): the cabinets' screens from their manuals, Sega's monitor for "
 	             "Planet Harriers and NASCAR and projector for the other Hikaru games, Gaelco's 28-inch monitor for "
-	             "Smashing Drive and Gaelco Football and 34-inch for ATV Track. "
+	             "Smashing Drive and Gaelco Football and 34-inch for ATV Track (none yet for the 15 kHz screens of "
+	             "the Gaelco 3D games). "
 	             "Demanding on the graphics card.");
 	watch(PREVIEW_CRT, [&] {
 		if (kit.dropdown("CRT screen", nullptr, screens, screen) && screen >= 0 &&
@@ -950,6 +991,17 @@ Menu::preview(const MenuKit &kit, const MenuState &state, int which, ImVec2 a, I
 		     "no close-up of this filter");
 		break;
 	}
+	case PREVIEW_FIELDS:
+		pair("INTERLACED PICTURE", FIELDS, state.gaelco3d_board_fields ? FIELDS : FIELDS + 1, "BOTH FIELDS · THE BOARD",
+		     state.gaelco3d_board_fields ? "BOTH FIELDS" : "ONE PICTURE",
+		     "Captured in Odin: Football Power, two players running. The board sends a new field about every 17 ms; "
+		     "the cabinet's tube showed them one after the other.");
+		break;
+	case PREVIEW_EDGES:
+		pair("POLYGON EDGES", EDGES, state.gaelco3d_wide_edges ? EDGES + 2 : EDGES + 1, "1× · THE BOARD",
+		     state.gaelco3d_wide_edges ? "WIDE" : "FINE",
+		     "Captured in Odin: Radikal Bikers, the seam between two pieces of the road, at 1× and at 4×.");
+		break;
 	case PREVIEW_VSYNC: {
 		static constexpr const char *NAMES[] = { "OFF", "ON", "ADAPTIVE" };
 

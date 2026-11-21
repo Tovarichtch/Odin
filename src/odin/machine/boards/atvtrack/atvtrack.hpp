@@ -44,6 +44,7 @@
 #include "odin/machine/cabinet/netbd_ring.hpp"
 #include "odin/machine/chips/pmx1/pmx1.hpp"
 #include "odin/machine/chips/pmx1/pmx1_core.hpp"
+#include "odin/machine/core/learned_ranges.hpp"
 #include "odin/machine/cpu/sh4/sh4.hpp"
 
 namespace odin {
@@ -172,6 +173,13 @@ public:
 
 	/* The motor DAC's four channels, 0 to 255 (motor_pins) */
 	const std::array<uint8_t, 4> &motors() const { return m_motors; }
+
+	/* The ranges the program has learned for its analog channels since
+	 * power-on (ATV Track, Smashing Drive; none before it has set them, or
+	 * for another program), and widening them to cover `kept`
+	 * (learned_ranges.hpp) */
+	std::optional<LearnedRanges> learned_ranges() const;
+	void widen_ranges(const LearnedRanges &kept);
 
 	/* ATV Track's motion platform (Game::motion_platform): its two sides
 	 * move as the motor DAC drives them, and the board reads where they

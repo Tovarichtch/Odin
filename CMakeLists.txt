@@ -194,13 +194,13 @@ endif()
 
 set(ODIN_SOURCES
 	host/app/main.cpp host/app/cpu_check.cpp host/app/options.cpp host/app/atvtrack_play.cpp
-	host/app/gaelco3d_play.cpp host/app/ball_kick.cpp
+	host/app/gaelco3d_play.cpp host/app/gaelco_play.cpp host/app/ball_kick.cpp
 	machine/boards/atvtrack/atvtrack.cpp machine/boards/atvtrack/atvtrack_state.cpp machine/boards/atvtrack/atvtrack_fpga.cpp
 	machine/chips/pmx1/pmx1.cpp machine/chips/pmx1/pmx1_core.cpp machine/chips/pmx1/pmx1_scene.cpp
 	machine/chips/pmx1/pmx1_host.cpp machine/chips/pmx1/pmx1_ta.cpp
-	machine/boards/gaelco3d/gaelco3d.cpp machine/boards/gaelco3d/gaelco3d_render.cpp machine/boards/gaelco3d/gaelco3d_scene.cpp
+	machine/boards/gaelco3d/gaelco3d.cpp machine/boards/gaelco3d/gaelco3d_video.cpp
 	machine/cpu/m68020/m68020.cpp machine/cpu/tms32031/tms32031.cpp machine/cpu/tms32031/tms32031_ops.cpp
-	machine/cpu/adsp2115/adsp2115.cpp
+	machine/cpu/adsp2115/adsp2115.cpp machine/cpu/pic16c71x/pic16c71x.cpp
 	host/ui/menu_session.cpp host/ui/menu_session_input.cpp
 	host/ui/menu_session_state.cpp host/app/session.cpp
 	host/app/library.cpp host/video/display.cpp
@@ -209,10 +209,12 @@ set(ODIN_SOURCES
 	host/gfx/vk_common.cpp host/renderer/hikaru/vk/drawing_vk.cpp
 	host/renderer/hikaru/vk/pictures_vk.cpp
 	host/renderer/hikaru/vk/pmx_vk.cpp
+	host/renderer/hikaru/vk/gaelco3d_vk.cpp
 	host/renderer/hikaru/vk/scene_vk.cpp
 	host/renderer/hikaru/vk/translucent_vk.cpp
 	host/renderer/hikaru/gl/drawing_gl.cpp
 	host/renderer/hikaru/gl/pmx_gl.cpp
+	host/renderer/hikaru/gl/gaelco3d_gl.cpp
 	host/renderer/hikaru/gl/pictures_gl.cpp
 	host/renderer/hikaru/gl/programs_gl.cpp
 	host/renderer/hikaru/gl/scene_gl.cpp
@@ -323,6 +325,7 @@ file(MAKE_DIRECTORY ${SPIRV_DIR}/glsl)
 set(SPIRV)
 foreach(shader whole_picture.vert blend.frag compose.vert compose.frag present.frag
 		mesh.vert mesh.geom mesh.frag sort.frag image.vert image.frag pmx.vert pmx.geom pmx.frag pmx_sort.frag
+		gaelco3d_draw.vert gaelco3d_draw.frag gaelco3d_show.frag
 		whole_window.vert
 		blur.frag show.frag average.frag sides.frag)
 	string(REGEX REPLACE ".*\\." "" stage ${shader})

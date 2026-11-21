@@ -59,11 +59,11 @@ namespace {
 std::optional<Game>
 load_or_tell(const Options &options, const std::string &name, const GameList &games, const Settings &settings)
 {
-	RomFiles files(options.roms_of(games.machine(name)), options.bios_path);
+	RomFiles files(options.rom_path, options.bios_path);
 	std::optional<Game> loaded = games.load_game(files, name);
 
 	if (loaded) {
-		const std::string cabinet = cabinet_of(settings, name);
+		const std::string cabinet = cabinet_of(settings, name, loaded->first_cabinet);
 
 		if (!loaded->use_cabinet(cabinet))
 			std::fprintf(stderr, "ERROR: settings: [players.%s]: not right: cabinet = %s\n", name.c_str(),
@@ -123,17 +123,12 @@ play(const Options &given, const std::string &name, const GameList &games, Setti
 		std::fprintf(stderr, "ERROR: failed to load '%s': can't load game files\n", name.c_str());
 		return Ended::FAILED;
 	}
-	if (game->machine == "atvtrack" || game->machine == "smashdrv") {
-		const Ended ended = play_atvtrack(options, *game, games, settings, settings_file, display, keys, pointers,
-		                                  opened);
+	/* Gaelco's boards: PowerVR (ATV Track, Smashing Drive) or 3D */
+	const bool powervr = game->machine == "atvtrack" || game->machine == "smashdrv";
 
-		repeats::end();
-		return ended;
-	}
-	if (game->machine == "gaelco3d" || game->machine == "footbpow" || game->machine == "speedup" ||
-	    game->machine == "surfplnt") {
-		const Ended ended = play_gaelco3d(options, *game, games, settings, settings_file, display, keys, pointers,
-		                                  opened);
+	if (powervr || gaelco3d_machine(game->machine)) {
+		const auto play_gaelco = powervr ? play_atvtrack : play_gaelco3d;
+		const Ended ended = play_gaelco(options, *game, games, settings, settings_file, display, keys, pointers, opened);
 
 		repeats::end();
 		return ended;
@@ -349,7 +344,7 @@ main(int argc, char **argv)
 
 		odin::Options launch = options;
 		if (!opened.folder.empty())
-			launch.rom_path = launch.gaelco_path = opened.folder;
+			launch.rom_path = opened.folder;
 		opened = {};
 
 		odin::Ended ended =

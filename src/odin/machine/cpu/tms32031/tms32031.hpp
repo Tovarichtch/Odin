@@ -1,3 +1,5 @@
+// license:BSD-3-Clause
+// copyright-holders:Aaron Giles
 /*
  *  ██████╗ ██████╗ ██╗███╗   ██╗
  * ██╔═══██╗██╔══██╗██║████╗  ██║
@@ -56,12 +58,14 @@ public:
 /* From MAME's tms320c3x (BSD-3-Clause, Aaron Giles) */
 class Tms32031 {
 public:
-
 	Tms32031(Tms32031Bus &bus, std::span<const uint8_t> boot);
 
 	void set_reset(bool held);
 
 	void set_int(unsigned line, bool asserted);
+	/* Words read directly from `base` up, without the bus: a ROM, whose
+	 * writes still go to the bus */
+	void set_rom(uint32_t base, std::span<const uint32_t> words) { m_rom_base = base; m_rom = words; }
 
 	uint32_t run(uint32_t cycles);
 
@@ -75,7 +79,6 @@ public:
 	static uint32_t from_float(float value);
 
 private:
-
 	struct Reg {
 		uint32_t man = 0;
 		int32_t exp = 0;
@@ -159,16 +162,13 @@ private:
 
 	void load_int(unsigned dreg, uint32_t value);
 	void absi(unsigned dreg, uint32_t src);
-	void addc(unsigned dreg, uint32_t a, uint32_t b);
-	void addi(unsigned dreg, uint32_t a, uint32_t b);
-	void subb(unsigned dreg, uint32_t a, uint32_t b);
-	void subi(unsigned dreg, uint32_t a, uint32_t b);
-	void logic(unsigned dreg, uint32_t result);
+	/* `carry`, `borrow`: ST's C for ADDC, SUBB, SUBRB and NEGB, else 0 */
+	void addi(unsigned dreg, uint32_t a, uint32_t b, uint32_t carry = 0);
+	void subi(unsigned dreg, uint32_t a, uint32_t b, uint32_t borrow = 0);
+	void negi(unsigned dreg, uint32_t src, uint32_t borrow = 0);
 	void ash(unsigned dreg, uint32_t src, uint32_t count);
 	void lsh(unsigned dreg, uint32_t src, uint32_t count);
 	void mpyi(unsigned dreg, uint32_t a, uint32_t b);
-	void negb(unsigned dreg, uint32_t src);
-	void negi(unsigned dreg, uint32_t src);
 	void cmpi(uint32_t a, uint32_t b);
 
 	void op_two(uint32_t op);
@@ -181,6 +181,8 @@ private:
 	Tms32031Bus &m_bus;
 	std::array<uint32_t, 4096> m_boot{};
 	std::array<uint32_t, 2048> m_ram{};
+	uint32_t m_rom_base = 0;
+	std::span<const uint32_t> m_rom;
 	std::array<Reg, REGS> m_r{};
 	uint32_t m_bkmask = 0;
 	uint32_t m_pc = 0;

@@ -1,3 +1,5 @@
+// license:BSD-3-Clause
+// copyright-holders:Aaron Giles, Couriersud
 /*
  *  ██████╗ ██████╗ ██╗███╗   ██╗
  * ██╔═══██╗██╔══██╗██║████╗  ██║
@@ -27,20 +29,25 @@
 #define ODIN_GAELCO3D_HPP
 
 #include <array>
-#include <deque>
+#include <atomic>
 #include <cstdint>
+#include <deque>
 #include <memory>
+#include <mutex>
+#include <optional>
+#include <set>
 #include <span>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
+#include <thread>
 #include <utility>
 #include <vector>
 
-#include "odin/machine/chips/pmx1/pmx1_scene.hpp"
+#include "odin/machine/boards/gaelco3d/gaelco3d_video.hpp"
+#include "odin/machine/core/learned_ranges.hpp"
 #include "odin/machine/cpu/adsp2115/adsp2115.hpp"
 #include "odin/machine/cpu/m68000/m68000.hpp"
 #include "odin/machine/cpu/m68020/m68020.hpp"
+#include "odin/machine/cpu/pic16c71x/pic16c71x.hpp"
 #include "odin/machine/cpu/tms32031/tms32031.hpp"
 
 namespace odin {
@@ -56,7 +63,7 @@ public:
 		uint32_t shift, accum;
 		uint16_t address;
 		uint8_t state, command, bits, cs, clk, di, locked;
-		uint8_t pad[1];
+		uint8_t pad[3];
 
 		bool operator==(const State &) const = default;
 	};
@@ -85,6 +92,8 @@ public:
 		std::vector<uint8_t> texture;
 		std::vector<uint8_t> texmask;
 		std::vector<uint8_t> boot;
+		/* Football Power: the program of each ball's PIC16C710 */
+		std::vector<uint8_t> pic;
 		bool kick_sensors = false;
 		/* Speed Up and Surf Planet: a 68000 at 15 MHz and the TMS320C31
 		 * at 60 MHz */
@@ -94,9 +103,20 @@ public:
 		bool surf_planet = false;
 	};
 
-	static constexpr unsigned WIDTH = 576, HEIGHT = 432;
+	static constexpr unsigned WIDTH = Gaelco3dVideo::WIDTH, HEIGHT = Gaelco3dVideo::HEIGHT;
 
 	static constexpr uint32_t SOUND_RATE = 16'000'000 / (2 * 6 * 16 * 4);
+
+	/* One frame of the board is one field on its screen. A line is 720 dots
+	 * at 11.25 MHz, 64 us: 45 MHz divided by 4 (Speed Up's schematic,
+	 * sheet 4; the same 45 MHz on Football Power's board), the line length
+	 * in the board designer's slides. A field is 260.5 lines, 521 half
+	 * lines of 1/31250 s, 59.98 a second: MEASURED, the attract sequences
+	 * run at 59.98 fields a second in three videos of real boards of both
+	 * kinds, and 521 is the only whole number of half lines that gives that
+	 * rate. No document states it */
+	static constexpr uint64_t HALF_LINES_PER_SECOND = 31'250, HALF_LINES_PER_FIELD = 521;
+	uint64_t frame_nanoseconds() const { return HALF_LINES_PER_FIELD * 1'000'000'000 / HALF_LINES_PER_SECOND; }
 
 	explicit Gaelco3d(Roms roms);
 	~Gaelco3d();
@@ -107,23 +127,51 @@ public:
 
 	void set_switches(const std::array<uint16_t, 4> &switches) { m_switches = switches; }
 	void set_analog(const std::array<uint8_t, 4> &analog) { m_analog = analog; }
-	/* Football Power: the middle, left and right sensors under each ball */
+	/* Football Power: the accelerometers under each ball, as its PIC's
+	 * converter reads them: AN0 (ADXL150), AN1 (ADXL250 Y), AN2 (ADXL250 X) */
 	using BallSensors = std::array<std::array<uint8_t, 3>, 2>;
 	static constexpr std::array<uint8_t, 3> BALL_AT_REST = { 0x80, 0x80, 0x80 };
-	void set_ball_sensors(const BallSensors &sensors) { m_ball = sensors; }
+	void set_ball_sensors(const BallSensors &sensors);
 
-	const std::vector<uint32_t> &picture() const { return m_picture; }
-
-	void set_gpu(bool on);
-	PmxScene take_scene() { return std::exchange(m_ready, PmxScene{}); }
+	/* RGBA bytes, WIDTH x HEIGHT, top line first */
+	const std::vector<uint32_t> &picture() const { return m_video.picture(); }
+	/* One picture per field, or both fields as the board keeps them
+	 * (Gaelco3dVideo::set_one_picture) */
+	void set_one_picture(bool on) { m_video.set_one_picture(on); }
+	/* Above the board's resolution: the host GPU draws each field
+	 * (Gaelco3dVideo::set_gpu, take_scene) */
+	void set_gpu(bool on, bool native, bool wide) { m_video.set_gpu(on, native, wide); }
+	Gaelco3dScene take_scene() { return m_video.take_scene(); }
+	/* The ranges the program has learned for its analog channels since
+	 * power-on (Speed Up; none for the other games, or before it has
+	 * cleared them), and widening them to cover `kept`
+	 * (learned_ranges.hpp) */
+	std::optional<LearnedRanges> learned_ranges() const;
+	void widen_ranges(const LearnedRanges &kept);
 
 	const std::vector<int16_t> &sound() const { return m_sound; }
-	/* Speed Up's rear speakers; its front and seat ones are sound() */
-	const std::vector<int16_t> &rear_sound() const { return m_rear_sound; }
+	/* The second pair: Speed Up's seat speakers; on the other games, the
+	 * woofer channel and the fourth channel (AudioOut::woofer_pairs) */
+	const std::vector<int16_t> &option_sound() const { return m_option_sound; }
+	/* Speed Up's woofer, one sample a frame */
+	const std::vector<int16_t> &woofer_sound() const { return m_woofer_sound; }
 
 	uint8_t outputs() const { return m_outlatch; }
 	/* Speed Up's wheel motor, -128 to 127, positive to the left */
 	int16_t motor() const { return m_motor; }
+	/* Of that command, as the program made it: the part the wheel's
+	 * position gives (its spring), whether the spring was on, and the hit
+	 * played (cars +-1 to +-3, a wall +-4; 0: none); none where its
+	 * routines are not found */
+	struct MotorParts {
+		int spring = 0;
+		bool spring_on = false;
+		int hit = 0;
+	};
+	std::optional<MotorParts> motor_parts() const
+	{
+		return m_spring_at ? std::optional<MotorParts>(m_motor_parts) : std::nullopt;
+	}
 	unsigned frame() const { return m_frame; }
 
 	/* False when the EEPROM keeps no settings yet */
@@ -156,6 +204,7 @@ private:
 		uint8_t read8(uint32_t addr, unsigned) override { return board.m_main_bus.read8(addr & 0xFFFFFF); }
 		void write16(uint32_t addr, uint16_t value, unsigned) override { board.m_main_bus.write16(addr & 0xFFFFFF, value); }
 		void write8(uint32_t addr, uint8_t value, unsigned) override { board.m_main_bus.write8(addr & 0xFFFFFF, value); }
+		bool waiting(uint32_t pc) override;
 		Gaelco3d &board;
 	};
 	struct Dsp : Tms32031Bus {
@@ -175,42 +224,41 @@ private:
 		Gaelco3d &board;
 	};
 
-	struct Vertex {
-		float x, y;
-	};
-	struct Poly {
-		uint32_t tex, color;
-		float ooz_dx, ooz_dy, ooz_base, uoz_dx, uoz_dy, uoz_base, voz_dx, voz_dy, voz_base, z0;
-	};
-	enum class Span : uint8_t { FLAT, NORMAL, BLEND };
-
 	uint32_t io_read(uint32_t addr, unsigned size);
 	void io_write(uint32_t addr, uint32_t value, unsigned size);
-	void palette_write(uint32_t index, uint16_t value);
 	void main_latch(unsigned bit, bool on);
 	void out_latch(unsigned bit, bool on);
-	void kick_clock(bool on);
-	void render_write(uint32_t data);
-	void render_poly(const uint32_t *data);
-	void triangle(const Poly &poly, Span span, const Vertex &a, const Vertex &b, const Vertex &c);
-	void scan(const Poly &poly, Span span, int y, int x0, int x1);
-	uint32_t texel(const Poly &poly, int u, int v) const;
-	void scene_poly(const Poly &poly, Span span, const Vertex *vert, unsigned count, unsigned depth = 0);
-	uint32_t image_of(uint32_t &base, unsigned &w, unsigned &h);
-	void end_scene();
-	void forget_images();
+	/* Runs the balls' PICs up to the main CPU's time */
+	void balls_to_main();
 	void autobuffer();
 	void run_adsp_to(uint64_t to);
+	/* The ADSP runs on its own thread, up to the same moments in the same
+	 * order (it takes its interrupts where each run starts). Only its
+	 * status byte, its latch and its samples reach the rest of the board:
+	 * anything that reads or writes them waits for it first */
+	void adsp_to(uint64_t to);
+	void adsp_send();
+	void adsp_settle();
+	void adsp_loop();
 	void start_autobuffer();
 	void stop_autobuffer();
-	void expand_textures(const std::vector<uint8_t> &texture, const std::vector<uint8_t> &texmask);
-	void make_picture();
 	void tell_once(const char *what, uint32_t addr, uint32_t value);
+	void set_ipl();
+	uint64_t main_cycles() const { return m_main16 ? m_main16->cycles() : m_main->cycles(); }
+	void main_run(uint32_t cycles);
+	void end_main_run();
 	uint8_t ram8(uint32_t addr) const
 	{
 		return static_cast<uint8_t>(m_ram[(addr & 0xFFFF) >> 2] >> (8 * (3 - (addr & 3))));
 	}
 	uint16_t ram16(uint32_t addr) const { return static_cast<uint16_t>(ram8(addr) << 8 | ram8(addr + 1)); }
+	void set_ram8(uint32_t addr, uint8_t value)
+	{
+		uint32_t &word = m_ram[(addr & 0xFFFF) >> 2];
+		const unsigned shift = 8 * (3 - (addr & 3));
+
+		word = (word & ~(uint32_t{ 0xFF } << shift)) | uint32_t{ value } << shift;
+	}
 
 	Main m_main_bus;
 	Main16 m_main16_bus;
@@ -220,44 +268,33 @@ private:
 	std::unique_ptr<M68000> m_main16;
 	std::unique_ptr<Tms32031> m_tms;
 	std::unique_ptr<Adsp2115> m_adsp;
+	uint64_t m_main_clock = 0, m_tms_cycles = 0;
 	Roms m_roms;
+	std::vector<uint32_t> m_tms_rom;
 	std::string m_name;
+	Gaelco3dVideo m_video;
 
 	std::array<uint32_t, 0x4000> m_ram{};
 	std::array<uint32_t, 0x4000> m_palette_ram{};
-	std::vector<uint32_t> m_palette;
-	std::vector<uint8_t> m_texture, m_texmask;
-	std::vector<uint16_t> m_screen, m_zbuffer;
-	std::vector<uint32_t> m_polydata;
-	uint32_t m_polydata_count = 0;
-	std::vector<uint32_t> m_picture;
-
-	struct ImageKey {
-		uint32_t base, size;
-		bool operator==(const ImageKey &) const = default;
-	};
-	struct ImageKeyHash {
-		size_t operator()(const ImageKey &k) const { return std::hash<uint64_t>()(uint64_t{ k.base } << 32 | k.size); }
-	};
-	struct Image {
-		uint32_t id;
-		unsigned used;
-	};
-	bool m_gpu = false;
-	PmxScene m_scene, m_ready, m_carry;
-	float m_most_w = 0.0f;
-	std::unordered_map<ImageKey, Image, ImageKeyHash> m_images;
-	std::unordered_map<ImageKey, ImageKey, ImageKeyHash> m_aliases;
-	std::vector<uint32_t> m_gone;
-	uint32_t m_next_image = 1;
-	bool m_palette_changed = true;
 
 	Eeprom93c66 m_eeprom;
 	uint8_t m_mainlatch = 0, m_outlatch = 0;
 	int16_t m_motor = 0;
+	/* Speed Up's learned ranges: the addresses of their records and of the
+	 * word its boot code sets once it has cleared them (0: none) */
+	uint32_t m_ranges_records = 0, m_ranges_marker = 0;
+	/* Where Speed Up's program keeps the wheel's position, its gain, whether
+	 * the spring is on and the hit played (0: not found), and the parts of
+	 * the last command */
+	uint32_t m_spring_at = 0, m_gain_at = 0, m_spring_on_at = 0, m_hit_at = 0;
+	MotorParts m_motor_parts;
 	bool m_tms_reset = true;
-	bool m_trap1_rte = false;
 	uint32_t m_wait_counter = 0;
+	/* The 68000's frame wait: its option or ready cell, its frame cell */
+	struct Wait16 {
+		bool routine = false;
+		uint32_t flag = 0, cell = 0;
+	} m_wait16;
 	unsigned m_adsp_wait_at = 4;
 	bool m_vblank_irq = false;
 
@@ -267,12 +304,6 @@ private:
 	void drain_link();
 	void pace_link();
 	void link_send(uint16_t word);
-	void set_ipl();
-	uint64_t main_cycles() const { return m_main16 ? m_main16->cycles() : m_main->cycles(); }
-	void main_run(uint32_t cycles);
-	void end_main_run();
-	uint64_t m_main_clock = 0, m_tms_cycles = 0, m_serial_byte = 0;
-	uint64_t m_serial_ready_at = 0;
 	bool m_serial_ready = true, m_serial_irq = false, m_sending = false;
 	bool m_rts = false, m_other_rts = true;
 	std::array<bool, 16> m_rts_of{};
@@ -280,7 +311,10 @@ private:
 	unsigned m_cabinet = 0;
 	uint8_t m_serial_in = 0;
 	std::deque<uint16_t> m_rx;
-	uint64_t m_rx_at = 0;
+	/* The byte this board drives on the link bus, and whether the program
+	 * has seen the bus free since the last byte it read */
+	uint8_t m_out_byte = 0;
+	bool m_seen_free = true;
 	bool m_link_open = false;
 	bool m_paced = false;
 	int m_ahead = 0;
@@ -299,18 +333,32 @@ private:
 	std::array<uint16_t, 4> m_switches{};
 	std::array<uint8_t, 4> m_analog{ 0x80, 0x80, 0x80, 0x80 };
 	std::array<uint8_t, 4> m_analog_shift{};
-	std::array<uint32_t, 2> m_kick_ports{}, m_kick_length{};
-	BallSensors m_ball{ BALL_AT_REST, BALL_AT_REST };
-	uint8_t m_kick_clock = 27;
-	bool m_kick_state = false;
+	/* The TLC548s' last conversions, and the clock pulses of the read in
+	 * progress */
+	std::array<uint8_t, 4> m_adc_sample{ 0x80, 0x80, 0x80, 0x80 };
+	uint8_t m_adc_clocks = 0;
+	/* Football Power's balls A and B (bits 29 and 28 of long 0x51002C) */
+	std::array<std::unique_ptr<Pic16c71x>, 2> m_balls;
 
-	std::vector<int16_t> m_sound, m_rear_sound;
+	std::vector<int16_t> m_sound, m_option_sound, m_woofer_sound;
 
 	std::array<uint64_t, 3> m_base{};
 	uint64_t m_slices = 0;
 	unsigned m_frame = 0;
 	bool m_verbose = false;
-	std::unordered_set<uint64_t> m_told;
+	/* What tell_once has told, and at which address */
+	std::mutex m_told_mutex;
+	std::set<std::pair<std::string, uint32_t>> m_told;
+
+	/* The moments the ADSP runs up to: those given (written by the board),
+	 * those sent to its thread a few at a time, and those it has run */
+	static constexpr uint32_t ADSP_GOALS = 1024, ADSP_BATCH = 16;
+	std::array<uint64_t, ADSP_GOALS> m_adsp_goals{};
+	uint32_t m_adsp_given = 0;
+	std::atomic<uint32_t> m_adsp_sent{ 0 }, m_adsp_done{ 0 };
+	std::atomic<bool> m_adsp_resting{ false };
+	/* The last member: its thread starts once the others are built */
+	std::thread m_adsp_thread;
 };
 }
 

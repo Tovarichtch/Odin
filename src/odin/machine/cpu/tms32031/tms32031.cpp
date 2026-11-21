@@ -1,3 +1,5 @@
+// license:BSD-3-Clause
+// copyright-holders:Aaron Giles
 /*
  *  ██████╗ ██████╗ ██╗███╗   ██╗
  * ██╔═══██╗██╔══██╗██║████╗  ██║
@@ -26,8 +28,6 @@
 #include "odin/machine/cpu/tms32031/tms32031.hpp"
 
 #include <bit>
-#include <cmath>
-#include <cstring>
 
 namespace odin {
 namespace {
@@ -97,6 +97,8 @@ Tms32031::read(uint32_t addr)
 		return m_boot[addr];
 	if (addr - RAM_BASE < m_ram.size())
 		return m_ram[addr - RAM_BASE];
+	if (addr - m_rom_base < m_rom.size())
+		return m_rom[addr - m_rom_base];
 	if ((addr & 0xFFFF00) == 0x808000)
 		return addr == BUS_CONTROL ? m_bus_control : 0;
 	return m_bus.read(addr);
@@ -236,7 +238,10 @@ Tms32031::run(uint32_t cycles)
 void
 Tms32031::execute_one()
 {
-	const uint32_t op = read(m_pc);
+	/* The program, mostly from the internal RAM or the ROM */
+	const uint32_t op = m_pc - RAM_BASE < m_ram.size()  ? m_ram[m_pc - RAM_BASE]
+	                    : m_pc - m_rom_base < m_rom.size() ? m_rom[m_pc - m_rom_base]
+	                                                       : read(m_pc);
 
 	burn(1);
 	m_pc = (m_pc + 1) & 0xFFFFFF;

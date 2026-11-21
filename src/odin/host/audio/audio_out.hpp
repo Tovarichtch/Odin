@@ -188,7 +188,8 @@ public:
 
 	/* The samples of a frame of each board. The board makes its frames
 	 * a little longer than the 1/60 s they are shown for: between 30 and
-	 * 120 ms are kept ahead, a sample more or less a frame. */
+	 * 120 ms are kept ahead, a sample more or less a frame, from the
+	 * middle where the stream starts. */
 	void play(std::span<const int16_t> main, std::span<const int16_t> option);
 	/* The menu stops the sound where it is, and lets it go on */
 	void pause(bool paused);
@@ -211,6 +212,7 @@ private:
 	float m_volume = 1.0f;
 	bool m_heard = true;
 	bool m_paused = false;
+	bool m_primed = false;	/* the stream has its first samples ahead */
 };
 
 } /* namespace odin */

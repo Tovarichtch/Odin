@@ -1,3 +1,5 @@
+// license:BSD-3-Clause
+// copyright-holders:Aaron Giles
 /*
  *  ██████╗ ██████╗ ██╗███╗   ██╗
  * ██╔═══██╗██╔══██╗██║████╗  ██║
@@ -95,10 +97,9 @@ Adsp2115::reset()
 		update_l(n);
 		update_i(n);
 	}
-	m_pc = m_ppc = 0;
+	m_pc = 0;
 	m_loop = 0xFFFF;
 	m_loop_condition = 0;
-	m_astat_clear = ~(CFLAG | VFLAG | NFLAG | ZFLAG);
 	m_mstat = 0;
 	m_sstat = 0x55;
 	m_idle = 0;
@@ -426,7 +427,6 @@ Adsp2115::write_reg(unsigned group, unsigned reg, int32_t value)
 		case 0x9: m_bus.sport_tx(0, u); break;
 		case 0xB: m_bus.sport_tx(1, u); break;
 		case 0xC:
-
 			m_ifc = u;
 			if (u & 0x0002) m_irq_latch[IRQ0] = 0;
 			if (u & 0x0004) m_irq_latch[IRQ1] = 0;
@@ -838,6 +838,7 @@ Adsp2115::generate_irq(unsigned line, unsigned index)
 	if (!(m_imask & (0x20u >> index)))
 		return false;
 	m_irq_latch[line] = 0;
+	m_wait_last = m_wait_turn = 0;
 	pc_stack_push(m_pc);
 	stat_stack_push();
 	m_pc = 4 + index * 4;
@@ -852,8 +853,16 @@ Adsp2115::generate_irq(unsigned line, unsigned index)
 void
 Adsp2115::check_irqs()
 {
-	const auto level = [this](unsigned line, unsigned edge_bit) {
-		return (m_icntl & edge_bit) ? m_irq_latch[line] != 0 : m_irq_state[line] != 0;
+	/* With SPORT1 as a serial port (SYSCONTROL bit 10), the IRQ1 and IRQ0
+	 * vectors are its own interrupts, latched like all internal ones: ICNTL
+	 * only sets the pins. A transmit interrupt that comes during another
+	 * one is served after it. (ADSP-2100 Family User's Manual 3.4.2.1,
+	 * 3.4.2.4) */
+	const bool sport1 = (m_control[SYSCONTROL] & 0x400) != 0;
+	const auto level = [this, sport1](unsigned line, unsigned edge_bit) {
+		const bool latched = (m_icntl & edge_bit) || (sport1 && line != IRQ2);
+
+		return latched ? m_irq_latch[line] != 0 : m_irq_state[line] != 0;
 	};
 
 	if (level(IRQ2, 4) && generate_irq(IRQ2, 0))
@@ -906,14 +915,24 @@ Adsp2115::run(uint32_t cycles)
 		return cycles;
 	}
 	m_icount = cycles;
-	m_spin = false;
+	m_wait_last = m_wait_turn = 0;
 	while (m_icount > 0) {
-		if (m_pc == m_wait_pc && m_bus.waiting(m_pc)) {
-			m_cycles += static_cast<uint64_t>(m_icount);
-			m_icount = 0;
-			break;
+		if (m_pc == m_wait_pc) {
+			if (m_bus.waiting(m_pc)) {
+				const uint64_t turn = m_wait_last ? m_cycles - m_wait_last : 0;
+
+				if (turn && turn == m_wait_turn) {
+					const uint64_t whole = static_cast<uint64_t>(m_icount - 1) / turn * turn;
+
+					m_cycles += whole;
+					m_icount -= static_cast<decltype(m_icount)>(whole);
+				}
+				m_wait_turn = turn;
+				m_wait_last = m_cycles;
+			} else {
+				m_wait_last = m_wait_turn = 0;
+			}
 		}
-		m_ppc = m_pc;
 
 		const uint32_t op = program_read(m_pc);
 
@@ -929,7 +948,7 @@ Adsp2115::run(uint32_t cycles)
 		execute(op);
 		m_icount--;
 		m_cycles++;
-		if (m_idle || m_spin) {
+		if (m_idle) {
 			m_cycles += static_cast<uint64_t>(m_icount > 0 ? m_icount : 0);
 			m_icount = 0;
 		}
@@ -1083,11 +1102,8 @@ Adsp2115::execute(uint32_t op)
 			loop_stack_push(op & 0x3FFFF);
 			pc_stack_push(m_pc);
 		} else if (top >= 0x18 && top <= 0x1B) {
-			if (condition(cond)) {
+			if (condition(cond))
 				m_pc = bits(op, 4, 14);
-				if (m_pc == m_ppc)
-					m_spin = true;
-			}
 		} else if (top >= 0x1C && top <= 0x1F) {
 			if (condition(cond)) {
 				pc_stack_push(m_pc);
@@ -1206,14 +1222,14 @@ Adsp2115::load(const Adsp2115State &in)
 	m_cntr_stack = in.cntr_stack;
 	m_loop_stack = in.loop_stack;
 	m_stat_stack = in.stat_stack;
-	m_pc = m_ppc = in.pc;
+	m_pc = in.pc;
 	m_loop = in.loop;
 	m_loop_condition = in.loop_condition;
 	m_cntr = in.cntr;
 	m_astat = in.astat;
 	m_sstat = in.sstat;
 	m_mstat = m_mstat_prev = in.mstat;
-	m_astat_clear = (m_mstat & MSTAT_STICKYV) ? ~(CFLAG | NFLAG | ZFLAG) : ~(CFLAG | VFLAG | NFLAG | ZFLAG);
+	update_mstat();
 	m_pc_sp = in.pc_sp;
 	m_cntr_sp = in.cntr_sp;
 	m_stat_sp = in.stat_sp;

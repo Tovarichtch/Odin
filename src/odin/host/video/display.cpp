@@ -241,6 +241,7 @@ Display::Display(const Keyboard &keys, const Options &options, SDL_Window *windo
 	  m_show_speed(options.show_speed), m_vsync(options.vsync),
 	  m_wait_on_time(false), m_wait_late(false), m_waits(false),
 	  m_frame(0), m_scale(options.scale), m_anisotropy(options.anisotropy), m_upscale_mode(options.upscale_mode),
+	  m_board_fields(options.board_fields), m_wide_edges(options.wide_edges),
 	  m_filter(find_filter(options.filter)), m_logged(false),
 	  m_picture{ 0, Renderer::WIDTH, Renderer::HEIGHT },
 	  m_late(env_flag("ODIN_LATE_DRAW")), m_held(false), m_late_draw(0),
@@ -335,6 +336,7 @@ Display::attach_scenes(const std::string &game, const std::string &title)
 		m_own_built = 1;
 		m_own_native = m_own->draws_native();
 		m_own_sorts = m_own->sorts_per_pixel();
+		m_own_largest = m_own->largest_texture();
 		m_graphics->set_waits(false);
 		m_waits = false;
 	});
@@ -357,6 +359,19 @@ Display::set_scene(PmxScene scene)
 {
 	finish();
 	m_own_scene = std::move(scene);
+	m_own_is_gaelco3d = false;
+	m_own_fresh = true;
+}
+
+void
+Display::set_scene(Gaelco3dScene scene)
+{
+	finish();
+	/* The palette the previous scene brought, if it was not drawn */
+	if (m_own_fresh && m_own_is_gaelco3d && scene.palette.empty())
+		scene.palette = std::move(m_own_gaelco3d.palette);
+	m_own_gaelco3d = std::move(scene);
+	m_own_is_gaelco3d = true;
 	m_own_fresh = true;
 }
 
@@ -380,7 +395,10 @@ Display::draw_own(bool late, unsigned w, unsigned h, bool bar)
 			m_own->set_scale(m_scale);
 			m_own_built = m_scale;
 		}
-		m_own->draw_pmx(m_own_scene, m_anisotropy);
+		if (m_own_is_gaelco3d)
+			m_own->draw_gaelco3d(m_own_gaelco3d);
+		else
+			m_own->draw_pmx(m_own_scene, m_anisotropy);
 		m_own_fresh = false;
 	}
 	if (m_own_blank) {
@@ -819,6 +837,7 @@ Display::end_frame(unsigned frame, bool late, BarState *bar)
 			draw_own(late, static_cast<unsigned>(w), static_cast<unsigned>(h), over);
 		});
 		show_speed();
+		print_speed();
 		return;
 	}
 	m_renderer->take_frame(frame, static_cast<unsigned>(w), static_cast<unsigned>(h), m_hole);

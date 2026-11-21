@@ -1,3 +1,5 @@
+// license:BSD-3-Clause
+// copyright-holders:Karl Stenerud
 /*
  *  ██████╗ ██████╗ ██╗███╗   ██╗
  * ██╔═══██╗██╔══██╗██║████╗  ██║
@@ -28,10 +30,17 @@
 #include "odin/machine/cpu/m68020/m68020.hpp"
 
 #include <bit>
+#include <utility>
 
 namespace odin {
 namespace {
 constexpr uint32_t ADDRESS_MASK = 0xFFFFFF;
+/* The timing: 3 clocks per data access (no wait state, M68020 user's manual
+ * p. 5-24), 2 per instruction, its words free, and the manual's best case
+ * for multiply, divide and exceptions (p. 8-30, 8-39). MEASURED: on the
+ * code Radikal Bikers and Football Power run, with their cache on, the total
+ * falls between the manual's best case and its cache case. HEURISTIC: the
+ * cost of each instruction, which only a real chip can give (p. 8-12) */
 constexpr unsigned BUS_CLOCKS = 3;
 
 enum AluOp : unsigned { ALU_OR, ALU_AND, ALU_SUB, ALU_ADD, ALU_EOR, ALU_CMP };
@@ -302,7 +311,6 @@ M68020::Ea
 M68020::ea(unsigned mode, unsigned reg, Size s)
 {
 	Ea e{ Ea::MEM, static_cast<uint8_t>(reg), 0, 0 };
-	const uint32_t step = (s == BYTE && reg == 7) ? 2 : bytes(s);
 
 	switch (mode) {
 	case 0:
@@ -316,10 +324,10 @@ M68020::ea(unsigned mode, unsigned reg, Size s)
 		break;
 	case 3:
 		e.addr = m_a[reg];
-		m_a[reg] += step;
+		m_a[reg] += an_step(s, reg);
 		break;
 	case 4:
-		m_a[reg] -= step;
+		m_a[reg] -= an_step(s, reg);
 		e.addr = m_a[reg];
 		break;
 	case 5:
@@ -589,6 +597,7 @@ M68020::interrupt(unsigned level)
 	const unsigned vector = answer < 0 ? 24 + level : static_cast<unsigned>(answer);
 
 	m_stopped = false;
+	m_wait_last = m_wait_turn = 0;
 	set_sr(static_cast<uint16_t>(((m_sr | SR_S) & ~SR_T & ~SR_I) | level << 8));
 	push16(static_cast<uint16_t>(vector * 4));
 	push32(m_pc);
@@ -611,6 +620,8 @@ M68020::run(uint32_t cycles)
 	const uint64_t start = m_cycles;
 
 	m_run_end = m_cycles + cycles;
+	/* Other chips ran since the last slice: a pass is measured again */
+	m_wait_last = m_wait_turn = 0;
 	while (m_cycles < m_run_end) {
 		const unsigned mask_level = (m_sr & SR_I) >> 8;
 
@@ -623,13 +634,30 @@ M68020::run(uint32_t cycles)
 			interrupt(m_ipl);
 			continue;
 		}
-		if (m_stopped || (m_pc == m_wait_pc && m_bus.waiting(m_pc))) {
+		if (m_stopped) {
 			m_cycles = m_run_end;
 			break;
 		}
+		if (m_pc == m_wait_pc)
+			wait_turn();
 		execute();
 	}
 	return static_cast<uint32_t>(m_cycles - start);
+}
+
+void
+M68020::wait_turn()
+{
+	if (!m_bus.waiting(m_pc)) {
+		m_wait_last = m_wait_turn = 0;
+		return;
+	}
+	const uint64_t turn = m_wait_last ? m_cycles - m_wait_last : 0;
+
+	if (turn && turn == m_wait_turn)
+		m_cycles += (m_run_end - m_cycles - 1) / turn * turn;
+	m_wait_turn = turn;
+	m_wait_last = m_cycles;
 }
 
 void
@@ -702,30 +730,10 @@ M68020::op_0000()
 	const unsigned mode = (op >> 3) & 7, reg = op & 7, high = (op >> 9) & 7;
 
 	if (op & 0x100) {
-		if (mode == 1) {
-			const uint32_t addr = m_a[reg] + sext16(fetch16());
-			const unsigned dreg = (op >> 9) & 7;
-
-			switch ((op >> 6) & 3) {
-			case 0:
-				set_d(dreg, WORD, static_cast<uint32_t>(read8(addr)) << 8 | read8(addr + 2));
-				break;
-			case 1:
-				m_d[dreg] = static_cast<uint32_t>(read8(addr)) << 24 | static_cast<uint32_t>(read8(addr + 2)) << 16 |
-				            static_cast<uint32_t>(read8(addr + 4)) << 8 | read8(addr + 6);
-				break;
-			case 2:
-				write8(addr, static_cast<uint8_t>(m_d[dreg] >> 8));
-				write8(addr + 2, static_cast<uint8_t>(m_d[dreg]));
-				break;
-			default:
-				for (unsigned i = 0; i < 4; i++)
-					write8(addr + 2 * i, static_cast<uint8_t>(m_d[dreg] >> (24 - 8 * i)));
-				break;
-			}
-			return;
-		}
-		op_bit((op >> 6) & 3, true);
+		if (mode == 1)
+			op_movep();
+		else
+			op_bit((op >> 6) & 3, true);
 		return;
 	}
 	if (high == 4) {
@@ -735,7 +743,7 @@ M68020::op_0000()
 	if (((op >> 6) & 3) == 3) {
 		if (high <= 2)
 			op_cmp2_chk2();
-		else if (high >= 5 && mode == 7 && reg == 4 && high != 5)
+		else if (high >= 6 && mode == 7 && reg == 4)
 			op_cas2();
 		else if (high >= 5)
 			op_cas();
@@ -748,6 +756,32 @@ M68020::op_0000()
 		return;
 	}
 	op_immediate();
+}
+
+void
+M68020::op_movep()
+{
+	const uint16_t op = m_ir;
+	const uint32_t addr = m_a[op & 7] + sext16(fetch16());
+	const unsigned dreg = (op >> 9) & 7;
+
+	switch ((op >> 6) & 3) {
+	case 0:
+		set_d(dreg, WORD, static_cast<uint32_t>(read8(addr)) << 8 | read8(addr + 2));
+		break;
+	case 1:
+		m_d[dreg] = static_cast<uint32_t>(read8(addr)) << 24 | static_cast<uint32_t>(read8(addr + 2)) << 16 |
+		            static_cast<uint32_t>(read8(addr + 4)) << 8 | read8(addr + 6);
+		break;
+	case 2:
+		write8(addr, static_cast<uint8_t>(m_d[dreg] >> 8));
+		write8(addr + 2, static_cast<uint8_t>(m_d[dreg]));
+		break;
+	default:
+		for (unsigned i = 0; i < 4; i++)
+			write8(addr + 2 * i, static_cast<uint8_t>(m_d[dreg] >> (24 - 8 * i)));
+		break;
+	}
 }
 
 void
@@ -1090,7 +1124,7 @@ M68020::op_0100()
 				m_a[7] += static_cast<uint32_t>(disp);
 				return;
 			}
-			if (mode == 1 || !alterable(mode, reg)) {
+			if (!alterable(mode, reg)) {
 				illegal();
 				return;
 			}
@@ -1103,10 +1137,6 @@ M68020::op_0100()
 			if (mode == 0) {
 				m_d[reg] = m_d[reg] >> 16 | m_d[reg] << 16;
 				flags_nz(LONG, m_d[reg]);
-				return;
-			}
-			if (mode == 1) {
-				illegal(4);
 				return;
 			}
 			if (!control(mode, reg)) {
@@ -1707,9 +1737,9 @@ M68020::op_abcd_sbcd(bool add)
 	const unsigned rx = op & 7, ry = (op >> 9) & 7;
 
 	if (op & 8) {
-		m_a[rx] -= rx == 7 ? 2 : 1;
+		m_a[rx] -= an_step(BYTE, rx);
 		const uint32_t src = read8(m_a[rx]);
-		m_a[ry] -= ry == 7 ? 2 : 1;
+		m_a[ry] -= an_step(BYTE, ry);
 		const uint32_t dst = read8(m_a[ry]);
 
 		write8(m_a[ry], static_cast<uint8_t>(bcd(add, dst, src)));
@@ -1738,7 +1768,7 @@ M68020::op_pack_unpk(bool pack)
 		const uint8_t r = static_cast<uint8_t>((v >> 4 & 0xF0) | (v & 0x0F));
 
 		if (op & 8) {
-			m_a[ry] -= ry == 7 ? 2 : 1;
+			m_a[ry] -= an_step(BYTE, ry);
 			write8(m_a[ry], r);
 		} else {
 			set_d(ry, BYTE, r);
@@ -1748,7 +1778,7 @@ M68020::op_pack_unpk(bool pack)
 	uint32_t v;
 
 	if (op & 8) {
-		m_a[rx] -= rx == 7 ? 2 : 1;
+		m_a[rx] -= an_step(BYTE, rx);
 		v = read8(m_a[rx]);
 	} else {
 		v = m_d[rx] & 0xFF;
@@ -1814,9 +1844,9 @@ M68020::op_addx_subx(bool add)
 	uint32_t src, dst;
 
 	if (op & 8) {
-		m_a[rx] -= (s == BYTE && rx == 7) ? 2 : bytes(s);
+		m_a[rx] -= an_step(s, rx);
 		src = read(s, m_a[rx]);
-		m_a[ry] -= (s == BYTE && ry == 7) ? 2 : bytes(s);
+		m_a[ry] -= an_step(s, ry);
 		dst = read(s, m_a[ry]);
 	} else {
 		src = m_d[rx] & mask(s);
@@ -1878,10 +1908,10 @@ M68020::op_1011()
 	if (mode == 1) {
 		const uint32_t src = read(s, m_a[reg]);
 
-		m_a[reg] += (s == BYTE && reg == 7) ? 2 : bytes(s);
+		m_a[reg] += an_step(s, reg);
 		const uint32_t dst = read(s, m_a[dreg]);
 
-		m_a[dreg] += (s == BYTE && dreg == 7) ? 2 : bytes(s);
+		m_a[dreg] += an_step(s, dreg);
 		alu(ALU_CMP, s, dst, src);
 		return;
 	}
@@ -2016,20 +2046,18 @@ shift_bits(unsigned kind, bool left, uint32_t v, uint32_t m, uint32_t top, unsig
 }
 }
 
-void
-M68020::op_shift_register()
+/* `v` shifted or rotated `count` times, the flags set: X stays as it was for
+ * ROL, ROR and a count of 0 */
+uint32_t
+M68020::shift_rotate(unsigned kind, bool left, Size s, uint32_t v, unsigned count)
 {
-	const uint16_t op = m_ir;
-	const Size s = size_bits_to((op >> 6) & 3);
-	const unsigned kind = (op >> 3) & 3, reg = op & 7;
-	const bool left = (op & 0x100) != 0;
-	const unsigned count = (op & 0x20) ? (m_d[(op >> 9) & 7] & 63) : (((op >> 9) & 7) ? ((op >> 9) & 7) : 8);
-	const ShiftResult r = shift_bits(kind, left, m_d[reg], mask(s), msb(s), count, (m_sr & SR_X) != 0);
-	uint16_t f = m_sr & static_cast<uint16_t>(~(SR_N | SR_Z | SR_V | SR_C | (count && kind != ROTATE ? SR_X : 0)));
+	const ShiftResult r = shift_bits(kind, left, v, mask(s), msb(s), count, (m_sr & SR_X) != 0);
+	const bool sets_x = count && kind != ROTATE;
+	uint16_t f = m_sr & static_cast<uint16_t>(~(SR_N | SR_Z | SR_V | SR_C | (sets_x ? SR_X : 0)));
 
 	if (r.c)
 		f |= SR_C;
-	if (count && kind != ROTATE && r.x)
+	if (sets_x && r.x)
 		f |= SR_X;
 	if (r.v)
 		f |= SR_V;
@@ -2038,7 +2066,19 @@ M68020::op_shift_register()
 	if (r.value & msb(s))
 		f |= SR_N;
 	m_sr = f;
-	set_d(reg, s, r.value);
+	return r.value;
+}
+
+void
+M68020::op_shift_register()
+{
+	const uint16_t op = m_ir;
+	const Size s = size_bits_to((op >> 6) & 3);
+	const unsigned kind = (op >> 3) & 3, reg = op & 7;
+	const bool left = (op & 0x100) != 0;
+	const unsigned count = (op & 0x20) ? (m_d[(op >> 9) & 7] & 63) : (((op >> 9) & 7) ? ((op >> 9) & 7) : 8);
+
+	set_d(reg, s, shift_rotate(kind, left, s, m_d[reg], count));
 	m_cycles += count > 8 ? 4 : 2;
 }
 
@@ -2054,21 +2094,8 @@ M68020::op_shift_memory()
 		return;
 	}
 	const Ea e = ea(mode, reg, WORD);
-	const ShiftResult r = shift_bits(kind, left, get(e, WORD), 0xFFFF, 0x8000, 1, (m_sr & SR_X) != 0);
-	uint16_t f = m_sr & static_cast<uint16_t>(~(SR_N | SR_Z | SR_V | SR_C | (kind != ROTATE ? SR_X : 0)));
 
-	if (r.c)
-		f |= SR_C;
-	if (kind != ROTATE && r.x)
-		f |= SR_X;
-	if (r.v)
-		f |= SR_V;
-	if ((r.value & 0xFFFF) == 0)
-		f |= SR_Z;
-	if (r.value & 0x8000)
-		f |= SR_N;
-	m_sr = f;
-	write16(e.addr, static_cast<uint16_t>(r.value));
+	write16(e.addr, static_cast<uint16_t>(shift_rotate(kind, left, WORD, get(e, WORD), 1)));
 }
 
 void
@@ -2078,7 +2105,7 @@ M68020::op_bitfield()
 	const unsigned kind = (op >> 8) & 7, mode = (op >> 3) & 7, reg = op & 7;
 	const bool reads = kind == 0 || kind == 1 || kind == 3 || kind == 5;
 
-	if (mode == 1 || (mode != 0 && (reads ? !control(mode, reg) : (!control(mode, reg) || !alterable(mode, reg))))) {
+	if (mode != 0 && (!control(mode, reg) || (!reads && !alterable(mode, reg)))) {
 		illegal();
 		return;
 	}
@@ -2110,7 +2137,6 @@ M68020::op_bitfield()
 		shift = 40 - static_cast<unsigned>(offset) - width;
 		field = static_cast<uint32_t>(data >> shift) & field_mask;
 	}
-	field &= field_mask;
 	uint16_t f = m_sr & static_cast<uint16_t>(~(SR_N | SR_Z | SR_V | SR_C));
 
 	if (field == 0)

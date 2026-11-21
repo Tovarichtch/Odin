@@ -134,6 +134,8 @@ MenuSession::MenuSession(const Options &options, Display &display, Keyboard &key
 	state.scale = options.display.scale;
 	state.anisotropy = options.display.anisotropy;
 	state.upscale_mode = static_cast<unsigned>(options.display.upscale_mode);
+	state.gaelco3d_board_fields = options.display.board_fields;
+	state.gaelco3d_wide_edges = options.display.wide_edges;
 	state.filter = options.display.filter;
 	state.window = options.display.window ? options.display.window : 1;
 	state.custom_w = options.display.window_w;
@@ -155,7 +157,6 @@ MenuSession::MenuSession(const Options &options, Display &display, Keyboard &key
 	state.kept = !settings_file.empty();
 	state.roms = options.rom_path;
 	state.roms_given = options.given.roms;
-	state.gaelco = options.gaelco_path;
 	state.bios = options.bios_path;
 	state.bios_given = options.given.bios;
 	state.saves = SaveFolder::root(options.saves);
@@ -216,9 +217,11 @@ MenuSession::fill_games()
 	MenuState &state = m_menu_state;
 
 	state.games.clear();
+	/* Each family under its parent's name; the running one under the title
+	 * of the version that runs */
 	for (const GameList::Entry &entry : m_games.entries())
 		if (entry.parent.empty())
-			state.games.emplace_back(entry.name, entry.title);
+			state.games.emplace_back(entry.name, m_game && entry.name == m_game->family() ? m_game->title : entry.title);
 	std::stable_sort(state.games.begin(), state.games.end(),
 	                 [](const auto &a, const auto &b) { return title_before(a.second, b.second); });
 	for (const auto &[name, title] : state.games) {
@@ -235,9 +238,14 @@ MenuSession::fill_games()
 		if (described) {
 			audio.parts = described->sound_parts;
 			audio.seated = described->seated;
-			for (const Game::Cabinet &model : described->cabinets)
+			for (const Game::Cabinet &model : described->cabinets) {
 				if (model.seated && !*model.seated)
 					audio.standing.push_back(model.id);
+				if (model.woofer && !*model.woofer)
+					audio.no_woofer.push_back(model.id);
+				if (model.woofer_optional)
+					audio.optional_woofer.push_back(model.id);
+			}
 			audio.family = described->woofer ? SoundFamily::WOOFER :
 			               described->option_speakers || described->option_vibration ? SoundFamily::TWO_BOARDS :
 			               SoundFamily::ONE;
@@ -264,6 +272,8 @@ MenuSession::fill_games()
 
 		sound.mixed = described->option_speakers || described->option_vibration || woofer;
 		sound.woofer = woofer;
+		sound.no_woofer = runs && woofer && !m_game->woofer_wired;
+		sound.seat_woofer = described->seat_woofer();
 		sound.level_name = woofer ? "Woofer" : described->option_speakers ? "Seat speakers" : "Panel shaker";
 		sound.level = sound.standard = static_cast<float>(described->option_level);
 		for (const auto &[key, value] : m_settings.section("sound." + name)) {
@@ -271,7 +281,7 @@ MenuSession::fill_games()
 				sound.played = played_of(*mode_named(value));
 			} else if (key == (woofer ? "woofer_level" : "option_level") && level_named(value)) {
 				sound.level = static_cast<float>(*level_named(value));
-			} else if (key == "woofer_cutoff" && woofer) {
+			} else if (key == "woofer_cutoff" && (woofer || sound.seat_woofer)) {
 				for (int c = 0; c < static_cast<int>(std::size(WOOFER_CUTOFFS)); c++)
 					if (value == WOOFER_CUTOFFS[c])
 						sound.cutoff = c;
@@ -774,6 +784,8 @@ MenuSession::fill_bar(BarState &bar) const
 	const MenuState &state = m_menu_state;
 
 	static_cast<BarSettings &>(bar) = state;
+	/* Of the game that runs, the pages drawn since it started or not */
+	bar.own_picture = m_game && gaelco3d_machine(m_game->machine);
 	bar.fullscreen = m_display.fullscreen();
 	bar.verbose_given = state.verbose_given;
 	bar.silent = state.silent != nullptr;
@@ -851,6 +863,7 @@ MenuSession::fill_bar_inputs(BarState &bar) const
 	bar.dead_zone = { -1, -1 };
 	bar.trigger_threshold = { -1, -1 };
 	bar.can_shake = m_game && m_game->shakes();
+	bar.learns_range = m_game && m_game->learns_range;
 	bar.undo = m_undo_until && SDL_GetTicks() < m_undo_until;
 	bar.players = 1;
 	if (!m_game)
@@ -887,6 +900,7 @@ MenuSession::fill_bar_inputs(BarState &bar) const
 		}
 	light_guns(m_game->name, controls, bar.guns, bar.gun, bar.sights);
 	bar.shake = vibration_on(m_settings, m_game->name);
+	bar.keep_calibration = keeps_calibration_of(m_settings, m_game->name);
 	bar.hide_cursor = m_controls.hides_cursor();
 }
 
@@ -931,6 +945,9 @@ MenuSession::do_bar(BarState &bar)
 	if (m_game) {
 		if (bar.can_shake && bar.shake != vibration_on(m_settings, m_game->name))
 			keep_vibration(m_game->name, bar.shake, true);
+		/* From the end of the game that runs */
+		if (bar.learns_range && bar.keep_calibration != keeps_calibration_of(m_settings, m_game->name))
+			keep_calibration(m_game->name, bar.keep_calibration);
 		if (bar.hide_cursor != m_controls.hides_cursor()) {
 			keep_hide_cursor(m_game->name, bar.hide_cursor, true, m_controls.panel().takes_mouse());
 			m_controls.follow_cursor();
@@ -1032,10 +1049,6 @@ MenuSession::take_folder()
 		state.roms = folder;
 		keep("paths", "roms", folder);
 		break;
-	case Folder::GAELCO:
-		state.gaelco = folder;
-		keep("paths", "gaelco", folder);
-		break;
 	case Folder::BIOS:
 		state.bios = folder;
 		keep("paths", "bios", folder);
@@ -1067,8 +1080,8 @@ MenuSession::take_folder()
 	return std::nullopt;
 }
 
-/* The picker opened where the folder is now; that of the Gaelco games or of
- * the BIOS, else where the games are */
+/* The picker opened where the folder is now; that of the BIOS, else where
+ * the games are */
 void
 MenuSession::ask_folder(MenuState::Folder folder)
 {
@@ -1077,7 +1090,6 @@ MenuSession::ask_folder(MenuState::Folder folder)
 
 	state.no_picker = false;
 	m_dialog.ask(m_display.window(), folder == Folder::ROMS ? state.roms :
-	             folder == Folder::GAELCO ? (state.gaelco.empty() ? state.roms : state.gaelco) :
 	             folder == Folder::BIOS ? (state.bios.empty() ? state.roms : state.bios) :
 	             folder == Folder::SAVES ? state.saves :
 	             folder == Folder::ARTWORK ? state.artwork :

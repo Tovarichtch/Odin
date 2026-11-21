@@ -126,11 +126,12 @@ struct HostState {
 /* Where a control is now, for the drawing of the cabinet: worked or not;
  * an analog one from -1 (left or up) to 1 (right or down), a pedal from 0
  * to 1, as its inputs hold it now (a key at the end of the way); a lever at
- * its position. */
+ * its position, and the ways its inputs hold now (down, up). */
 struct ControlNow {
 	bool on = false;
 	float value = 0.0f;
 	size_t position = 0;
+	bool down = false, up = false;
 };
 
 /* The control panel of a cabinet: from what the host holds, the switches
@@ -207,9 +208,6 @@ public:
 	/* A control as the host holds it now, the lever where the last update
 	 * left it; nothing changes */
 	ControlNow now(const HostState &host, size_t control) const;
-	/* The levers moved by what the host holds now, as an update moves
-	 * them: the menu shows them while the game waits */
-	void move_levers(const HostState &host);
 	/* An axis of a joystick that steers the game goes that many degrees
 	 * of a wheel from one end to the other (0: the whole way of the
 	 * wheel), never further than the wheel does */
