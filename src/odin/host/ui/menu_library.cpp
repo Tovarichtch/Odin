@@ -81,6 +81,8 @@ system_name(const std::string &system)
 		return "Gaelco 3D";
 	if (system == "gaelco")
 		return "Gaelco PowerVR";
+	if (system == "c82")
+		return "Gaelco C82";
 
 	std::string name = system;
 

@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "odin/host/app/games.hpp"
 #include "odin/host/app/kept_ranges.hpp"
@@ -39,11 +40,12 @@
 #include "odin/host/input/controls.hpp"
 #include "odin/host/input/outputs_network.hpp"
 #include "odin/machine/boards/board.hpp"
+#include "odin/machine/chips/pmx1/pmx1_scene.hpp"
 
 namespace odin {
 
 /* What the games of Gaelco's boards share on the host's side
- * (atvtrack_play.cpp, gaelco3d_play.cpp) */
+ * (atvtrack_play.cpp, gaelco3d_play.cpp, rollext_play.cpp) */
 
 class GaelcoLink;
 
@@ -53,6 +55,10 @@ uint8_t adc_value(const std::array<uint8_t, 2> &span, uint16_t channel);
 /* The board's link cable as the page Link shows it: `link`, none without
  * the cable; `failed`, its port could not be opened */
 Board::LinkStatus link_status_of(const GaelcoLink *link, bool failed);
+/* A board's own picture, `width` x `height` RGBA bytes, stretched over the
+ * whole 640 x 480 the display draws on, as it filled the cabinet's screen;
+ * the display then fits it to the window like any game's picture */
+PmxScene picture_scene(const std::vector<uint32_t> &picture, unsigned width, unsigned height);
 
 /* A game of a Gaelco board in Odin's window, with the Hikaru menu, bar and
  * controls: what it plays with around its board, then the board the caller

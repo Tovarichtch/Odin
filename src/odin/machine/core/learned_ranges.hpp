@@ -31,9 +31,9 @@
 namespace odin {
 
 /* The ranges a game learns for its analog channels, the lowest and the
- * highest reading of each, as Speed Up, ATV Track and Smashing Drive keep
- * them in RAM from power-on: their cabinets learn them again each time
- * they are switched on. Odin can keep them from one start to the next
+ * highest reading of each, as Speed Up, ATV Track, Smashing Drive and
+ * Rolling Extreme keep them in RAM from power-on: their cabinets learn
+ * them again each time they are switched on. Odin can keep them from one start to the next
  * ([players.<game>] keep_calibration, experimental). A range whose low end
  * is above its high one has learned nothing yet */
 struct LearnedRange {

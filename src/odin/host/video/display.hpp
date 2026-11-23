@@ -44,6 +44,7 @@
 #include "odin/host/video/picture.hpp"
 
 #include "odin/machine/boards/gaelco3d/gaelco3d_scene.hpp"
+#include "odin/machine/boards/rollext/d3plus_scene.hpp"
 #include "odin/machine/chips/pmx1/pmx1_scene.hpp"
 
 namespace odin {
@@ -129,6 +130,9 @@ public:
 	void set_scene(PmxScene scene);
 	/* A field of a Gaelco 3D board above the board's resolution, instead */
 	void set_scene(Gaelco3dScene scene);
+	/* A picture of Rolling Extreme's 3D chip above the board's
+	 * resolution, instead */
+	void set_scene(std::shared_ptr<const D3plusScene> scene);
 	/* The DAC of that board puts out black: the picture is black, its
 	 * scenes drawn all the same (its frame buffer keeps them) */
 	void set_blank(bool blank);
@@ -342,6 +346,7 @@ private:
 	PmxScene m_own_scene;
 	Gaelco3dScene m_own_gaelco3d;
 	bool m_own_is_gaelco3d = false;
+	std::shared_ptr<const D3plusScene> m_own_d3plus;
 	unsigned m_own_built = 1;
 	bool m_own_fresh = false;
 	bool m_own_blank = false;

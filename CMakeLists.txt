@@ -199,6 +199,11 @@ set(ODIN_SOURCES
 	machine/chips/pmx1/pmx1.cpp machine/chips/pmx1/pmx1_core.cpp machine/chips/pmx1/pmx1_scene.cpp
 	machine/chips/pmx1/pmx1_host.cpp machine/chips/pmx1/pmx1_ta.cpp
 	machine/boards/gaelco3d/gaelco3d.cpp machine/boards/gaelco3d/gaelco3d_video.cpp
+	host/app/rollext_play.cpp machine/boards/rollext/rollext.cpp machine/boards/rollext/d3plus.cpp
+	machine/cpu/tms320c82/tms320c82.cpp machine/cpu/tms320c82/c82_mp.cpp machine/cpu/tms320c82/c82_mp_ops.cpp
+	machine/cpu/tms320c82/c82_fpu.cpp machine/cpu/tms320c82/c82_tc.cpp machine/cpu/tms320c82/c82_pp.cpp
+	machine/cpu/tms320c82/c82_pp_ops.cpp machine/cpu/tms320c82/c82_pp_block.cpp machine/cpu/tms320c82/c82_pp_host.cpp machine/cpu/tms320c82/c82_pp_host_exec.cpp
+	machine/cpu/tms320c82/c82_mp_host.cpp machine/cpu/tms320c82/c82_mp_host_exec.cpp
 	machine/cpu/m68020/m68020.cpp machine/cpu/tms32031/tms32031.cpp machine/cpu/tms32031/tms32031_ops.cpp
 	machine/cpu/adsp2115/adsp2115.cpp machine/cpu/pic16c71x/pic16c71x.cpp
 	host/ui/menu_session.cpp host/ui/menu_session_input.cpp
@@ -210,11 +215,13 @@ set(ODIN_SOURCES
 	host/renderer/hikaru/vk/pictures_vk.cpp
 	host/renderer/hikaru/vk/pmx_vk.cpp
 	host/renderer/hikaru/vk/gaelco3d_vk.cpp
+	host/renderer/hikaru/vk/d3plus_vk.cpp
 	host/renderer/hikaru/vk/scene_vk.cpp
 	host/renderer/hikaru/vk/translucent_vk.cpp
 	host/renderer/hikaru/gl/drawing_gl.cpp
 	host/renderer/hikaru/gl/pmx_gl.cpp
 	host/renderer/hikaru/gl/gaelco3d_gl.cpp
+	host/renderer/hikaru/gl/d3plus_gl.cpp
 	host/renderer/hikaru/gl/pictures_gl.cpp
 	host/renderer/hikaru/gl/programs_gl.cpp
 	host/renderer/hikaru/gl/scene_gl.cpp
@@ -325,7 +332,7 @@ file(MAKE_DIRECTORY ${SPIRV_DIR}/glsl)
 set(SPIRV)
 foreach(shader whole_picture.vert blend.frag compose.vert compose.frag present.frag
 		mesh.vert mesh.geom mesh.frag sort.frag image.vert image.frag pmx.vert pmx.geom pmx.frag pmx_sort.frag
-		gaelco3d_draw.vert gaelco3d_draw.frag gaelco3d_show.frag
+		gaelco3d_draw.vert gaelco3d_draw.frag gaelco3d_show.frag d3plus_draw.vert d3plus_draw.frag
 		whole_window.vert
 		blur.frag show.frag average.frag sides.frag)
 	string(REGEX REPLACE ".*\\." "" stage ${shader})

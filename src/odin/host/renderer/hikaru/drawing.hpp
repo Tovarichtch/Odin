@@ -39,6 +39,7 @@
 #include "odin/common/repeats.hpp"
 #include "odin/machine/chips/antarctic/antarctic_list.hpp"
 #include "odin/machine/boards/gaelco3d/gaelco3d_scene.hpp"
+#include "odin/machine/boards/rollext/d3plus_scene.hpp"
 #include "odin/machine/chips/pmx1/pmx1_scene.hpp"
 #include "odin/machine/boards/hikaru/hikaru_draw.hpp"
 #include "odin/host/gfx/host_graphics.hpp"
@@ -294,6 +295,10 @@ public:
 	/* Draws a field of a Gaelco 3D board above the board's resolution
 	 * (gaelco3d_gl.cpp) as the frame's picture, at the picture scale */
 	virtual void draw_gaelco3d(const Gaelco3dScene &scene) = 0;
+	/* Draws a picture of Rolling Extreme's 3D chip above the board's
+	 * resolution (d3plus_gl.cpp) as the frame's picture, at the picture
+	 * scale */
+	virtual void draw_d3plus(const D3plusScene &scene) = 0;
 	/* Makes the programs draw_pmx draws with before its first scene, and
 	 * those of the keys of a list of the Neon 250 (read_pmx_list) the card
 	 * runs; `progress` is told how many of how many are made: none, then

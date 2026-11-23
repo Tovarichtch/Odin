@@ -276,13 +276,17 @@ struct Game {
 	 * apart (NASCAR: Deluxe): "cabinets" in the list, [{"id": ..., "name":
 	 * ..., "grounded": [...], "controls": {<id>: {fields in place of those
 	 * of that control}}, "seated": false when it is played standing,
-	 * "woofer": false when it has none}]. The cabinet of the list is
-	 * "standard". */
+	 * "woofer": false when it has none, "wheel_motor": false when it has
+	 * no motor}]. The cabinet of the list is "standard". */
 	struct Cabinet {
 		std::string id, name;
 		std::vector<GameControl> controls;
 		std::vector<JvsSwitch> grounded;
 		std::optional<bool> motion_platform, seated, woofer;
+		/* "wheel_motor": false when that cabinet has no motor where the
+		 * game's other cabinet has one (Rolling Extreme's sit-down: its
+		 * JP1 F-MOTOR is not wired, SD p. 36) */
+		std::optional<bool> wheel_motor;
 		/* "woofer": "optional" (Surf Planet's Atari kit, SP-ATK p. 4-5) */
 		bool woofer_optional = false;
 		std::optional<std::vector<GameOutput>> outputs;
@@ -299,6 +303,11 @@ struct Game {
 			uint8_t value, standard;
 		};
 		std::optional<Setting> nand_setting;
+		/* The same in the settings a Gaelco board keeps in its EEPROM:
+		 * "eeprom_setting" (Rolling Extreme's cabinet mode, byte 0x0A of
+		 * its settings at 0x400D2E30: 0 up right, 1 sit down, as its test
+		 * screen shows it, 0x400039E0) */
+		std::optional<Setting> eeprom_setting;
 	};
 	std::vector<Cabinet> cabinets;
 	/* The ADC channels of a Gaelco board its cabinet ties to the ground,
@@ -441,6 +450,13 @@ inline bool
 gaelco3d_machine(const std::string &machine)
 {
 	return machine == "gaelco3d" || machine == "footbpow" || machine == "speedup" || machine == "surfplnt";
+}
+
+/* Whether a machine is Gaelco's TMS320C82 board: Rolling Extreme */
+inline bool
+rollext_machine(const std::string &machine)
+{
+	return machine == "rollext";
 }
 
 /* The list of the games, a JSON file (odin-games.json). A game has sections

@@ -48,6 +48,7 @@ extern const char odin_glsl_compose_vert[], odin_glsl_compose_frag[];
 extern const char odin_glsl_image_vert[], odin_glsl_image_frag[];
 extern const char odin_glsl_pmx_vert[], odin_glsl_pmx_frag[], odin_glsl_pmx_geom[], odin_glsl_pmx_sort_frag[];
 extern const char odin_glsl_gaelco3d_draw_vert[], odin_glsl_gaelco3d_draw_frag[], odin_glsl_gaelco3d_show_frag[];
+extern const char odin_glsl_d3plus_draw_vert[], odin_glsl_d3plus_draw_frag[];
 extern const char odin_glsl_whole_window_vert[], odin_glsl_blur_frag[], odin_glsl_show_frag[];
 extern const char odin_glsl_average_frag[], odin_glsl_sides_frag[];
 
