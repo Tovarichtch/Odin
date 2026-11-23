@@ -87,7 +87,9 @@ apart by commas (see INPUTS below).
                                Gaelco 3D and Rolling Extreme: 1 is the
                                board's own exact picture; above 1, the
                                graphics card redraws its scenes, close
-                               to the board.
+                               to the board. Rolling Extreme keeps its
+                               own picture on a card whose textures
+                               hold fewer than 16384 rows.
  upscale_mode  raw, snap,      How flat 2D pieces (HUD, text) are drawn
                native          above scale 1. raw: fine like the rest;
                                snap: corners on the board's pixels;
@@ -206,8 +208,9 @@ apart by commas (see INPUTS below).
  variants      on, off         Also show versions of a game (airtrixo...).
                                Default on.
  systems       hikaru, gaelco, Only these systems, apart by commas
-               gaelco3d        (gaelco: the PowerVR boards of ATV Track,
-                               Gaelco Football and Smashing Drive).
+               gaelco3d, c82   (gaelco: the PowerVR boards of ATV Track,
+                               Gaelco Football and Smashing Drive; c82:
+                               the TMS320C82 board of Rolling Extreme).
                                Default: all.
 
 [paths]
@@ -338,7 +341,9 @@ versions.
                                   Atari sold), sitdown (Rolling Extreme:
                                   its seat, its pedals, no motor; Odin
                                   sets its cabinet mode to sit down, the
-                                  standard upright back to up right).
+                                  standard upright back to up right; with
+                                  no settings kept yet, from the next
+                                  start).
                                   Default standard (radikalba: atari).
  card             <name>          Virtual-On card in hand (von4).
 
@@ -357,10 +362,11 @@ versions.
                                   Default 120.
 
  Games with a woofer: atvtrack, gfootbal, smashdrv, footbpow14, radikalb,
- surfplnt and rollext (its fourth channel: the seat's speakers on the sit
- down cabinet). Rolling Extreme's four channels go through its board's own
- filters in every mode: left and right below about 8 kHz, the woofer and
- the seat below about 350 Hz and 3 dB louder, all four above about 12 Hz.
+ surfplnt and rollext (its fourth channel: the seat's speakers of the
+ sit-down cabinet, heard in quad only). Rolling Extreme's four channels
+ go through its board's own filters in every mode: left and right below
+ about 8 kHz, the woofer and the seat below about 350 Hz and 3 dB louder,
+ all four above about 12 Hz.
 
  mode             main, mix, quad  main: left and right only. mix: the
                                    woofer's lows in both. quad: left,

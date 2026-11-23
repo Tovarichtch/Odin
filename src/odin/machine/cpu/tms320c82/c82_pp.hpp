@@ -649,9 +649,9 @@ private:
 	bool m_pc_written = false;
 	/* The branch target, and which of its G (2) and L (1) bits count */
 	uint32_t m_new_pc = 0, m_new_pc_bits = 0;
-	/* Decoded instructions by address (HEURISTIC cache of the emulator,
-	 * checked against the word fetched): the lines steps() reads, then the
-	 * rest */
+	/* Decoded instructions by address (a cache of the emulator, not of
+	 * the chip, checked against the word fetched): the lines steps()
+	 * reads, then the rest */
 	struct Cached {
 		uint64_t word = 0;
 		C82PpInsn insn;

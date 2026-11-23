@@ -106,6 +106,19 @@ Gaelco games (atvtrack, gfootbal, smashdrv)
   PIC) that was never dumped: the kick is modelled (see below).
 
 
+rollext (Rolling Extreme)
+
+- Linked cabinets are not emulated: each cabinet plays alone.
+- Testers report missing shadows, vehicles that blink out and back, 3D
+  drawn over RANKING in the demo and glitched textures at times, from the
+  second demo loop on (to check).
+- The backdrop of a road's title is blue-green where the cabinet videos
+  show it blue, and the title may be more see-through on the cabinet (to
+  check).
+- The flames of the wheels were never compared with a cabinet: the known
+  videos are too small (to check).
+
+
 NOT EMULATED OR GUESSED
 -----------------------
 
@@ -561,7 +574,7 @@ Gaelco 3D boards
   (gaelco3d_video.cpp); above 1x, the colours the board writes into one
   pixel of each pair a field mixed half and half with those under them
   (gaelco3d_show.frag). The board's picture is enlarged to 640 x 480
-  smoothly (gaelco3d_play.cpp).
+  smoothly (gaelco_play.cpp).
 - The 68EC020 takes 2 clocks an instruction and 3 a data access: what
   each instruction costs, only a real chip can give. On Radikal Bikers'
   and Football Power's code, the total falls between the manual's best
@@ -574,8 +587,143 @@ Gaelco 3D boards
   stall); the strength of its gamepad's shakes and which of its two
   motors each goes to (gaelco3d_play.cpp).
 
+Gaelco C82 board (Rolling Extreme)
+
+- A frame, /EINT1 to /EINT1, is 437 lines of 3,600 periods of the 90 MHz
+  oscillator: 57.208 Hz. The rate was measured on videos of cabinets (the
+  beat of their screens against the cameras, the race's TIME); the split
+  into lines is a guess. A frequency counter on a board will settle it
+  (rollext_clocks.hpp, rollext.hpp). /EINT1 rises once a frame, at its
+  start (rollext.cpp).
+- The four DACs take a sample, and ask the next one with XPT2, every 2048
+  periods of the 90 MHz oscillator (43,945.3 Hz, found from the pitches
+  of the sounds; the FPGA's divider is not known), one period after it
+  came (rollext.hpp, rollext.cpp, rollext_play.cpp).
+- The FLEX 10K chips are configured once as many clocks came as bits
+  were sent (rollext.cpp).
+- Writes to the flash are left out: the rescue program that programs it
+  is not emulated (rollext.cpp).
+- The 16-bit ports read or written in other sizes take their bytes in
+  big-endian order; what nothing answers reads 0; the inputs no code was
+  seen to read, and the unused bits, read high (rollext.cpp).
+- The two ADCs (TLC549): their last conversion reads 0 at power-on, their
+  data reads high while /CS is high, an input is taken at the 8th falling
+  clock (rollext.cpp).
+- A register of the video side that the MP writes 0 and the link's XPT3
+  list reads: its meaning is not known, it reads 0 (rollext.cpp).
+- The link between two cabinets is not emulated: no word is ever ready
+  (rollext.cpp).
+- The 3D chip takes PP0's peripheral transfers 64 bits at a time, with no
+  wait; where the board decodes them is not known (rollext.cpp).
+- The board's 512 x 384 picture is enlarged smoothly, as the Gaelco 3D's
+  (gaelco_play.cpp).
+- The handlebar's force follows the motor's byte in a straight line: the
+  board of the motor is not in the schematic and is not known
+  (rollext.hpp, rollext_play.cpp).
+- A coin's pulse lasts 6 frames; on a gamepad, the jolts of the
+  handlebar's motor shake it, at full strength from half the motor's
+  whole byte, as Speed Up's effects against its full force
+  (rollext_play.cpp).
+
+D3PLUS-4 (the 3D chip of Rolling Extreme)
+
+- Its drawing is worked out from the game's packets and videos of
+  cabinets; what nothing proved is marked HEURISTIC (d3plus.hpp).
+- At power-up the FIFO is empty, the chip idle, both frames black and the
+  clipping rectangle the whole picture (d3plus.cpp).
+- A marker ends a picture: the chip shows it and draws the next one into
+  its other frame, cleared to black, its depth too, as on the Gaelco 3D
+  (d3plus.cpp).
+- The FIFO holds one transfer of PP0 at its largest; a transfer into the
+  full FIFO is kept, where the board would make the TC wait; a marker
+  takes no room in it (d3plus.hpp, d3plus.cpp).
+- The chip spends 1536 periods of its 90 MHz clock on a packet (about
+  17 us), whatever the size of its polygon (d3plus.hpp).
+- A packet of type 00, never seen, is drawn as a triangle like 01; the
+  clipping rectangle includes its edges; an edge crosses the line of its
+  lower end, not that of its upper end; a line's pixels go from
+  ceil(left) to ceil(right) - 1 (d3plus.cpp).
+- The depth, z = (w4 >> 7) / Q, takes Q without the lowest bit of its
+  three floats: KONKRET's name on the READY screen and a tile of the
+  backdrop, one bit apart, are level on the cabinet, which shows the name
+  whole (d3plus.cpp, d3plus_draw.frag).
+- Bit 29 of w0 skips the depth test, as the cabinet videos show for the
+  road's name after CHOOSE A ROAD; the depth is still written where the
+  packet is nearer: not written, the control screen's "up right" breaks;
+  written everywhere, the rider's board shows through the flames of its
+  wheels (d3plus.cpp, d3plus_gl.cpp, d3plus_vk.cpp).
+- Bits 23-20 of w0 are an opacity L: the point becomes
+  dst + (src - dst) * L / 16 (0: opaque), its depth not written
+  (d3plus.cpp, d3plus_draw.frag, d3plus_gl.cpp, d3plus_vk.cpp).
+- A texel is taken alone at floor(u), floor(v) from the texture's origin,
+  wrapped on the sheet: whether the chip filters is not known
+  (d3plus.cpp, d3plus_draw.frag).
+- Each 5-bit channel of a colour becomes 8 bits as c * 255 / 31, the
+  DACs' ramp not being known; bit 15 of a colour of the palette is not
+  known and is ignored (d3plus.cpp, d3plus_draw.frag).
+
+TMS320C82 (the processor of Rolling Extreme)
+
+- Its master processor (MP), two parallel processors (PP) and transfer
+  controller (TC) take turns by slices of a few cycles of their clock,
+  not cycle by cycle (tms320c82.cpp, tms320c82.hpp).
+- The MP's timing: a cycle an instruction, one more for a long immediate
+  and for an annulled branch's nop, two to take an exception; no cache,
+  scoreboard stall or wait state, a floating-point result written before
+  the next instruction, as the scoreboard makes it look (c82_mp.hpp,
+  c82_mp.cpp).
+- The PPs' timing: a cycle an instruction, one more when a local access
+  of format 1 goes to the global port (§ 6.3.2 says nothing of formats 2
+  and 3), 8 or 11 for an external store or load, the least of TI's
+  table, the board's memory timing not being known; no instruction
+  cache, no crossbar contention (c82_pp.hpp, c82_pp.cpp, c82_pp_ops.cpp).
+- The TC's timing: 64 bits a cycle on each side, source and destination
+  one after the other; no wait state, page, refresh or cache service; the
+  data move at the end of an entry (c82_tc.hpp).
+- What TI leaves undefined starts at 0 or reads 0: the on-chip RAM at
+  power-up, the registers after a reset, the reserved registers and
+  codes, CONFIG's Release, and the LRU registers, whose "known state" TI
+  does not give (tms320c82.cpp, c82_mp.cpp, c82_pp.cpp).
+- The reserved and illegal encodings TI leaves open get a guessed meaning,
+  each said where it is done: a reserved opcode of the MP is illegal, the
+  one reserved for emulation a nop (c82_mp_ops.cpp, c82_pp_ops.cpp,
+  c82_pp.cpp).
+- The MP's etrap is a trap but for MIP and MPC; bit 19 of FPST, which the
+  C82 names vm (vector fast mode), is taken as SPRU109's fm for every
+  instruction; a tiny result is seen after rounding (c82_mp_ops.cpp,
+  c82_fpu.cpp).
+- The PPs: a halting move to a15 does the store of its first delay slot
+  at the unhalt; a software reset takes 4 cycles; P of comm reads 0; the
+  reset of the instruction cache does nothing, no cache being emulated;
+  which pseudo-instruction does which push, and a reset leaves the word
+  at 0x0100#FF0 unwritten; a clash in the pipeline goes to the execute
+  stage; an unimplemented opcode also stops the instruction in the
+  execute stage (c82_pp.cpp).
+- The PPs' arithmetic where the manuals leave it open: the shift of a
+  split product, the saturation of a rounded upper halfword (the data
+  sheet's text and table disagree), ALU code 0 outside format E, the
+  flags after a saturate-clamp, the FMOD modes 2, 3, 6 and 7, the order
+  of a global and a local access (c82_pp_ops.cpp).
+- The TC: a request it cannot serve yet stays queued, said once, without
+  holding the others, and an XPT it cannot serve ends there; guided and
+  fill transfers, VRAM read transfers, block write, transparency,
+  suspension and resumption are not done (a long-form XPT waits for the
+  end of the entry in progress); an XPT's access code goes out at the
+  start of its entry; a code is synchronized at once; CONFIG T (no round
+  robin) is not looked at; a peripheral device transfer with neither
+  address at 0, which § 8.3 does not describe, is treated as not
+  emulated yet (c82_tc.cpp, c82_tc.hpp).
+- A peripheral device write with no device on the board leaves the memory
+  as it was; a narrower read of a TC register takes its bytes of the
+  word, and a store of another size to a TC register, which takes 32-bit
+  stores only, is left out (tms320c82.hpp, tms320c82.cpp).
+
 Host and user interface
 
+- The drawings of Rolling Extreme's cabinets on the page Input: the
+  handlebar's travel (20 degrees each way) and where its shaft is, and
+  the seat's tilt (12 degrees each way), are guessed, no manual gives
+  them (cabinet_view.cpp).
 - The list of the files a game lacks, on its sheet in the library,
   scrolls with the mouse alone, not with a gamepad or the keys
   (menu_library.cpp).
