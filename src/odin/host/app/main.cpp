@@ -51,6 +51,16 @@
 #include "odin/host/app/user_files.hpp"
 #include "odin/host/app/version.hpp"
 
+#if defined(__ANDROID__)
+/* SDL's activity calls SDL_main in the library */
+#include <algorithm>
+#include <functional>
+#include <SDL3/SDL_hints.h>
+#include <SDL3/SDL_main.h>
+#include <sched.h>
+#include <unistd.h>
+#endif
+
 namespace odin {
 namespace {
 
@@ -280,6 +290,50 @@ games_test_list()
 	return next;
 }
 
+#if defined(__ANDROID__)
+/* The board runs on one thread, the drawing on another: both kept off the
+ * slow cores of the phone (big.LITTLE), where Android may put them. The
+ * threads made after this one (drawing, sound) take the same cores. */
+void
+keep_to_fast_cores()
+{
+	const long count = sysconf(_SC_NPROCESSORS_CONF);
+	std::vector<long> speeds;
+
+	for (long cpu = 0; cpu < count && cpu < CPU_SETSIZE; cpu++) {
+		char path[96];
+		long khz = 0;
+
+		std::snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%ld/cpufreq/cpuinfo_max_freq", cpu);
+		if (std::FILE *const file = std::fopen(path, "r")) {
+			if (std::fscanf(file, "%ld", &khz) != 1)
+				khz = 0;
+			std::fclose(file);
+		}
+		speeds.push_back(khz);
+	}
+	std::vector<long> tiers(speeds);
+	std::sort(tiers.begin(), tiers.end(), std::greater<long>());
+	tiers.erase(std::unique(tiers.begin(), tiers.end()), tiers.end());
+	tiers.erase(std::remove(tiers.begin(), tiers.end(), 0L), tiers.end());
+	if (tiers.size() < 2)
+		return;
+	/* Two kinds of cores: the big ones; three or more: the two fastest */
+	const long least = tiers.size() >= 3 ? tiers[1] : tiers[0];
+	cpu_set_t set;
+	int kept = 0;
+
+	CPU_ZERO(&set);
+	for (size_t cpu = 0; cpu < speeds.size(); cpu++)
+		if (speeds[cpu] >= least) {
+			CPU_SET(cpu, &set);
+			kept++;
+		}
+	if (sched_setaffinity(0, sizeof(set), &set) == 0)
+		std::printf("cpu: kept to the %d cores of %ld MHz and more\n", kept, least / 1000);
+}
+#endif
+
 } /* namespace */
 } /* namespace odin */
 
@@ -289,6 +343,13 @@ main(int argc, char **argv)
 	odin::Options options;
 	odin::GameList games;
 
+#if defined(__ANDROID__)
+	/* The back key comes as a key, not as the end of the activity */
+	SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+	/* Either way up, as the phone is held (the lock of the rotation kept):
+	 * the menus and the touch pad lay themselves out for the window */
+	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight Portrait");
+#endif
 	/* With the OpenGL driver of Intel loaded, a process of Windows ends
 	 * without what its buffers still hold: it goes out here. */
 	std::atexit([] { std::fflush(nullptr); });
@@ -304,6 +365,11 @@ main(int argc, char **argv)
 	}
 	odin::start_log(options);
 	odin::print_banner();
+#if defined(__ANDROID__)
+	/* Before the drawing thread, which takes the same cores; after the
+	 * log, which tells them */
+	odin::keep_to_fast_cores();
+#endif
 	if (parsed != odin::Parsed::RUN) {
 		odin::print_help(argv[0]);
 		return parsed == odin::Parsed::HELP_ASKED ? 0 : 1;

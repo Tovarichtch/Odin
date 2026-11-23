@@ -27,7 +27,7 @@
 
 #include "odin/host/input/pointers.hpp"
 
-#if !defined(__linux__) && !defined(_WIN32)
+#if (!defined(__linux__) && !defined(_WIN32)) || defined(__ANDROID__)
 
 namespace odin {
 

@@ -48,7 +48,7 @@ inline constexpr const char *VSYNCS[] = { "off", "on", "adaptive" };
 inline constexpr DisplaySides SIDES = DisplaySides::BEZEL;
 inline constexpr const char *SIDES_NAMES[] = { "off", "blur", "image" };
 /* The graphics API by default, and the names of odin.ini */
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__ANDROID__)
 inline constexpr DisplayApi API = DisplayApi::VULKAN;
 #else
 inline constexpr DisplayApi API = DisplayApi::OPENGL;

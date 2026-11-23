@@ -44,7 +44,7 @@ namespace odin {
 namespace {
 
 /* The folder of the executable of Odin; empty when it cannot be told */
-std::string
+[[maybe_unused]] std::string
 executable_folder()
 {
 	std::error_code error;
@@ -75,6 +75,39 @@ executable_folder()
 
 } /* namespace */
 
+#if defined(__ANDROID__)
+/* Android: the folder the activity chose (shared storage, Odin/), where the
+ * roms, the artwork, the settings and the log are; the data of the APK
+ * (odin-games.json, the filters) unpacked by the activity in its own */
+std::string
+program_folder()
+{
+	return env_text("ODIN_ANDROID_FOLDER");
+}
+
+std::vector<std::string>
+program_data_folders()
+{
+	std::vector<std::string> folders;
+
+	for (const char *variable : { "ODIN_ANDROID_DATA", "ODIN_ANDROID_FOLDER" })
+		if (const std::string folder = env_text(variable); !folder.empty())
+			folders.push_back(folder);
+	return folders;
+}
+
+std::string
+user_data_dir()
+{
+	return program_folder();
+}
+
+std::string
+portable_folder()
+{
+	return program_folder();
+}
+#else
 std::string
 program_folder()
 {
@@ -130,6 +163,7 @@ portable_folder()
 			return folder;
 	return {};
 }
+#endif
 
 std::string
 odin_data_dir()

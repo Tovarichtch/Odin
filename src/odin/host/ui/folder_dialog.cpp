@@ -48,7 +48,7 @@ struct Asked {
 };
 
 /* Read by the picker until it answers */
-constexpr SDL_DialogFileFilter ARCHIVES[] = { { "MAME game archives (zip, 7z)", "zip;7z" } };
+[[maybe_unused]] constexpr SDL_DialogFileFilter ARCHIVES[] = { { "MAME game archives (zip, 7z)", "zip;7z" } };
 
 /* Where the picker opens: the folder when it is there */
 const char *
@@ -100,6 +100,36 @@ FolderDialog::start()
 	return true;
 }
 
+#if defined(__ANDROID__)
+/* Android: the pickers of the system answer with content:// addresses, not
+ * paths. Odin reads its folder of the shared storage (Odin/), all files
+ * allowed: the folder asked is the one given, else Odin/roms. */
+void
+FolderDialog::ask(SDL_Window *window, const std::string &from, int asked)
+{
+	(void)window;
+	if (!start())
+		return;
+
+	const char *const at = start_at(from);
+	const char *const odin = SDL_getenv("ODIN_ANDROID_FOLDER");
+	const std::string folder = at ? std::string(at) : std::string(odin ? odin : "") + "/roms";
+	const char *const files[2] = { folder.c_str(), nullptr };
+
+	answered(new Asked{ m_slot, asked }, files, 0);
+}
+
+void
+FolderDialog::ask_archive(SDL_Window *window, const std::string &from, int asked)
+{
+	(void)window;
+	(void)from;
+	if (!start())
+		return;
+	SDL_SetError("on Android, put the archives in the folder Odin/roms of the phone");
+	answered(new Asked{ m_slot, asked }, nullptr, 0);
+}
+#else
 void
 FolderDialog::ask(SDL_Window *window, const std::string &from, int asked)
 {
@@ -113,6 +143,7 @@ FolderDialog::ask_archive(SDL_Window *window, const std::string &from, int asked
 	if (start())
 		SDL_ShowOpenFileDialog(answered, new Asked{ m_slot, asked }, window, ARCHIVES, 1, start_at(from), false);
 }
+#endif
 
 bool
 FolderDialog::open() const
