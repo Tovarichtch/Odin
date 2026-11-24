@@ -40,8 +40,11 @@ namespace odin {
  * a TCP server on port 8000 of this computer (127.0.0.1, where MAME takes
  * every address); a client gets "mame_start = <game>", then "<id> = <0 or
  * 1>" each time an output of the list changes, and "mame_stop = 1" at the
- * end, each line ended by a carriage return. What clients send is read and
- * dropped. Odin turns it on with "[outputs] network = on" in odin.ini. */
+ * end, each line ended by a carriage return. A game with a drive board
+ * (NASCAR) also sends its command as "m3ffb = <XX>", the byte in hex, as
+ * Supermodel and Flycast do: each time it changes, and to a client that
+ * comes in. What clients send is read and dropped. Odin turns it on with
+ * "[outputs] network = on" in odin.ini. */
 class OutputsNetwork {
 public:
 	static constexpr uint16_t PORT = 8000;
@@ -50,8 +53,11 @@ public:
 	/* The reads of a client a frame, at most */
 	static constexpr int MOST_READS = 16;
 
-	/* nullptr, said on stderr, when the port cannot be opened */
-	static std::unique_ptr<OutputsNetwork> open(const std::string &game, const std::vector<GameOutput> &outputs);
+	/* nullptr, said on stderr, when the port cannot be opened.
+	 * drive_first_output: the first output of the command of the drive
+	 * board (Game::drive_first_output), 0 for none. */
+	static std::unique_ptr<OutputsNetwork> open(const std::string &game, const std::vector<GameOutput> &outputs,
+	                                            unsigned drive_first_output);
 	~OutputsNetwork();
 	OutputsNetwork(const OutputsNetwork &) = delete;
 	OutputsNetwork &operator=(const OutputsNetwork &) = delete;
@@ -67,6 +73,8 @@ public:
 	 * "now"; "was" follows. */
 	static std::string changes(const std::vector<GameOutput> &list, std::vector<bool> &was,
 	                           std::span<const uint8_t> now);
+	/* The line of a command of the drive board */
+	static std::string drive_line(uint8_t command);
 
 private:
 	struct Client {
@@ -74,7 +82,8 @@ private:
 		std::string queued;
 	};
 
-	OutputsNetwork(intptr_t listener, const std::string &game, const std::vector<GameOutput> &outputs);
+	OutputsNetwork(intptr_t listener, const std::string &game, const std::vector<GameOutput> &outputs,
+	               unsigned drive_first_output);
 	void accept_all();
 	void flush();
 
@@ -82,6 +91,9 @@ private:
 	std::string m_game;
 	std::vector<GameOutput> m_outputs;
 	std::vector<bool> m_was;
+	unsigned m_drive_first_output;
+	/* The command of the drive board last sent, -1 before the first frame */
+	int m_drive = -1;
 	std::vector<Client> m_clients;
 };
 
